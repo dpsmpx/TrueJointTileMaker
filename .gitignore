@@ -1,0 +1,11 @@
+# Сборка PascalABC.NET
+*.exe
+*.pdb
+*.mdb
+*.dll
+bin/
+obj/
+
+# Резервные копии среды
+*.bak
+*~
