@@ -36,6 +36,16 @@ var
   CfgLastFolder: string;
   ///Файл палитры 8x8, загружаемый при запуске.
   CfgPaletteFile: string;
+  ///Бесшовный предпросмотр тайла.
+  CfgShowSeamless: boolean;
+  ///Запускаться сразу в режиме карты локации.
+  CfgStartInMapMode: boolean;
+  ///Размер новой карты локации по умолчанию.
+  CfgDefaultMapWidth, CfgDefaultMapHeight: integer;
+  ///Папка с картами локаций для диалогов открытия и сохранения.
+  CfgMapsFolder: string;
+  ///Последняя открытая или сохранённая карта. Заполняется программой.
+  CfgLastMapFile: string;
 
 ///Сбрасывает все настройки к значениям по умолчанию.
 procedure ConfigSetDefaults;
@@ -61,6 +71,13 @@ begin
   CfgLastFile := '';
   CfgLastFolder := '';
   CfgPaletteFile := 'Resources/Palitra.png';
+  CfgShowSeamless := false;
+  CfgStartInMapMode := false;
+  // Размер локаций Andors-Love по умолчанию совпадает с картами игры.
+  CfgDefaultMapWidth := 48;
+  CfgDefaultMapHeight := 18;
+  CfgMapsFolder := '';
+  CfgLastMapFile := '';
 end;
 
 function RuBool(b: boolean): string;
@@ -151,7 +168,19 @@ begin
     else if key = 'lastfolder' then
       begin CfgLastFolder := val; n := n + 1 end
     else if key = 'palettefile' then
-      begin CfgPaletteFile := val; n := n + 1 end;
+      begin CfgPaletteFile := val; n := n + 1 end
+    else if key = 'showseamless' then
+      begin CfgShowSeamless := ParseBool(val, CfgShowSeamless); n := n + 1 end
+    else if key = 'startinmapmode' then
+      begin CfgStartInMapMode := ParseBool(val, CfgStartInMapMode); n := n + 1 end
+    else if key = 'defaultmapwidth' then
+      begin CfgDefaultMapWidth := ParseInt(val, CfgDefaultMapWidth, CFG_MIN_TILE, 256); n := n + 1 end
+    else if key = 'defaultmapheight' then
+      begin CfgDefaultMapHeight := ParseInt(val, CfgDefaultMapHeight, CFG_MIN_TILE, 256); n := n + 1 end
+    else if key = 'mapsfolder' then
+      begin CfgMapsFolder := val; n := n + 1 end
+    else if key = 'lastmapfile' then
+      begin CfgLastMapFile := val; n := n + 1 end;
   end;
 
   Result := n;
@@ -237,6 +266,19 @@ begin
   AddLine(lines, '# Показывать шахматку под полупрозрачными пикселями.');
   AddLine(lines, 'ShowChecker = ' + RuBool(CfgShowChecker));
   AddLine(lines, '');
+  AddLine(lines, '# Рисовать тайл повторяющимся, чтобы сразу видеть швы.');
+  AddLine(lines, 'ShowSeamless = ' + RuBool(CfgShowSeamless));
+  AddLine(lines, '');
+  AddLine(lines, '# Запускаться сразу в режиме карты локации.');
+  AddLine(lines, 'StartInMapMode = ' + RuBool(CfgStartInMapMode));
+  AddLine(lines, '');
+  AddLine(lines, '# Размер новой карты локации, 4..256.');
+  AddLine(lines, 'DefaultMapWidth = ' + IntToStr(CfgDefaultMapWidth));
+  AddLine(lines, 'DefaultMapHeight = ' + IntToStr(CfgDefaultMapHeight));
+  AddLine(lines, '');
+  AddLine(lines, '# Папка с картами локаций, например data/maps игры Andors-Love.');
+  AddLine(lines, 'MapsFolder = ' + CfgMapsFolder);
+  AddLine(lines, '');
   AddLine(lines, '# Изображение, загружаемое при запуске. Пусто — не загружать.');
   AddLine(lines, '# Размер тайла берётся из самого изображения.');
   AddLine(lines, 'StartupImage = ' + CfgStartupImage);
@@ -249,6 +291,7 @@ begin
   AddLine(lines, '');
   AddLine(lines, '# Заполняется программой.');
   AddLine(lines, 'LastFile = ' + CfgLastFile);
+  AddLine(lines, 'LastMapFile = ' + CfgLastMapFile);
   AddLine(lines, 'LastFolder = ' + CfgLastFolder);
 
   try
