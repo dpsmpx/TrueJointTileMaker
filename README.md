@@ -103,7 +103,7 @@ GNU General Public License версии 3, см. файл `LICENSE`.
 
 ## Благодарности
 
-Автор — DeadPixel, [vk.com/deadpixel_programmer](https://vk.com/deadpixel_programmer).
+Автор — dpsmpx, [vk.com/dpsmpx](https://vk.com/dpsmpx).
 
 Команде PascalABC.NET за язык, среду разработки и библиотеку GraphABC, на
 которой построен весь интерфейс редактора.
