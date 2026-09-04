@@ -20,6 +20,19 @@ ShowGrid = нет
 # Показывать шахматку под полупрозрачными пикселями.
 ShowChecker = да
 
+# Рисовать тайл повторяющимся, чтобы сразу видеть швы.
+ShowSeamless = нет
+
+# Запускаться сразу в режиме карты локации.
+StartInMapMode = нет
+
+# Размер новой карты локации, 4..256.
+DefaultMapWidth = 48
+DefaultMapHeight = 18
+
+# Папка с картами локаций, например data/maps игры Andors-Love.
+MapsFolder =
+
 # Изображение, загружаемое при запуске. Пусто — не загружать.
 # Размер тайла берётся из самого изображения.
 StartupImage = Картинки/debug.png
@@ -32,4 +45,5 @@ PaletteFile = Resources/Palitra.png
 
 # Заполняется программой.
 LastFile =
+LastMapFile =
 LastFolder =
