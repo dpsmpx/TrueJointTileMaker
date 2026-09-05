@@ -304,3 +304,6 @@ GNU General Public License версии 3, см. файл `LICENSE`.
 которой построен весь интерфейс редактора.
 
 Игре Andors-Love за формат карт, ради которого сделан режим локаций.
+
+Группе [vk.com/programmer_ne_lamer](https://vk.com/programmer_ne_lamer) за
+сообщество и поддержку.
