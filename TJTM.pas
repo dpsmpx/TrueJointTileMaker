@@ -18,7 +18,7 @@ uses GraphABC, System.Drawing, System.Drawing.Imaging, TJTMColor, TJTMConfig, TJ
 
 const
   APP_TITLE = 'True Joint Tile Maker';
-  APP_VERSION = '0.4.0';
+  APP_VERSION = '0.5.0';
 
   ///Холст редактирования и панель справа от него.
   CANVAS_W = 600;
@@ -33,6 +33,8 @@ const
 
   PAL_COLS = 8;
   PAL_ROWS = 8;
+  ///Пиксель не связан ни с одной ячейкой палитры.
+  IDX_NONE = 255;
 
   ///Вертикальная разметка панели. Отрисовка и попадание мыши считают
   ///границы по одним и тем же константам.
@@ -135,6 +137,11 @@ var
   DraggingSelection: boolean;
 
   Palette: array[,] of Color;
+  ///Привязка пикселей тайла к ячейкам палитры: номер ячейки или IDX_NONE.
+  ///Массив идёт рядом с Tile и всегда того же размера.
+  TileIdx: array[,] of byte;
+  ///Индексный режим: правка ячейки палитры перекрашивает связанные пиксели.
+  IndexedOn: boolean;
 
   ///Панорама и масштаб, общие для обоих режимов.
   PixelSize: integer := 8;
@@ -152,6 +159,11 @@ var
 
   FirstColor: Color;
   SecondColor: Color;
+  ///Ячейки палитры, из которых взяты рабочие цвета. Держатся согласованными
+  ///с самим цветом: индекс либо IDX_NONE, либо указывает на ячейку,
+  ///чей цвет совпадает с рабочим.
+  FirstIdx: byte := IDX_NONE;
+  SecondIdx: byte := IDX_NONE;
   Hue, Sat, Val: integer;
 
   ///Выбранный инструмент отдельно для каждого режима.
@@ -171,6 +183,15 @@ var
   ///История отмен. Для каждого режима своя, снимками целого документа.
   UndoStack: array of array[,] of Color;
   RedoStack: array of array[,] of Color;
+  ///Привязки к палитре ходят по истории вместе с цветами: иначе отмена
+  ///вернула бы прежние цвета, но оставила привязки от отменённой операции.
+  UndoIdx: array of array[,] of byte;
+  RedoIdx: array of array[,] of byte;
+  ///Сама палитра тоже. В индексном режиме правка ячейки меняет тайл, и
+  ///отменять их порознь бессмысленно: пиксели вернулись бы к прежнему цвету,
+  ///а ячейка осталась новой, и связь между ними потерялась бы.
+  UndoPal: array of array[,] of Color;
+  RedoPal: array of array[,] of Color;
   MapUndoGrid: array of array[,] of byte;
   MapRedoGrid: array of array[,] of byte;
   MapUndoObjs: array of array of MapObject;
@@ -191,7 +212,9 @@ var
   BmpOver: Bitmap;
   RawOver: array of byte;
   OverDirty: boolean := true;
-  OverCacheW, OverCacheH, OverCacheMode: integer := -1;
+  OverCacheW: integer := -1;
+  OverCacheH: integer := -1;
+  OverCacheMode: integer := -1;
 
   ///Состояние ввода.
   KeyPressed: boolean;
@@ -507,6 +530,116 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
+// Привязка пикселей к палитре.
+//
+// У каждого пикселя тайла есть номер ячейки палитры, из которой взят его цвет,
+// либо IDX_NONE. Правка ячейки перекрашивает связанные с ней пиксели, поэтому
+// набор тайлов можно перекрасить целиком, не перерисовывая ни одного.
+//
+// Привязка — всегда только подсказка, а не источник истины: цвет пикселя
+// остаётся в Tile, и перед перекраской он сверяется с прежним цветом ячейки.
+// Поэтому устаревшая привязка не может испортить картинку — она лишь не
+// сработает. Это позволяет заводить привязки где удобно, не доказывая, что
+// все пути записи в Tile их поддерживают.
+// ---------------------------------------------------------------------------
+
+///Сравнивает цвета, не глядя на прозрачность.
+function SameRGB(a, b: Color): boolean;
+begin
+  Result := (a.R = b.R) and (a.G = b.G) and (a.B = b.B);
+end;
+
+///Номер ячейки палитры по её месту в сетке.
+function PalIndexAt(j, i: integer): byte;
+begin
+  Result := i * PAL_COLS + j;
+end;
+
+///Цвет ячейки палитры по номеру. Для IDX_NONE возвращает прозрачный.
+function PalColorOf(idx: byte): Color;
+begin
+  if idx >= PAL_COLS * PAL_ROWS then Result := ARGB(0, 0, 0, 0)
+  else Result := Palette[idx mod PAL_COLS, idx div PAL_COLS];
+end;
+
+///Первая ячейка палитры такого же цвета. IDX_NONE, если такого цвета в
+///палитре нет. Прозрачность не участвует: полупрозрачный мазок цветом
+///палитры остаётся связанным с ней.
+function IndexOfColor(c: Color): byte;
+begin
+  Result := IDX_NONE;
+  for var i := 0 to PAL_ROWS - 1 do
+    for var j := 0 to PAL_COLS - 1 do
+      if SameRGB(c, Palette[j, i]) then
+      begin
+        Result := PalIndexAt(j, i);
+        exit;
+      end;
+end;
+
+///Приводит массив привязок к размеру тайла. Несовпадение размеров означает,
+///что тайл сменился, и прежние привязки к нему уже не относятся.
+procedure EnsureTileIdx;
+begin
+  if (Length(TileIdx, 0) = TW) and (Length(TileIdx, 1) = TH) then exit;
+  SetLength(TileIdx, TW, TH);
+  for var i := 0 to TH - 1 do
+    for var j := 0 to TW - 1 do
+      TileIdx[j, i] := IDX_NONE;
+end;
+
+///Записывает привязку с проверкой границ, чтобы вызывающему не приходилось
+///повторять её на каждом месте записи в Tile.
+procedure SetIdx(x, y: integer; v: byte);
+begin
+  if (Length(TileIdx, 0) <> TW) or (Length(TileIdx, 1) <> TH) then exit;
+  if (x < 0) or (y < 0) or (x >= TW) or (y >= TH) then exit;
+  TileIdx[x, y] := v;
+end;
+
+///Заново выводит привязки из цветов: пиксель связывается с ячейкой палитры
+///того же цвета. Так тайл, нарисованный до включения режима или открытый из
+///файла, становится управляемым палитрой. Возвращает число связанных пикселей.
+function RebindTileToPalette: integer;
+begin
+  Result := 0;
+  EnsureTileIdx;
+  for var i := 0 to TH - 1 do
+    for var j := 0 to TW - 1 do
+    begin
+      TileIdx[j, i] := IndexOfColor(Tile[j, i]);
+      if TileIdx[j, i] <> IDX_NONE then Result := Result + 1;
+    end;
+end;
+
+///Перекрашивает пиксели, связанные с ячейкой палитры. Цвет каждого сверяется
+///с прежним цветом ячейки: пиксель, который с тех пор перекрасили иначе,
+///не трогается. Прозрачность пикселя сохраняется — меняется только цвет.
+function RecolorPaletteEntry(idx: byte; oldC, newC: Color): integer;
+begin
+  Result := 0;
+  if idx = IDX_NONE then exit;
+  if (Length(TileIdx, 0) <> TW) or (Length(TileIdx, 1) <> TH) then exit;
+  for var i := 0 to TH - 1 do
+    for var j := 0 to TW - 1 do
+      if (TileIdx[j, i] = idx) and SameRGB(Tile[j, i], oldC) then
+      begin
+        Tile[j, i] := ARGB(Tile[j, i].A, newC.R, newC.G, newC.B);
+        Result := Result + 1;
+      end;
+end;
+
+///Сколько пикселей тайла связано с палитрой.
+function BoundPixelCount: integer;
+begin
+  Result := 0;
+  if (Length(TileIdx, 0) <> TW) or (Length(TileIdx, 1) <> TH) then exit;
+  for var i := 0 to TH - 1 do
+    for var j := 0 to TW - 1 do
+      if TileIdx[j, i] <> IDX_NONE then Result := Result + 1;
+end;
+
+// ---------------------------------------------------------------------------
 // История отмен. Снимок берётся один раз на операцию, а не на каждый пиксель.
 // ---------------------------------------------------------------------------
 
@@ -564,6 +697,10 @@ procedure ClearTileHistory;
 begin
   SetLength(UndoStack, 0);
   SetLength(RedoStack, 0);
+  SetLength(UndoIdx, 0);
+  SetLength(RedoIdx, 0);
+  SetLength(UndoPal, 0);
+  SetLength(RedoPal, 0);
 end;
 
 procedure ClearMapHistory;
@@ -608,15 +745,28 @@ begin
   else
   begin
     if (TW < 1) or (TH < 1) then exit;
+    EnsureTileIdx;
     SetLength(UndoStack, Length(UndoStack) + 1);
     UndoStack[Length(UndoStack) - 1] := CloneGrid(Tile);
+    SetLength(UndoIdx, Length(UndoIdx) + 1);
+    UndoIdx[Length(UndoIdx) - 1] := CloneBytes(TileIdx);
+    SetLength(UndoPal, Length(UndoPal) + 1);
+    UndoPal[Length(UndoPal) - 1] := CloneGrid(Palette);
     while Length(UndoStack) > limit do
     begin
       for var i := 0 to Length(UndoStack) - 2 do
+      begin
         UndoStack[i] := UndoStack[i + 1];
+        UndoIdx[i] := UndoIdx[i + 1];
+        UndoPal[i] := UndoPal[i + 1];
+      end;
       SetLength(UndoStack, Length(UndoStack) - 1);
+      SetLength(UndoIdx, Length(UndoIdx) - 1);
+      SetLength(UndoPal, Length(UndoPal) - 1);
     end;
     SetLength(RedoStack, 0);
+    SetLength(RedoIdx, 0);
+    SetLength(RedoPal, 0);
   end;
   MarkModified;
 end;
@@ -640,12 +790,28 @@ begin
   else
   begin
     if Length(UndoStack) = 0 then exit;
+    EnsureTileIdx;
     SetLength(RedoStack, Length(RedoStack) + 1);
     RedoStack[Length(RedoStack) - 1] := CloneGrid(Tile);
+    SetLength(RedoIdx, Length(RedoIdx) + 1);
+    RedoIdx[Length(RedoIdx) - 1] := CloneBytes(TileIdx);
+    SetLength(RedoPal, Length(RedoPal) + 1);
+    RedoPal[Length(RedoPal) - 1] := CloneGrid(Palette);
     Tile := UndoStack[Length(UndoStack) - 1];
     SetLength(UndoStack, Length(UndoStack) - 1);
     TW := Length(Tile, 0);
     TH := Length(Tile, 1);
+    if Length(UndoIdx) > 0 then
+    begin
+      TileIdx := UndoIdx[Length(UndoIdx) - 1];
+      SetLength(UndoIdx, Length(UndoIdx) - 1);
+    end;
+    if Length(UndoPal) > 0 then
+    begin
+      Palette := UndoPal[Length(UndoPal) - 1];
+      SetLength(UndoPal, Length(UndoPal) - 1);
+    end;
+    EnsureTileIdx;
   end;
   ResetSelection;
   ClampView;
@@ -672,12 +838,28 @@ begin
   else
   begin
     if Length(RedoStack) = 0 then exit;
+    EnsureTileIdx;
     SetLength(UndoStack, Length(UndoStack) + 1);
     UndoStack[Length(UndoStack) - 1] := CloneGrid(Tile);
+    SetLength(UndoIdx, Length(UndoIdx) + 1);
+    UndoIdx[Length(UndoIdx) - 1] := CloneBytes(TileIdx);
+    SetLength(UndoPal, Length(UndoPal) + 1);
+    UndoPal[Length(UndoPal) - 1] := CloneGrid(Palette);
     Tile := RedoStack[Length(RedoStack) - 1];
     SetLength(RedoStack, Length(RedoStack) - 1);
     TW := Length(Tile, 0);
     TH := Length(Tile, 1);
+    if Length(RedoIdx) > 0 then
+    begin
+      TileIdx := RedoIdx[Length(RedoIdx) - 1];
+      SetLength(RedoIdx, Length(RedoIdx) - 1);
+    end;
+    if Length(RedoPal) > 0 then
+    begin
+      Palette := RedoPal[Length(RedoPal) - 1];
+      SetLength(RedoPal, Length(RedoPal) - 1);
+    end;
+    EnsureTileIdx;
   end;
   ResetSelection;
   ClampView;
@@ -694,6 +876,9 @@ begin
   Tile := newTile;
   TW := Length(Tile, 0);
   TH := Length(Tile, 1);
+  ///Открытый файл ничего не знает о палитре, поэтому привязки выводятся
+  ///из его же цветов: совпал с ячейкой — значит, ею и управляется.
+  RebindTileToPalette;
   CurrentFile := fileName;
   DocMode := DOC_TILE;
   TileModified := false;
@@ -782,6 +967,19 @@ begin
   Result := BrushReplace or (ToolTile = T_ERASER);
 end;
 
+///Ячейка палитры, из которой взят цвет кисти для этой клетки. Повторяет
+///разбор инструментов из BrushColorAt, чтобы цвет и его привязка не разошлись.
+function BrushIndexAt(x, y: integer): byte;
+begin
+  if ToolTile = T_ERASER then Result := IDX_NONE
+  else if ToolTile = T_DITHER then
+  begin
+    if ((x + y) mod 2) = 0 then Result := FirstIdx else Result := SecondIdx;
+  end
+  else
+    Result := FirstIdx;
+end;
+
 ///Одна клетка тайла с учётом заворота через край и маски штриха.
 procedure PaintOne(x, y: integer);
 var
@@ -799,8 +997,18 @@ begin
     StrokeMask[x, y] := true;
   end;
   c := BrushColorAt(x, y);
-  if BrushReplaces then Tile[x, y] := c
-  else Tile[x, y] := BlendOver(c, Tile[x, y]);
+  if BrushReplaces then
+  begin
+    Tile[x, y] := c;
+    SetIdx(x, y, BrushIndexAt(x, y));
+  end
+  else
+  begin
+    Tile[x, y] := BlendOver(c, Tile[x, y]);
+    ///Смешанный цвет чаще всего уже не цвет палитры, поэтому привязка
+    ///выводится из того, что получилось, а не берётся у кисти.
+    SetIdx(x, y, IndexOfColor(Tile[x, y]));
+  end;
   if LiveDraw then DrawTilePixel(x, y);
 end;
 
@@ -950,6 +1158,7 @@ var
   qx, qy: array of integer;
   head, tail: integer;
   target: Color;
+  ni: byte;
 
   procedure Push(x, y: integer);
   begin
@@ -966,6 +1175,9 @@ begin
   if (sx < 0) or (sy < 0) or (sx >= TW) or (sy >= TH) then exit;
   target := Tile[sx, sy];
   if SameColor(target, newColor) then exit;
+  ///Привязка одна на всю заливку, поэтому палитра просматривается один раз,
+  ///а не на каждый залитый пиксель.
+  ni := IndexOfColor(newColor);
   SetLength(visited, TW, TH);
   SetLength(qx, TW * TH);
   SetLength(qy, TW * TH);
@@ -978,6 +1190,7 @@ begin
     var y := qy[head];
     head := head + 1;
     Tile[x, y] := newColor;
+    SetIdx(x, y, ni);
     Push(x + 1, y);
     Push(x - 1, y);
     Push(x, y + 1);
@@ -1072,7 +1285,12 @@ begin
       for var j := 0 to bw - 1 do
         if (px + j >= 0) and (py + i >= 0) and (px + j < TW) and (py + i < TH) then
           if Buffer[j, i].A > 0 then
+          begin
             Tile[px + j, py + i] := Buffer[j, i];
+            ///Буфер хранит только цвета, поэтому привязка вставленного
+            ///выводится из них заново.
+            SetIdx(px + j, py + i, IndexOfColor(Buffer[j, i]));
+          end;
   end;
 end;
 
@@ -1140,7 +1358,10 @@ begin
   if (Length(Buffer, 0) <> SelW) or (Length(Buffer, 1) <> SelH) then exit;
   for var i := 0 to SelH - 1 do
     for var j := 0 to SelW - 1 do
+    begin
       Tile[SelX + j, SelY + i] := Buffer[j, i];
+      SetIdx(SelX + j, SelY + i, IndexOfColor(Buffer[j, i]));
+    end;
 end;
 
 // ---------------------------------------------------------------------------
@@ -1148,45 +1369,62 @@ end;
 // ---------------------------------------------------------------------------
 
 procedure ClearTile;
+var
+  ni: byte;
 begin
   PushUndo;
+  EnsureTileIdx;
+  ni := IndexOfColor(ARGB(255, 255, 255, 255));
   for var i := 0 to TH - 1 do
     for var j := 0 to TW - 1 do
+    begin
       Tile[j, i] := ARGB(255, 255, 255, 255);
+      TileIdx[j, i] := ni;
+    end;
   NeedRepaint := true;
 end;
 
 procedure RandomizeTile;
 begin
   PushUndo;
+  EnsureTileIdx;
   for var i := 0 to TH - 1 do
     for var j := 0 to TW - 1 do
+    begin
       if Random(0, 3) = 0 then
         Tile[j, i] := RGB(128 + Random(64), 128 + Random(64), 128 + Random(64))
       else
         Tile[j, i] := RGB(64 + Random(128), 64 + Random(128), 64 + Random(128));
+      ///Случайный цвет палитре не принадлежит.
+      TileIdx[j, i] := IDX_NONE;
+    end;
   NeedRepaint := true;
 end;
 
 ///Заменяет один цвет другим по всему тайлу.
 function ReplaceColorEverywhere(fromC, toC: Color): integer;
+var
+  ni: byte;
 begin
   Result := 0;
+  EnsureTileIdx;
+  ni := IndexOfColor(toC);
   for var i := 0 to TH - 1 do
     for var j := 0 to TW - 1 do
       if SameColor(Tile[j, i], fromC) then
       begin
         Tile[j, i] := toC;
+        TileIdx[j, i] := ni;
         Result := Result + 1;
       end;
 end;
 
-///Ближайший цвет палитры по расстоянию в RGB. Прозрачность сохраняется.
-function NearestPaletteColor(c: Color): Color;
+///Ближайшая ячейка палитры по расстоянию в RGB.
+function NearestPaletteIndex(c: Color): byte;
 var
   best, d, dr, dg, db: integer;
 begin
-  Result := c;
+  Result := IDX_NONE;
   best := -1;
   for var i := 0 to PAL_ROWS - 1 do
     for var j := 0 to PAL_COLS - 1 do
@@ -1198,41 +1436,83 @@ begin
       if (best < 0) or (d < best) then
       begin
         best := d;
-        Result := ARGB(c.A, Palette[j, i].R, Palette[j, i].G, Palette[j, i].B);
+        Result := PalIndexAt(j, i);
       end;
     end;
 end;
 
-///Сводит весь тайл к цветам палитры. Заменяет собой индексированный режим
-///в том, ради чего он чаще всего нужен: привести картинку к общему набору.
-procedure QuantizeTileToPalette;
+///Ближайший цвет палитры по расстоянию в RGB. Прозрачность сохраняется.
+function NearestPaletteColor(c: Color): Color;
+var
+  idx: byte;
+  p: Color;
 begin
+  idx := NearestPaletteIndex(c);
+  if idx = IDX_NONE then
+    Result := c
+  else
+  begin
+    p := PalColorOf(idx);
+    Result := ARGB(c.A, p.R, p.G, p.B);
+  end;
+end;
+
+///Сводит весь тайл к цветам палитры и связывает каждый пиксель с той ячейкой,
+///к которой он сведён. После этого палитра управляет всем тайлом целиком.
+procedure QuantizeTileToPalette;
+var
+  idx: byte;
+  p: Color;
+begin
+  EnsureTileIdx;
   for var i := 0 to TH - 1 do
     for var j := 0 to TW - 1 do
       if Tile[j, i].A > 0 then
-        Tile[j, i] := NearestPaletteColor(Tile[j, i]);
+      begin
+        idx := NearestPaletteIndex(Tile[j, i]);
+        if idx <> IDX_NONE then
+        begin
+          p := PalColorOf(idx);
+          Tile[j, i] := ARGB(Tile[j, i].A, p.R, p.G, p.B);
+          TileIdx[j, i] := idx;
+        end;
+      end;
 end;
 
 procedure FlipTileH;
 var
   t: array[,] of Color;
+  n: array[,] of byte;
 begin
+  EnsureTileIdx;
   SetLength(t, TW, TH);
+  SetLength(n, TW, TH);
   for var i := 0 to TH - 1 do
     for var j := 0 to TW - 1 do
+    begin
       t[j, i] := Tile[TW - 1 - j, i];
+      n[j, i] := TileIdx[TW - 1 - j, i];
+    end;
   Tile := t;
+  TileIdx := n;
 end;
 
 procedure FlipTileV;
 var
   t: array[,] of Color;
+  n: array[,] of byte;
 begin
+  EnsureTileIdx;
   SetLength(t, TW, TH);
+  SetLength(n, TW, TH);
   for var i := 0 to TH - 1 do
     for var j := 0 to TW - 1 do
+    begin
       t[j, i] := Tile[j, TH - 1 - i];
+      n[j, i] := TileIdx[j, TH - 1 - i];
+    end;
   Tile := t;
+  TileIdx := n;
 end;
 
 // ---------------------------------------------------------------------------
@@ -1257,22 +1537,43 @@ var
 begin
   c := HSVtoRGB(Hue, Sat, Val);
   FirstColor := ARGB(FirstColor.A, c.R, c.G, c.B);
+  ///Цвет, набранный ползунками, связан с палитрой только если случайно
+  ///совпал с одной из ячеек. Единственная точка, где меняется цвет полосами,
+  ///поэтому привязку достаточно пересчитать здесь.
+  FirstIdx := IndexOfColor(FirstColor);
 end;
 
 procedure PickColor(c: Color);
 begin
   FirstColor := c;
+  FirstIdx := IndexOfColor(c);
   SyncHSVFromColor;
   NeedRepaint := true;
+end;
+
+///Пипетка по тайлу. Вместе с цветом берётся и его привязка, поэтому взятый
+///цвет продолжает управляться той же ячейкой палитры, даже если тот же цвет
+///стоит в палитре дважды.
+procedure PickColorFromTile(x, y: integer);
+begin
+  if (x < 0) or (y < 0) or (x >= TW) or (y >= TH) then exit;
+  PickColor(Tile[x, y]);
+  if (Length(TileIdx, 0) <> TW) or (Length(TileIdx, 1) <> TH) then exit;
+  if TileIdx[x, y] = IDX_NONE then exit;
+  if SameRGB(PalColorOf(TileIdx[x, y]), FirstColor) then FirstIdx := TileIdx[x, y];
 end;
 
 procedure SwapColors;
 var
   t: Color;
+  ti: byte;
 begin
   t := FirstColor;
   FirstColor := SecondColor;
   SecondColor := t;
+  ti := FirstIdx;
+  FirstIdx := SecondIdx;
+  SecondIdx := ti;
   SyncHSVFromColor;
   NeedRepaint := true;
 end;
@@ -1722,6 +2023,9 @@ begin
 end;
 
 procedure DrawPaletteSection;
+var
+  edge: Color;
+  fj, fi: integer;
 begin
   GraphABC.Brush.Color := cPanel;
   FillRect(PANEL_X, SLOT1_Y0 - 2, PANEL_X + PANEL_W, SLOT1_Y1 + 2);
@@ -1731,8 +2035,19 @@ begin
       GraphABC.Brush.Color := BlendOver(Palette[j, i], CheckerColor(j, i));
       FillRect(PalCellX(j), PalCellY(i), PalCellX(j + 1), PalCellY(i + 1));
     end;
+  ///Рамка палитры цветом выделения показывает, что индексный режим включён:
+  ///в нём правка ячейки перекрашивает тайл, и об этом надо знать заранее.
+  if IndexedOn and (DocMode = DOC_TILE) then edge := cAccent else edge := cBorder;
   FrameRect(PAL_X0 - 1, PAL_Y0 - 1,
-            PAL_X0 + PAL_COLS * PAL_CELL + 1, PAL_Y0 + PAL_ROWS * PAL_CELL + 1, cBorder);
+            PAL_X0 + PAL_COLS * PAL_CELL + 1, PAL_Y0 + PAL_ROWS * PAL_CELL + 1, edge);
+  ///Ячейка, из которой взят первый цвет, обведена: видно, какая именно
+  ///ячейка поедет за кистью, когда её поправят.
+  if (FirstIdx <> IDX_NONE) and (DocMode = DOC_TILE) then
+  begin
+    fj := FirstIdx mod PAL_COLS;
+    fi := FirstIdx div PAL_COLS;
+    FrameRect(PalCellX(fj), PalCellY(fi), PalCellX(fj + 1), PalCellY(fi + 1), cAccent);
+  end;
 end;
 
 procedure DrawColorSection;
@@ -2230,6 +2545,48 @@ begin
   Result := res;
 end;
 
+///Вопрос с двумя ответами. Escape равнозначен отказу.
+function AskYesNo(title, text, yes, no_: string): boolean;
+var
+  done, res: boolean;
+begin
+  res := false;
+  done := false;
+  ClickPending := false;
+  KeyPending := false;
+  while not done do
+  begin
+    ClearWindow(cBack);
+    GraphABC.Font.Color := cText;
+    DrawTextCentered(0, H div 2 - 90, WIN_W, H div 2 - 50, title);
+    GraphABC.Font.Color := cText;
+    DrawTextCentered(40, H div 2 - 46, WIN_W - 40, H div 2 + 10, text);
+
+    if UIButton(WIN_W div 2 - 180, H div 2 + 30, 170, 34, yes, true) then
+    begin
+      res := true;
+      done := true;
+    end;
+    if UIButton(WIN_W div 2 + 10, H div 2 + 30, 170, 34, no_, true) then
+    begin
+      res := false;
+      done := true;
+    end;
+
+    Redraw;
+    ClickPending := false;
+    if TakeKey = KEY_ESC then
+    begin
+      res := false;
+      done := true;
+    end;
+    Idle;
+  end;
+  WaitMouseRelease;
+  NeedRepaint := true;
+  Result := res;
+end;
+
 ///Экран создания нового тайла. Заменяет прежний ввод чисел с клавиатуры,
 ///который блокировал программу на ReadInteger.
 ///Возвращает true, если пользователь подтвердил создание.
@@ -2493,13 +2850,14 @@ procedure ShowColorOpsScreen;
 var
   done: boolean;
   y, bx, bw, bh, stp, n: integer;
+  caption: string;
 begin
   done := false;
   ClickPending := false;
   KeyPending := false;
   bw := 420;
-  bh := 34;
-  stp := 40;
+  bh := 30;
+  stp := 34;
   bx := (WIN_W - bw) div 2;
 
   while not done do
@@ -2555,8 +2913,34 @@ begin
       NeedRepaint := true;
     end;
 
-    y := y + stp + 10;
-    UILabel(0, y - 24, WIN_W, 22, 'Буфер обмена', cTextDim);
+    ///Отступ такой, чтобы подпись раздела не наезжала на кнопку над ней:
+    ///кнопка кончается через bh, подпись занимает ещё двадцать точек.
+    y := y + stp + 20;
+    UILabel(0, y - 22, WIN_W, 20, 'Индексная палитра', cTextDim);
+    if IndexedOn then caption := 'Индексный режим: включён'
+    else caption := 'Индексный режим: выключен';
+    if UIButton(bx, y, bw, bh, caption, true) then
+    begin
+      IndexedOn := not IndexedOn;
+      if IndexedOn then RebindTileToPalette;
+      NeedRepaint := true;
+    end;
+
+    y := y + stp;
+    if UIButton(bx, y, bw, bh, 'Привязать тайл к палитре', true) then
+    begin
+      n := RebindTileToPalette;
+      NeedRepaint := true;
+      done := true;
+      ShowMessage('Привязка к палитре',
+                  'Связано пикселей: ' + IntToStr(n) + ' из ' +
+                  IntToStr(TW * TH) + '. Остальные не совпали ни с одной ' +
+                  'ячейкой палитры и правкой ячеек не изменятся. Свести тайл ' +
+                  'к цветам палитры можно кнопкой выше — тогда свяжутся все.');
+    end;
+
+    y := y + stp + 20;
+    UILabel(0, y - 22, WIN_W, 20, 'Буфер обмена', cTextDim);
     if UIButton(bx, y, bw, bh, 'Отразить буфер по горизонтали', BufferFilled) then
     begin
       BufferFlipH;
@@ -3228,6 +3612,350 @@ end;
 // Справка, настройки, главное меню
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Набор тайлов Andors-Love.
+//
+// Игра ищет картинки по имени файла: data/tiles/wall.png и так далее, по файлу
+// на слот. Имена и их состав повторяют src/gfx/tiles.cpp игры — это такой же
+// контракт между двумя проектами, как коды клеток в TJTMMap, и разъезжаться
+// им нельзя: слот, названный иначе, игра просто не найдёт.
+//
+// Ненарисованный слот — не дырка: игра рисует его прежним способом, заливкой
+// и знаком шрифта. Поэтому набор можно делать по одному тайлу и в любом
+// порядке, а пустые слоты в этом экране — нормальное состояние, не ошибка.
+// ---------------------------------------------------------------------------
+
+const
+  TSET_COUNT = 17;
+  TSET_COLS = 6;
+  TSET_CELL_W = 112;
+  TSET_CELL_H = 104;
+  TSET_THUMB = 56;
+  TSET_X0 = (WIN_W - TSET_COLS * TSET_CELL_W) div 2;
+  TSET_Y0 = 96;
+
+var
+  ///Тайлы набора и их миниатюры. Кэш живёт, пока открыт экран: перечитывать
+  ///семнадцать файлов на каждый кадр отрисовки незачем.
+  TsetGrid: array of array[,] of Color;
+  TsetBmp: array of Bitmap;
+
+///Имя файла слота без расширения. Порядок задан игрой.
+function TsetFile(i: integer): string;
+begin
+  case i of
+    0: Result := 'floor';
+    1: Result := 'wall';
+    2: Result := 'water';
+    3: Result := 'tree';
+    4: Result := 'grass';
+    5: Result := 'road';
+    6: Result := 'deadwater';
+    7: Result := 'player';
+    8: Result := 'npc';
+    9: Result := 'mob';
+    10: Result := 'exit';
+    11: Result := 'sign';
+    12: Result := 'item';
+    13: Result := 'bed';
+    14: Result := 'chest';
+    15: Result := 'portal';
+    16: Result := 'note';
+    else Result := '';
+  end;
+end;
+
+///Название слота по-русски. Взято из тех же мест игры, что и имена файлов.
+function TsetName(i: integer): string;
+begin
+  case i of
+    0: Result := 'пол';
+    1: Result := 'стена';
+    2: Result := 'вода';
+    3: Result := 'дерево';
+    4: Result := 'трава';
+    5: Result := 'дорога';
+    6: Result := 'стоячая вода';
+    7: Result := 'герой';
+    8: Result := 'житель';
+    9: Result := 'враг';
+    10: Result := 'переход';
+    11: Result := 'табличка';
+    12: Result := 'предмет';
+    13: Result := 'лежанка';
+    14: Result := 'сундук';
+    15: Result := 'портал';
+    16: Result := 'записка';
+    else Result := '';
+  end;
+end;
+
+///Местность рисуется непрозрачной, объекты — с прозрачным фоном.
+///Разделение показывается на экране, чтобы не гадать, где нужен фон.
+function TsetIsTerrain(i: integer): boolean;
+begin
+  Result := i <= 6;
+end;
+
+///Папка набора. Пустая строка означает, что папка не задана или не найдена.
+function TilesDir: string;
+begin
+  Result := ResolvePath(CfgTilesFolder);
+  if (Result <> '') and System.IO.Directory.Exists(Result) then exit;
+  Result := '';
+end;
+
+function TsetPath(i: integer): string;
+var
+  dir: string;
+begin
+  Result := '';
+  if (i < 0) or (i >= TSET_COUNT) then exit;
+  dir := TilesDir;
+  if dir = '' then exit;
+  try
+    Result := System.IO.Path.Combine(dir, TsetFile(i) + '.png');
+  except
+    Result := '';
+  end;
+end;
+
+///Собирает миниатюру сетки цветов. Прозрачные пиксели кладутся на шахматку:
+///иначе тайлы объектов, у которых фон прозрачный, выглядели бы пустыми.
+function MakeThumb(g: array[,] of Color; size: integer): Bitmap;
+var
+  raw: array of byte;
+  gw, gh, sx, sy, k: integer;
+  c: Color;
+begin
+  Result := nil;
+  if g = nil then exit;
+  gw := Length(g, 0);
+  gh := Length(g, 1);
+  if (gw < 1) or (gh < 1) or (size < 1) then exit;
+  SetLength(raw, size * size * 4);
+  for var py := 0 to size - 1 do
+    for var px := 0 to size - 1 do
+    begin
+      sx := ClampI(px * gw div size, 0, gw - 1);
+      sy := ClampI(py * gh div size, 0, gh - 1);
+      c := BlendOver(g[sx, sy], CheckerColor(px, py));
+      k := (py * size + px) * 4;
+      raw[k + 0] := c.B;
+      raw[k + 1] := c.G;
+      raw[k + 2] := c.R;
+      raw[k + 3] := 255;
+    end;
+  Result := BytesToImage(raw, size);
+end;
+
+///Перечитывает один слот с диска. Отсутствующий файл — не ошибка:
+///слот просто остаётся пустым.
+procedure TsetLoadSlot(i: integer);
+var
+  path: string;
+  g: array[,] of Color;
+begin
+  if (i < 0) or (i >= TSET_COUNT) then exit;
+  if Length(TsetBmp) <> TSET_COUNT then exit;
+  if TsetBmp[i] <> nil then
+  begin
+    TsetBmp[i].Dispose;
+    TsetBmp[i] := nil;
+  end;
+  SetLength(TsetGrid[i], 0, 0);
+  path := TsetPath(i);
+  if path = '' then exit;
+  if not FileThere(path) then exit;
+  if not ReadImageGrid(path, g, true) then exit;
+  TsetGrid[i] := g;
+  TsetBmp[i] := MakeThumb(g, TSET_THUMB);
+end;
+
+procedure TsetLoadAll;
+begin
+  SetLength(TsetGrid, TSET_COUNT);
+  SetLength(TsetBmp, TSET_COUNT);
+  for var i := 0 to TSET_COUNT - 1 do TsetLoadSlot(i);
+end;
+
+///Освобождает миниатюры. Без этого каждое открытие экрана оставляло бы
+///за собой семнадцать картинок.
+procedure TsetFree;
+begin
+  for var i := 0 to Length(TsetBmp) - 1 do
+    if TsetBmp[i] <> nil then
+    begin
+      TsetBmp[i].Dispose;
+      TsetBmp[i] := nil;
+    end;
+  SetLength(TsetBmp, 0);
+  SetLength(TsetGrid, 0);
+end;
+
+function TsetCellX(slot: integer): integer;
+begin
+  Result := TSET_X0 + (slot mod TSET_COLS) * TSET_CELL_W;
+end;
+
+function TsetCellY(slot: integer): integer;
+begin
+  Result := TSET_Y0 + (slot div TSET_COLS) * TSET_CELL_H;
+end;
+
+function TsetHit(px, py: integer; var slot: integer): boolean;
+var
+  col, row: integer;
+begin
+  Result := false;
+  slot := -1;
+  if (px < TSET_X0) or (py < TSET_Y0) then exit;
+  col := (px - TSET_X0) div TSET_CELL_W;
+  row := (py - TSET_Y0) div TSET_CELL_H;
+  if (col < 0) or (col >= TSET_COLS) or (row < 0) then exit;
+  slot := row * TSET_COLS + col;
+  if (slot < 0) or (slot >= TSET_COUNT) then
+  begin
+    slot := -1;
+    exit;
+  end;
+  Result := true;
+end;
+
+///Экран набора. Возвращает true, если тайл слота открыт в редакторе:
+///вызывающему тогда стоит уйти из меню в редактор, как после обычной загрузки.
+function ShowTilesetScreen: boolean;
+var
+  done: boolean;
+  slot, cx, cy, tx: integer;
+  dir, path, note: string;
+begin
+  Result := false;
+  TsetLoadAll;
+  done := false;
+  note := '';
+  ClickPending := false;
+  KeyPending := false;
+
+  while not done do
+  begin
+    dir := TilesDir;
+    ClearWindow(cBack);
+    GraphABC.Font.Color := cText;
+    DrawTextCentered(0, 10, WIN_W, 44, 'Набор тайлов Andors-Love');
+    if dir = '' then
+      UILabel(0, 46, WIN_W, 20,
+              'Папка набора не задана — укажите data/tiles игры', cWarn)
+    else
+      UILabel(0, 46, WIN_W, 20, FitText(dir, WIN_W - 40), cTextDim);
+    UILabel(0, 66, WIN_W, 20,
+            'Правая кнопка открывает тайл слота, левая пишет в слот текущий',
+            cTextDim);
+
+    for var i := 0 to TSET_COUNT - 1 do
+    begin
+      cx := TsetCellX(i);
+      cy := TsetCellY(i);
+      tx := cx + (TSET_CELL_W - TSET_THUMB) div 2;
+      GraphABC.Brush.Color := cFace;
+      FillRect(tx, cy + 2, tx + TSET_THUMB, cy + 2 + TSET_THUMB);
+      if TsetBmp[i] <> nil then
+        GraphBufferGraphics.DrawImage(TsetBmp[i], tx, cy + 2)
+      else
+        UILabel(cx, cy + 22, TSET_CELL_W, 18, 'нет файла', cTextDim);
+      ///Слот под курсором обведён цветом выделения: попасть в нужный из
+      ///семнадцати мелких клеток иначе трудно.
+      if (MouseX >= cx) and (MouseX < cx + TSET_CELL_W) and
+         (MouseY >= cy) and (MouseY < cy + TSET_CELL_H) then
+        FrameRect(tx - 1, cy + 1, tx + TSET_THUMB + 1, cy + 3 + TSET_THUMB, cAccent)
+      else
+        FrameRect(tx - 1, cy + 1, tx + TSET_THUMB + 1, cy + 3 + TSET_THUMB, cBorder);
+      if TsetIsTerrain(i) then GraphABC.Font.Color := cText
+      else GraphABC.Font.Color := cAccent;
+      UILabel(cx, cy + 60, TSET_CELL_W, 18,
+              FitText(TsetName(i), TSET_CELL_W - 4), GraphABC.Font.Color);
+      UILabel(cx, cy + 76, TSET_CELL_W, 18, TsetFile(i) + '.png', cTextDim);
+    end;
+
+    UILabel(0, 414, WIN_W, 18,
+            'Чёрным — местность, она рисуется непрозрачной; синим — объекты, ' +
+            'у них фон прозрачный', cTextDim);
+    if note <> '' then UILabel(0, 432, WIN_W, 18, note, cAccent);
+
+    if UIButton(WIN_W div 2 - 230, 458, 220, 34, 'Папка набора…', true) then
+    begin
+      path := AskOpenFile('Выберите любой тайл в папке набора');
+      if path <> '' then
+      begin
+        try
+          CfgTilesFolder := System.IO.Path.GetDirectoryName(path);
+        except
+          note := 'Не удалось разобрать путь';
+        end;
+        ConfigSave(ConfigPath);
+        TsetLoadAll;
+        note := '';
+      end;
+    end;
+    if UIButton(WIN_W div 2 + 10, 458, 220, 34, 'Закрыть', true) then done := true;
+
+    UILabel(0, H - 26, WIN_W, 20,
+            'Пустой слот игра рисует по-старому — набор можно делать по одному тайлу',
+            cTextDim);
+
+    // Клик по слоту разбирается после кнопок: области не пересекаются,
+    // поэтому порядок роли не играет, но так ближе к остальным экранам.
+    if ClickPending and TsetHit(ClickX, ClickY, slot) then
+    begin
+      path := TsetPath(slot);
+      if path = '' then
+        note := 'Сначала укажите папку набора'
+      else if ClickButton = MB_RIGHT then
+      begin
+        if not FileThere(path) then
+          note := 'В слоте ' + TsetFile(slot) + ' файла ещё нет'
+        else if ConfirmDiscard('Открыть тайл слота ' + TsetFile(slot) + '?') then
+        begin
+          if LoadTileFrom(path, false, true) then
+          begin
+            Result := true;
+            done := true;
+          end;
+        end;
+      end
+      else if ClickButton = MB_LEFT then
+      begin
+        if DocMode <> DOC_TILE then
+          note := 'Записать в слот можно только тайл, а сейчас открыта карта'
+        else if FileThere(path) and
+                (not AskYesNo('Заменить тайл в наборе',
+                              'В слоте ' + TsetFile(slot) + ' уже есть файл. ' +
+                              'Заменить его текущим тайлом ' + IntToStr(TW) +
+                              ' на ' + IntToStr(TH) + '?',
+                              'Заменить', 'Отмена')) then
+          note := ''
+        else
+        begin
+          if SaveTileTo(path) then
+          begin
+            TsetLoadSlot(slot);
+            note := 'Записано в слот ' + TsetFile(slot);
+          end;
+        end;
+      end;
+    end;
+
+    Redraw;
+    ClickPending := false;
+    if TakeKey = KEY_ESC then done := true;
+    Idle;
+  end;
+
+  TsetFree;
+  WaitMouseRelease;
+  NeedRepaint := true;
+end;
+
 procedure ShowHelpScreen;
 var
   p: array of string;
@@ -3281,6 +4009,27 @@ begin
   Add('уже стоящий, правая убирает, средняя открывает правку строки.');
   Add('Выделение копирует и вставляет куски местности.');
   Add('');
+  Add('НАБОР ТАЙЛОВ ANDORS-LOVE');
+  Add('Клавиша T открывает набор игры: семнадцать слотов, по картинке на слот.');
+  Add('Игра ищет их по имени файла — floor.png, wall.png и так далее, — поэтому');
+  Add('слоты здесь названы и расположены так же, как в самой игре.');
+  Add('Правая кнопка открывает тайл слота в редакторе, левая записывает в слот');
+  Add('текущий тайл. Папка набора задаётся в настройках или прямо на экране.');
+  Add('Пустой слот — не ошибка: игра рисует его прежним способом, заливкой');
+  Add('и знаком шрифта, поэтому набор можно делать по одному тайлу.');
+  Add('');
+  Add('ИНДЕКСНАЯ ПАЛИТРА');
+  Add('Клавиша I связывает пиксели тайла с ячейками палитры того же цвета.');
+  Add('После этого правка ячейки левой кнопкой перекрашивает все связанные');
+  Add('с ней пиксели: набор тайлов перекрашивается сменой палитры, а не');
+  Add('перерисовкой. Включённый режим виден по рамке палитры цветом выделения,');
+  Add('а ячейка, из которой взят первый цвет, обведена ею же.');
+  Add('Правка ячейки и перекраска тайла отменяются вместе, одним Z.');
+  Add('Пиксель, не совпавший ни с одной ячейкой, остаётся свободным: чтобы');
+  Add('связать весь тайл, сведите его к цветам палитры в операциях с цветом.');
+  Add('Цвет, набранный ползунками, связи с палитрой не имеет, пока не совпадёт');
+  Add('с какой-нибудь ячейкой. Пипетка берёт цвет вместе с его связью.');
+  Add('');
   Add('БЕСШОВНОСТЬ И СИММЕТРИЯ');
   Add('Клавиша B включает бесшовный предпросмотр: тайл рисуется повторяющимся,');
   Add('и швы видно прямо во время работы. Клавиша W включает заворот через');
@@ -3294,6 +4043,7 @@ begin
   Add('X поменять местами цвета. P точный выбор цвета по каналам ARGB.');
   Add('G сетка, C шахматка, B бесшовность, W заворот, F и D оси симметрии.');
   Add('E режим замены вместо смешивания. R случайные цвета.');
+  Add('I индексная палитра. T набор тайлов Andors-Love.');
   Add('Delete очистить тайл. Tab переключить режим тайла и карты.');
   Add('Цифры от 1 выбирают инструмент. Плюс и минус — масштаб.');
   Add('Стрелки двигают изображение, пробел возвращает его в центр.');
@@ -3335,7 +4085,7 @@ var
   done: boolean;
   vHelp, vMenu, vGrid, vChecker, vSeam, vAutoLast, vMapStart: boolean;
   vW, vH, vMW, vMH: integer;
-  vStartup, vPalette, vMaps: string;
+  vStartup, vPalette, vMaps, vTiles: string;
   y, rowH, path1X, ctlX: integer;
   path: string;
 
@@ -3390,6 +4140,7 @@ begin
   vStartup := CfgStartupImage;
   vPalette := CfgPaletteFile;
   vMaps := CfgMapsFolder;
+  vTiles := CfgTilesFolder;
 
   rowH := 30;
   path1X := 200;
@@ -3417,7 +4168,7 @@ begin
     y := y + 36;
     if ToggleRow(30, y, 'Запускаться в режиме карты', vMapStart) then vMapStart := not vMapStart;
 
-    y := y + 46;
+    y := y + 40;
     StepRow(y, 'Ширина нового тайла', vW, MIN_TILE, MAX_TILE);
     y := y + 36;
     StepRow(y, 'Высота нового тайла', vH, MIN_TILE, MAX_TILE);
@@ -3426,7 +4177,7 @@ begin
     y := y + 36;
     StepRow(y, 'Высота новой карты', vMH, MAP_MIN_SIDE, MAP_MAX_SIDE);
 
-    y := y + 46;
+    y := y + 38;
     UILabelLeft(30, y, rowH, 'Стартовое изображение', cText);
     GraphABC.Brush.Color := cFace;
     FillRoundRect(path1X, y, ctlX + 120, y + rowH, 4, 4);
@@ -3438,7 +4189,7 @@ begin
     end;
     if UIButton(ctlX + 236, y, 100, rowH, 'Очистить', vStartup <> '') then vStartup := '';
 
-    y := y + 36;
+    y := y + 32;
     UILabelLeft(30, y, rowH, 'Файл палитры', cText);
     GraphABC.Brush.Color := cFace;
     FillRoundRect(path1X, y, ctlX + 120, y + rowH, 4, 4);
@@ -3450,7 +4201,7 @@ begin
     end;
     if UIButton(ctlX + 236, y, 100, rowH, 'Очистить', vPalette <> '') then vPalette := '';
 
-    y := y + 36;
+    y := y + 32;
     UILabelLeft(30, y, rowH, 'Папка карт локаций', cText);
     GraphABC.Brush.Color := cFace;
     FillRoundRect(path1X, y, ctlX + 120, y + rowH, 4, 4);
@@ -3469,6 +4220,23 @@ begin
     end;
     if UIButton(ctlX + 236, y, 100, rowH, 'Очистить', vMaps <> '') then vMaps := '';
 
+    y := y + 32;
+    UILabelLeft(30, y, rowH, 'Папка набора тайлов', cText);
+    GraphABC.Brush.Color := cFace;
+    FillRoundRect(path1X, y, ctlX + 120, y + rowH, 4, 4);
+    UILabelLeft(path1X + 6, y, rowH, FitText(vTiles, ctlX + 108 - path1X), cText);
+    if UIButton(ctlX + 130, y, 100, rowH, 'Выбрать', true) then
+    begin
+      path := AskOpenFile('Выберите любой тайл в нужной папке');
+      if path <> '' then
+        try
+          vTiles := System.IO.Path.GetDirectoryName(path);
+        except
+          vTiles := vTiles;
+        end;
+    end;
+    if UIButton(ctlX + 236, y, 100, rowH, 'Очистить', vTiles <> '') then vTiles := '';
+
     if UIButton(WIN_W div 2 - 190, H - 52, 180, 36, 'Сохранить', true) then
     begin
       CfgShowHelpOnStart := vHelp;
@@ -3485,6 +4253,7 @@ begin
       CfgStartupImage := vStartup;
       CfgPaletteFile := vPalette;
       CfgMapsFolder := vMaps;
+      CfgTilesFolder := vTiles;
       GridOn := vGrid;
       CheckerOn := vChecker;
       SeamlessOn := vSeam;
@@ -3517,8 +4286,10 @@ begin
   ClickPending := false;
   KeyPending := false;
   bw := 420;
-  bh := 34;
-  stp := 40;
+  ///Кнопок в режиме тайла двенадцать, и они должны уместиться над подписью
+  ///внизу окна: отсюда шаг мельче обычного.
+  bh := 32;
+  stp := 36;
   bx := (WIN_W - bw) div 2;
 
   while not done do
@@ -3555,7 +4326,7 @@ begin
       UILabel(0, 52, WIN_W, 22, 'режим тайла', cAccent);
     UILabel(0, 74, WIN_W, 22, info, cTextDim);
 
-    y := 104;
+    y := 100;
     if UIButton(bx, y, bw, bh, 'Продолжить редактирование', true) then done := true;
 
     y := y + stp;
@@ -3612,8 +4383,15 @@ begin
         ShowMapPropertiesScreen;
     end
     else
+      if UIButton(bx, y, bw, bh, 'Набор тайлов Andors-Love', true) then
+        if ShowTilesetScreen then done := true;
+
+    if not isMap then
+    begin
+      y := y + stp;
       if UIButton(bx, y, bw, bh, 'Операции с цветом', true) then
         ShowColorOpsScreen;
+    end;
 
     y := y + stp;
     if isMap then
@@ -3996,7 +4774,7 @@ begin
 
   if (ClickButton = MB_RIGHT) or AltDown or (ToolTile = T_PICK) then
   begin
-    PickColor(Tile[mx, my]);
+    PickColorFromTile(mx, my);
     exit;
   end;
 
@@ -4057,6 +4835,8 @@ end;
 procedure HandlePaletteClick;
 var
   cj, ci: integer;
+  idx: byte;
+  oldC: Color;
 begin
   if IsMiddle(ClickButton) then
   begin
@@ -4064,13 +4844,36 @@ begin
     exit;
   end;
   if not PalHit(ClickX, ClickY, cj, ci) then exit;
+  idx := PalIndexAt(cj, ci);
+
   if ClickButton = MB_RIGHT then
-    PickColor(Palette[cj, ci])
-  else
   begin
-    Palette[cj, ci] := FirstColor;
-    NeedRepaint := true;
+    PickColor(Palette[cj, ci]);
+    ///Цвет взят из конкретной ячейки, поэтому привязка ставится точная,
+    ///а не выведенная по цвету: когда один цвет стоит в палитре дважды,
+    ///важно, из какой именно ячейки его взяли.
+    FirstIdx := idx;
+    exit;
   end;
+
+  oldC := Palette[cj, ci];
+  if SameColor(oldC, FirstColor) then exit;
+
+  if IndexedOn and (DocMode = DOC_TILE) then
+  begin
+    ///Пиксели и сама ячейка меняются одной операцией и одной же отменяются.
+    PushUndo;
+    Palette[cj, ci] := FirstColor;
+    RecolorPaletteEntry(idx, oldC, FirstColor);
+    ///Второй рабочий цвет, взятый из этой ячейки, едет за ней следом.
+    if SecondIdx = idx then
+      SecondColor := ARGB(SecondColor.A, FirstColor.R, FirstColor.G, FirstColor.B);
+    OverDirty := true;
+  end
+  else
+    Palette[cj, ci] := FirstColor;
+
+  NeedRepaint := true;
 end;
 
 ///Протяжка по обзору двигает холст. Рамка видимой области при этом идёт
@@ -4203,6 +5006,16 @@ begin
     KEY_F: begin SymX := not SymX; NeedRepaint := true end;
     KEY_D: begin SymY := not SymY; NeedRepaint := true end;
     KEY_E: begin BrushReplace := not BrushReplace; NeedRepaint := true end;
+    KEY_T: if DocMode = DOC_TILE then ShowTilesetScreen;
+    KEY_I:
+      if DocMode = DOC_TILE then
+      begin
+        IndexedOn := not IndexedOn;
+        ///Включая режим, привязываем то, что уже нарисовано: иначе он
+        ///подействовал бы только на пиксели, положенные после включения.
+        if IndexedOn then RebindTileToPalette;
+        NeedRepaint := true;
+      end;
     KEY_1: SetTool(0);
     KEY_2: SetTool(1);
     KEY_3: SetTool(2);
