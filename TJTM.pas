@@ -55,6 +55,9 @@ const
   TOOL_COLS = 4;
   TOOL_CW = 44;
   TOOL_CH = 36;
+  ///Сторона значка на кнопке инструмента. Влезает в кнопку с полями,
+  ///поэтому значок любого размера показывается уменьшенным до неё.
+  ICON_PX = 28;
 
   BAR_SIZE = 100;
   BAR_H = 12;
@@ -112,6 +115,9 @@ const
 
   MB_LEFT = 1;
   MB_RIGHT = 2;
+
+  ///Промежуток, в который два щелчка по одной клетке считаются двойным.
+  DOUBLE_CLICK_MS = 450;
 
 var
   ///Размеры холста.
@@ -207,6 +213,13 @@ var
   RawAlpha: array of byte;
   BmpHSV, BmpHue, BmpAlpha: Bitmap;
   CachedHue: integer := -1;
+  ///Значки кнопок инструментов. Пусто там, где файла нет: такая кнопка
+  ///рисуется подписью, как раньше. Номера продолжают друг друга: сперва
+  ///девять инструментов тайла, потом пять инструментов карты.
+  IconBmp: array of Bitmap;
+  ///Значки надо перечитать: при запуске и после правки значка в наборе.
+  IconsDirty: boolean := true;
+
   ///Кэш обзорной панели. Картинка пересобирается только когда документ
   ///изменился: при панорамировании двигается лишь рамка видимой области.
   BmpOver: Bitmap;
@@ -226,6 +239,13 @@ var
   ClickPending: boolean;
   ClickX, ClickY, ClickButton: integer;
   WheelAccum: integer;
+  ///Распознавание двойного щелчка по карте: время и клетка прошлого щелчка.
+  ///Клетка, а не пиксель: на мелком масштабе палец легко съезжает на точку-две,
+  ///а по смыслу двойной щелчок делается по клетке.
+  LastClickMs: integer;
+  LastClickCX: integer := -100000;
+  LastClickCY: integer := -100000;
+
   ///Приём текста работает только пока открыто поле ввода.
   TextInputActive: boolean;
   TextInputBuf: string;
@@ -2001,7 +2021,7 @@ end;
 
 procedure DrawToolsSection;
 var
-  x0, y0: integer;
+  x0, y0, ic: integer;
 begin
   GraphABC.Brush.Color := cPanel;
   FillRect(PANEL_X, 0, PANEL_X + PANEL_W, TOOLS_Y1 + 2);
@@ -2018,7 +2038,16 @@ begin
     FillRoundRect(x0 + 1, y0 + 1, x0 + TOOL_CW - 3, y0 + TOOL_CH - 3, 5, 5);
     if CurTool = i then GraphABC.Font.Color := RGB(255, 255, 255)
     else GraphABC.Font.Color := cText;
-    DrawTextCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, ToolLabel(i));
+    ///Нарисованный значок заменяет подпись, ненарисованный — нет. Как и с
+    ///тайлами игры: набор делается по одному, и пока значка нет, кнопка
+    ///выглядит по-прежнему.
+    if DocMode = DOC_MAP then ic := T_TILE_COUNT + i else ic := i;
+    if (ic >= 0) and (ic < Length(IconBmp)) and (IconBmp[ic] <> nil) then
+      GraphBufferGraphics.DrawImage(IconBmp[ic],
+                                    x0 + (TOOL_CW - 2 - ICON_PX) div 2,
+                                    y0 + (TOOL_CH - 2 - ICON_PX) div 2)
+    else
+      DrawTextCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, ToolLabel(i));
   end;
 end;
 
@@ -3613,35 +3642,58 @@ end;
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Набор тайлов Andors-Love.
+// Наборы тайлов Andors-Love.
 //
 // Игра ищет картинки по имени файла: data/tiles/wall.png и так далее, по файлу
-// на слот. Имена и их состав повторяют src/gfx/tiles.cpp игры — это такой же
-// контракт между двумя проектами, как коды клеток в TJTMMap, и разъезжаться
-// им нельзя: слот, названный иначе, игра просто не найдёт.
+// на тайл. Семнадцать основных слотов названы так же и в том же порядке, что
+// в src/gfx/tiles.cpp игры — это такой же контракт между двумя проектами, как
+// коды клеток в TJTMMap: слот, названный иначе, игра просто не найдёт.
 //
-// Ненарисованный слот — не дырка: игра рисует его прежним способом, заливкой
-// и знаком шрифта. Поэтому набор можно делать по одному тайлу и в любом
-// порядке, а пустые слоты в этом экране — нормальное состояние, не ошибка.
+// Сверх них у каждого жителя и врага может быть своя картинка — npc_elder.png,
+// mob_wolf.png. Их состав здесь не перечислен и намеренно: список существ
+// живёт в самой игре, и вторая его копия в редакторе рано или поздно отстала
+// бы. Вместо этого редактор смотрит, какие файлы лежат в папке. Папка и есть
+// список: завели нового врага в игре, её же скрипт создал ему заготовку —
+// и он появился здесь сам.
+//
+// Ненарисованный тайл — не дырка: игра рисует его прежним способом, заливкой
+// и знаком шрифта. Поэтому пустой слот в этом экране — нормальное состояние.
 // ---------------------------------------------------------------------------
 
 const
-  TSET_COUNT = 17;
-  TSET_COLS = 6;
-  TSET_CELL_W = 112;
-  TSET_CELL_H = 104;
-  TSET_THUMB = 56;
+  ///Основных слотов игры. Их имена заданы списком: они часть контракта.
+  TSET_BASE_COUNT = 17;
+
+  ///Какой набор показан.
+  TS_BASE = 0;
+  TS_NPC = 1;
+  TS_MOB = 2;
+  TS_ICON = 3;
+  TS_KINDS = 4;
+
+  TSET_COLS = 8;
+  TSET_ROWS = 3;
+  TSET_PAGE = TSET_COLS * TSET_ROWS;
+  TSET_CELL_W = 96;
+  TSET_CELL_H = 92;
+  TSET_THUMB = 48;
   TSET_X0 = (WIN_W - TSET_COLS * TSET_CELL_W) div 2;
-  TSET_Y0 = 96;
+  TSET_Y0 = 118;
 
 var
-  ///Тайлы набора и их миниатюры. Кэш живёт, пока открыт экран: перечитывать
-  ///семнадцать файлов на каждый кадр отрисовки незачем.
+  ///Состав показанного набора: имя файла без расширения и подпись.
+  ///Заполняется заново при каждой смене набора и после правки папки.
+  TsetFiles: array of string;
+  TsetLabels: array of string;
+  ///Загруженные тайлы и их миниатюры. Кэш живёт, пока открыт экран:
+  ///перечитывать сотню файлов на каждый кадр отрисовки незачем.
   TsetGrid: array of array[,] of Color;
   TsetBmp: array of Bitmap;
+  TsetKind: integer := TS_BASE;
+  TsetPage: integer;
 
-///Имя файла слота без расширения. Порядок задан игрой.
-function TsetFile(i: integer): string;
+///Имя файла основного слота без расширения. Порядок задан игрой.
+function TsetBaseFile(i: integer): string;
 begin
   case i of
     0: Result := 'floor';
@@ -3665,8 +3717,8 @@ begin
   end;
 end;
 
-///Название слота по-русски. Взято из тех же мест игры, что и имена файлов.
-function TsetName(i: integer): string;
+///Название основного слота по-русски. Взято из тех же мест игры.
+function TsetBaseName(i: integer): string;
 begin
   case i of
     0: Result := 'пол';
@@ -3691,13 +3743,24 @@ begin
 end;
 
 ///Местность рисуется непрозрачной, объекты — с прозрачным фоном.
-///Разделение показывается на экране, чтобы не гадать, где нужен фон.
-function TsetIsTerrain(i: integer): boolean;
+function TsetBaseIsTerrain(i: integer): boolean;
 begin
   Result := i <= 6;
 end;
 
-///Папка набора. Пустая строка означает, что папка не задана или не найдена.
+///Название набора для переключателя.
+function TsetKindName(k: integer): string;
+begin
+  case k of
+    TS_BASE: Result := 'Основные';
+    TS_NPC: Result := 'Жители';
+    TS_MOB: Result := 'Враги';
+    TS_ICON: Result := 'Значки';
+    else Result := '';
+  end;
+end;
+
+///Папка набора игры. Пустая строка — папка не задана или не найдена.
 function TilesDir: string;
 begin
   Result := ResolvePath(CfgTilesFolder);
@@ -3705,18 +3768,117 @@ begin
   Result := '';
 end;
 
-function TsetPath(i: integer): string;
+///Папка значков редактора. Своя, а не общая с игрой: значки — имущество
+///редактора, и в наборе игры им делать нечего.
+function IconsDir: string;
+begin
+  Result := ResolvePath(CfgIconsFolder);
+  if Result = '' then exit;
+  if System.IO.Directory.Exists(Result) then exit;
+  Result := '';
+end;
+
+///Папка того набора, что показан сейчас.
+function TsetDirOf(k: integer): string;
+begin
+  if k = TS_ICON then Result := IconsDir else Result := TilesDir;
+end;
+
+///Полный путь к файлу тайла набора.
+function TsetPathOf(k: integer; base: string): string;
 var
   dir: string;
 begin
   Result := '';
-  if (i < 0) or (i >= TSET_COUNT) then exit;
-  dir := TilesDir;
+  if base = '' then exit;
+  dir := TsetDirOf(k);
   if dir = '' then exit;
   try
-    Result := System.IO.Path.Combine(dir, TsetFile(i) + '.png');
+    Result := System.IO.Path.Combine(dir, base + '.png');
   except
     Result := '';
+  end;
+end;
+
+///Собирает список файлов набора существ, читая саму папку. Возвращает имена
+///без расширения, только начинающиеся с prefix, по алфавиту.
+function ScanPrefixed(dir, prefix: string): array of string;
+var
+  names: array of string;
+  n: integer;
+begin
+  SetLength(names, 0);
+  n := 0;
+  if dir <> '' then
+    try
+      var files := System.IO.Directory.GetFiles(dir, prefix + '*.png');
+      System.Array.Sort(files);
+      SetLength(names, files.Length);
+      for var i := 0 to files.Length - 1 do
+      begin
+        var b := System.IO.Path.GetFileNameWithoutExtension(files[i]);
+        // GetFiles сверяет образец без учёта регистра и на коротких именах
+        // может прихватить лишнее, поэтому префикс проверяется ещё раз.
+        if (b <> '') and b.StartsWith(prefix) then
+        begin
+          names[n] := b;
+          n := n + 1;
+        end;
+      end;
+    except
+      n := 0;
+    end;
+  SetLength(names, n);
+  Result := names;
+end;
+
+///Имена значков инструментов. В отличие от существ этот список — имущество
+///редактора, поэтому он здесь, а не в папке: инструмент, для которого нет
+///файла, всё равно должен быть в списке, чтобы его значок можно было завести.
+function IconCount: integer;
+begin
+  Result := T_TILE_COUNT + T_MAP_COUNT;
+end;
+
+function IconFile(i: integer): string;
+begin
+  case i of
+    0: Result := 'tool_pen';
+    1: Result := 'tool_eraser';
+    2: Result := 'tool_fill';
+    3: Result := 'tool_pick';
+    4: Result := 'tool_line';
+    5: Result := 'tool_rect';
+    6: Result := 'tool_ellipse';
+    7: Result := 'tool_dither';
+    8: Result := 'tool_select';
+    9: Result := 'tool_map_paint';
+    10: Result := 'tool_map_fill';
+    11: Result := 'tool_map_rect';
+    12: Result := 'tool_map_object';
+    13: Result := 'tool_map_select';
+    else Result := '';
+  end;
+end;
+
+function IconName(i: integer): string;
+begin
+  case i of
+    0: Result := 'карандаш';
+    1: Result := 'ластик';
+    2: Result := 'заливка';
+    3: Result := 'пипетка';
+    4: Result := 'линия';
+    5: Result := 'прямоугольник';
+    6: Result := 'овал';
+    7: Result := 'дизеринг';
+    8: Result := 'выделение';
+    9: Result := 'местность';
+    10: Result := 'заливка карты';
+    11: Result := 'прямоугольник карты';
+    12: Result := 'объект';
+    13: Result := 'выделение карты';
+    else Result := '';
   end;
 end;
 
@@ -3749,38 +3911,68 @@ begin
   Result := BytesToImage(raw, size);
 end;
 
-///Перечитывает один слот с диска. Отсутствующий файл — не ошибка:
-///слот просто остаётся пустым.
-procedure TsetLoadSlot(i: integer);
+///Миниатюра с сохранением прозрачности. Шахматка тут не нужна и вредна:
+///значок ложится на кнопку, цвет которой меняется — выбранная кнопка синяя,
+///под курсором светлая, — и прозрачные места должны пропускать её, а не
+///подменяться серыми квадратами.
+function MakeThumbAlpha(g: array[,] of Color; size: integer): Bitmap;
+var
+  raw: array of byte;
+  gw, gh, sx, sy, k: integer;
+  c: Color;
+begin
+  Result := nil;
+  if g = nil then exit;
+  gw := Length(g, 0);
+  gh := Length(g, 1);
+  if (gw < 1) or (gh < 1) or (size < 1) then exit;
+  SetLength(raw, size * size * 4);
+  for var py := 0 to size - 1 do
+    for var px := 0 to size - 1 do
+    begin
+      sx := ClampI(px * gw div size, 0, gw - 1);
+      sy := ClampI(py * gh div size, 0, gh - 1);
+      c := g[sx, sy];
+      k := (py * size + px) * 4;
+      // Формат буфера — BGRA с домноженной альфой: GDI+ ждёт именно её,
+      // иначе полупрозрачные края значка светлеют ореолом.
+      raw[k + 0] := Round(c.B * c.A / 255);
+      raw[k + 1] := Round(c.G * c.A / 255);
+      raw[k + 2] := Round(c.R * c.A / 255);
+      raw[k + 3] := c.A;
+    end;
+  Result := BytesToImage(raw, size);
+end;
+
+///Перечитывает значки кнопок. Отсутствующий файл оставляет место пустым,
+///и такая кнопка рисуется подписью.
+procedure EnsureIcons;
 var
   path: string;
   g: array[,] of Color;
 begin
-  if (i < 0) or (i >= TSET_COUNT) then exit;
-  if Length(TsetBmp) <> TSET_COUNT then exit;
-  if TsetBmp[i] <> nil then
+  if not IconsDirty then exit;
+  IconsDirty := false;
+  for var i := 0 to Length(IconBmp) - 1 do
+    if IconBmp[i] <> nil then
+    begin
+      IconBmp[i].Dispose;
+      IconBmp[i] := nil;
+    end;
+  SetLength(IconBmp, IconCount);
+  for var i := 0 to IconCount - 1 do
   begin
-    TsetBmp[i].Dispose;
-    TsetBmp[i] := nil;
+    path := TsetPathOf(TS_ICON, IconFile(i));
+    if path = '' then continue;
+    if not FileThere(path) then continue;
+    if not ReadImageGrid(path, g, true) then continue;
+    IconBmp[i] := MakeThumbAlpha(g, ICON_PX);
   end;
-  SetLength(TsetGrid[i], 0, 0);
-  path := TsetPath(i);
-  if path = '' then exit;
-  if not FileThere(path) then exit;
-  if not ReadImageGrid(path, g, true) then exit;
-  TsetGrid[i] := g;
-  TsetBmp[i] := MakeThumb(g, TSET_THUMB);
+  NeedRepaint := true;
 end;
 
-procedure TsetLoadAll;
-begin
-  SetLength(TsetGrid, TSET_COUNT);
-  SetLength(TsetBmp, TSET_COUNT);
-  for var i := 0 to TSET_COUNT - 1 do TsetLoadSlot(i);
-end;
-
-///Освобождает миниатюры. Без этого каждое открытие экрана оставляло бы
-///за собой семнадцать картинок.
+///Освобождает миниатюры. Без этого каждая смена набора оставляла бы
+///за собой сотню картинок.
 procedure TsetFree;
 begin
   for var i := 0 to Length(TsetBmp) - 1 do
@@ -3793,45 +3985,131 @@ begin
   SetLength(TsetGrid, 0);
 end;
 
-function TsetCellX(slot: integer): integer;
+///Перечитывает один тайл набора с диска. Отсутствующий файл — не ошибка:
+///место просто остаётся пустым.
+procedure TsetLoadOne(i: integer);
+var
+  path: string;
+  g: array[,] of Color;
 begin
-  Result := TSET_X0 + (slot mod TSET_COLS) * TSET_CELL_W;
+  if (i < 0) or (i >= Length(TsetFiles)) then exit;
+  if Length(TsetBmp) <> Length(TsetFiles) then exit;
+  if TsetBmp[i] <> nil then
+  begin
+    TsetBmp[i].Dispose;
+    TsetBmp[i] := nil;
+  end;
+  SetLength(TsetGrid[i], 0, 0);
+  path := TsetPathOf(TsetKind, TsetFiles[i]);
+  if path = '' then exit;
+  if not FileThere(path) then exit;
+  if not ReadImageGrid(path, g, true) then exit;
+  TsetGrid[i] := g;
+  TsetBmp[i] := MakeThumb(g, TSET_THUMB);
 end;
 
-function TsetCellY(slot: integer): integer;
+///Пересобирает состав показанного набора и читает его картинки.
+procedure TsetBuild;
+var
+  found: array of string;
 begin
-  Result := TSET_Y0 + (slot div TSET_COLS) * TSET_CELL_H;
+  TsetFree;
+  SetLength(TsetFiles, 0);
+  SetLength(TsetLabels, 0);
+
+  if TsetKind = TS_BASE then
+  begin
+    SetLength(TsetFiles, TSET_BASE_COUNT);
+    SetLength(TsetLabels, TSET_BASE_COUNT);
+    for var i := 0 to TSET_BASE_COUNT - 1 do
+    begin
+      TsetFiles[i] := TsetBaseFile(i);
+      TsetLabels[i] := TsetBaseName(i);
+    end;
+  end
+  else if TsetKind = TS_ICON then
+  begin
+    SetLength(TsetFiles, IconCount);
+    SetLength(TsetLabels, IconCount);
+    for var i := 0 to IconCount - 1 do
+    begin
+      TsetFiles[i] := IconFile(i);
+      TsetLabels[i] := IconName(i);
+    end;
+  end
+  else
+  begin
+    // Состав существ читается из папки: список живёт в игре, и держать его
+    // вторую копию здесь значило бы однажды от неё отстать.
+    if TsetKind = TS_NPC then found := ScanPrefixed(TilesDir, 'npc_')
+    else found := ScanPrefixed(TilesDir, 'mob_');
+    SetLength(TsetFiles, Length(found));
+    SetLength(TsetLabels, Length(found));
+    for var i := 0 to Length(found) - 1 do
+    begin
+      TsetFiles[i] := found[i];
+      // Подпись — id существа без приставки вида: сама приставка и так
+      // написана в имени файла под миниатюрой.
+      TsetLabels[i] := Copy(found[i], 5, Length(found[i]) - 4);
+    end;
+  end;
+
+  SetLength(TsetGrid, Length(TsetFiles));
+  SetLength(TsetBmp, Length(TsetFiles));
+  for var i := 0 to Length(TsetFiles) - 1 do TsetLoadOne(i);
+
+  if TsetPage * TSET_PAGE >= Length(TsetFiles) then TsetPage := 0;
+end;
+
+function TsetPages: integer;
+begin
+  Result := (Length(TsetFiles) + TSET_PAGE - 1) div TSET_PAGE;
+  if Result < 1 then Result := 1;
+end;
+
+function TsetCellX(k: integer): integer;
+begin
+  Result := TSET_X0 + (k mod TSET_COLS) * TSET_CELL_W;
+end;
+
+function TsetCellY(k: integer): integer;
+begin
+  Result := TSET_Y0 + (k div TSET_COLS) * TSET_CELL_H;
+end;
+
+///Место на странице -> номер в наборе. -1, если место пустое.
+function TsetAt(k: integer): integer;
+begin
+  Result := TsetPage * TSET_PAGE + k;
+  if (Result < 0) or (Result >= Length(TsetFiles)) then Result := -1;
 end;
 
 function TsetHit(px, py: integer; var slot: integer): boolean;
 var
-  col, row: integer;
+  col, row, k: integer;
 begin
   Result := false;
   slot := -1;
   if (px < TSET_X0) or (py < TSET_Y0) then exit;
   col := (px - TSET_X0) div TSET_CELL_W;
   row := (py - TSET_Y0) div TSET_CELL_H;
-  if (col < 0) or (col >= TSET_COLS) or (row < 0) then exit;
-  slot := row * TSET_COLS + col;
-  if (slot < 0) or (slot >= TSET_COUNT) then
-  begin
-    slot := -1;
-    exit;
-  end;
+  if (col < 0) or (col >= TSET_COLS) or (row < 0) or (row >= TSET_ROWS) then exit;
+  k := TsetAt(row * TSET_COLS + col);
+  if k < 0 then exit;
+  slot := k;
   Result := true;
 end;
 
-///Экран набора. Возвращает true, если тайл слота открыт в редакторе:
-///вызывающему тогда стоит уйти из меню в редактор, как после обычной загрузки.
+///Экран наборов. Возвращает true, если тайл открыт в редакторе: вызывающему
+///тогда стоит уйти из меню в редактор, как после обычной загрузки.
 function ShowTilesetScreen: boolean;
 var
   done: boolean;
-  slot, cx, cy, tx: integer;
-  dir, path, note: string;
+  slot, cx, cy, tx, k: integer;
+  dir, path, note, note2: string;
 begin
   Result := false;
-  TsetLoadAll;
+  TsetBuild;
   done := false;
   note := '';
   ClickPending := false;
@@ -3839,82 +4117,117 @@ begin
 
   while not done do
   begin
-    dir := TilesDir;
+    dir := TsetDirOf(TsetKind);
     ClearWindow(cBack);
     GraphABC.Font.Color := cText;
-    DrawTextCentered(0, 10, WIN_W, 44, 'Набор тайлов Andors-Love');
+    DrawTextCentered(0, 6, WIN_W, 40, 'Наборы тайлов');
+
+    // Переключатель наборов. Открытый помечен точкой: UIButton не умеет
+    // показывать нажатое состояние, а знать, где ты находишься, нужно.
+    for var i := 0 to TS_KINDS - 1 do
+    begin
+      if i = TsetKind then note2 := '• ' + TsetKindName(i)
+      else note2 := TsetKindName(i);
+      if UIButton(TSET_X0 + i * 192, 46, 184, 28, note2, i <> TsetKind) then
+      begin
+        TsetKind := i;
+        TsetPage := 0;
+        TsetBuild;
+        note := '';
+      end;
+    end;
+
     if dir = '' then
-      UILabel(0, 46, WIN_W, 20,
-              'Папка набора не задана — укажите data/tiles игры', cWarn)
+    begin
+      if TsetKind = TS_ICON then
+        UILabel(0, 78, WIN_W, 18, 'Папка значков не найдена — создайте её кнопкой внизу', cWarn)
+      else
+        UILabel(0, 78, WIN_W, 18, 'Папка набора не задана — укажите data/tiles игры', cWarn);
+    end
     else
-      UILabel(0, 46, WIN_W, 20, FitText(dir, WIN_W - 40), cTextDim);
-    UILabel(0, 66, WIN_W, 20,
-            'Правая кнопка открывает тайл слота, левая пишет в слот текущий',
+      UILabel(0, 78, WIN_W, 18, FitText(dir, WIN_W - 40), cTextDim);
+    UILabel(0, 96, WIN_W, 18,
+            'Правая кнопка открывает тайл, левая пишет на его место текущий',
             cTextDim);
 
-    for var i := 0 to TSET_COUNT - 1 do
+    for var i := 0 to TSET_PAGE - 1 do
     begin
+      k := TsetAt(i);
+      if k < 0 then continue;
       cx := TsetCellX(i);
       cy := TsetCellY(i);
       tx := cx + (TSET_CELL_W - TSET_THUMB) div 2;
       GraphABC.Brush.Color := cFace;
       FillRect(tx, cy + 2, tx + TSET_THUMB, cy + 2 + TSET_THUMB);
-      if TsetBmp[i] <> nil then
-        GraphBufferGraphics.DrawImage(TsetBmp[i], tx, cy + 2)
+      if TsetBmp[k] <> nil then
+        GraphBufferGraphics.DrawImage(TsetBmp[k], tx, cy + 2)
       else
-        UILabel(cx, cy + 22, TSET_CELL_W, 18, 'нет файла', cTextDim);
-      ///Слот под курсором обведён цветом выделения: попасть в нужный из
-      ///семнадцати мелких клеток иначе трудно.
+        UILabel(cx, cy + 18, TSET_CELL_W, 16, 'нет', cTextDim);
+      ///Место под курсором обведено цветом выделения: попасть в нужное из
+      ///двух десятков мелких клеток иначе трудно.
       if (MouseX >= cx) and (MouseX < cx + TSET_CELL_W) and
          (MouseY >= cy) and (MouseY < cy + TSET_CELL_H) then
         FrameRect(tx - 1, cy + 1, tx + TSET_THUMB + 1, cy + 3 + TSET_THUMB, cAccent)
       else
         FrameRect(tx - 1, cy + 1, tx + TSET_THUMB + 1, cy + 3 + TSET_THUMB, cBorder);
-      if TsetIsTerrain(i) then GraphABC.Font.Color := cText
-      else GraphABC.Font.Color := cAccent;
-      UILabel(cx, cy + 60, TSET_CELL_W, 18,
-              FitText(TsetName(i), TSET_CELL_W - 4), GraphABC.Font.Color);
-      UILabel(cx, cy + 76, TSET_CELL_W, 18, TsetFile(i) + '.png', cTextDim);
+      if (TsetKind = TS_BASE) and (not TsetBaseIsTerrain(k)) then
+        UILabel(cx, cy + 52, TSET_CELL_W, 16,
+                FitText(TsetLabels[k], TSET_CELL_W - 4), cAccent)
+      else
+        UILabel(cx, cy + 52, TSET_CELL_W, 16,
+                FitText(TsetLabels[k], TSET_CELL_W - 4), cText);
+      UILabel(cx, cy + 68, TSET_CELL_W, 16,
+              FitText(TsetFiles[k] + '.png', TSET_CELL_W - 4), cTextDim);
     end;
 
-    UILabel(0, 414, WIN_W, 18,
-            'Чёрным — местность, она рисуется непрозрачной; синим — объекты, ' +
-            'у них фон прозрачный', cTextDim);
-    if note <> '' then UILabel(0, 432, WIN_W, 18, note, cAccent);
+    // Страницы. Показываются всегда, чтобы кнопки не прыгали с места на место.
+    if UIButton(TSET_X0, 398, 90, 28, 'Назад', TsetPage > 0) then
+      TsetPage := TsetPage - 1;
+    UILabel(TSET_X0 + 96, 398, 200, 28,
+            'страница ' + IntToStr(TsetPage + 1) + ' из ' + IntToStr(TsetPages) +
+            ',  тайлов ' + IntToStr(Length(TsetFiles)), cTextDim);
+    if UIButton(TSET_X0 + 306, 398, 90, 28, 'Дальше', TsetPage < TsetPages - 1) then
+      TsetPage := TsetPage + 1;
 
-    if UIButton(WIN_W div 2 - 230, 458, 220, 34, 'Папка набора…', true) then
+    if note <> '' then UILabel(0, 430, WIN_W, 18, note, cAccent);
+
+    if UIButton(WIN_W div 2 - 230, 456, 220, 32, 'Папка набора…', true) then
     begin
-      path := AskOpenFile('Выберите любой тайл в папке набора');
+      path := AskOpenFile('Выберите любой тайл в нужной папке');
       if path <> '' then
       begin
         try
-          CfgTilesFolder := System.IO.Path.GetDirectoryName(path);
+          if TsetKind = TS_ICON then CfgIconsFolder := System.IO.Path.GetDirectoryName(path)
+          else CfgTilesFolder := System.IO.Path.GetDirectoryName(path);
+          note := '';
         except
           note := 'Не удалось разобрать путь';
         end;
         ConfigSave(ConfigPath);
-        TsetLoadAll;
-        note := '';
+        TsetBuild;
       end;
     end;
-    if UIButton(WIN_W div 2 + 10, 458, 220, 34, 'Закрыть', true) then done := true;
+    if UIButton(WIN_W div 2 + 10, 456, 220, 32, 'Закрыть', true) then done := true;
 
-    UILabel(0, H - 26, WIN_W, 20,
-            'Пустой слот игра рисует по-старому — набор можно делать по одному тайлу',
+    UILabel(0, H - 44, WIN_W, 18,
+            'Пустое место игра рисует по-старому — набор можно делать по одному тайлу',
+            cTextDim);
+    UILabel(0, H - 26, WIN_W, 18,
+            'Состав жителей и врагов читается из самой папки: что в ней лежит, то и здесь',
             cTextDim);
 
-    // Клик по слоту разбирается после кнопок: области не пересекаются,
+    // Клик по месту разбирается после кнопок: области не пересекаются,
     // поэтому порядок роли не играет, но так ближе к остальным экранам.
     if ClickPending and TsetHit(ClickX, ClickY, slot) then
     begin
-      path := TsetPath(slot);
+      path := TsetPathOf(TsetKind, TsetFiles[slot]);
       if path = '' then
-        note := 'Сначала укажите папку набора'
+        note := 'Сначала укажите папку'
       else if ClickButton = MB_RIGHT then
       begin
         if not FileThere(path) then
-          note := 'В слоте ' + TsetFile(slot) + ' файла ещё нет'
-        else if ConfirmDiscard('Открыть тайл слота ' + TsetFile(slot) + '?') then
+          note := 'Файла ' + TsetFiles[slot] + '.png ещё нет'
+        else if ConfirmDiscard('Открыть тайл ' + TsetFiles[slot] + '?') then
         begin
           if LoadTileFrom(path, false, true) then
           begin
@@ -3926,10 +4239,10 @@ begin
       else if ClickButton = MB_LEFT then
       begin
         if DocMode <> DOC_TILE then
-          note := 'Записать в слот можно только тайл, а сейчас открыта карта'
+          note := 'Записать можно только тайл, а сейчас открыта карта'
         else if FileThere(path) and
-                (not AskYesNo('Заменить тайл в наборе',
-                              'В слоте ' + TsetFile(slot) + ' уже есть файл. ' +
+                (not AskYesNo('Заменить тайл',
+                              'Файл ' + TsetFiles[slot] + '.png уже есть. ' +
                               'Заменить его текущим тайлом ' + IntToStr(TW) +
                               ' на ' + IntToStr(TH) + '?',
                               'Заменить', 'Отмена')) then
@@ -3938,8 +4251,11 @@ begin
         begin
           if SaveTileTo(path) then
           begin
-            TsetLoadSlot(slot);
-            note := 'Записано в слот ' + TsetFile(slot);
+            TsetLoadOne(slot);
+            note := 'Записано: ' + TsetFiles[slot] + '.png';
+            ///Значки редактора берутся заново сразу: кнопка должна показать
+            ///нарисованное, а не прежнее, иначе непонятно, получилось ли.
+            if TsetKind = TS_ICON then IconsDirty := true;
           end;
         end;
       end;
@@ -4009,14 +4325,33 @@ begin
   Add('уже стоящий, правая убирает, средняя открывает правку строки.');
   Add('Выделение копирует и вставляет куски местности.');
   Add('');
-  Add('НАБОР ТАЙЛОВ ANDORS-LOVE');
-  Add('Клавиша T открывает набор игры: семнадцать слотов, по картинке на слот.');
-  Add('Игра ищет их по имени файла — floor.png, wall.png и так далее, — поэтому');
-  Add('слоты здесь названы и расположены так же, как в самой игре.');
-  Add('Правая кнопка открывает тайл слота в редакторе, левая записывает в слот');
-  Add('текущий тайл. Папка набора задаётся в настройках или прямо на экране.');
-  Add('Пустой слот — не ошибка: игра рисует его прежним способом, заливкой');
-  Add('и знаком шрифта, поэтому набор можно делать по одному тайлу.');
+  Add('НАБОРЫ ТАЙЛОВ');
+  Add('Клавиша T открывает наборы. Их четыре:');
+  Add('  Основные — семнадцать слотов игры: пол, стена, вода, герой и прочие.');
+  Add('  Жители и Враги — по картинке на существо: npc_elder, mob_wolf.');
+  Add('  Значки — картинки на кнопках инструментов самого редактора.');
+  Add('Правая кнопка открывает тайл в редакторе, левая записывает на его место');
+  Add('текущий. Открытый из набора тайл становится текущим файлом, поэтому S');
+  Add('сохраняет его обратно туда же.');
+  Add('');
+  Add('Имена основных слотов — часть договора с игрой: она ищет тайлы по имени');
+  Add('файла, и слот, названный иначе, она просто не найдёт. А вот состав');
+  Add('жителей и врагов редактор не хранит: он смотрит, какие файлы лежат');
+  Add('в папке. Папка и есть список — завели нового врага в игре, и он');
+  Add('появился здесь сам, без правки редактора.');
+  Add('');
+  Add('Пустое место — не ошибка: игра рисует такой тайл прежним способом,');
+  Add('заливкой и знаком шрифта, поэтому набор можно делать по одному.');
+  Add('То же и со значками: пока файла нет, кнопка выглядит подписью.');
+  Add('');
+  Add('ИЗ КАРТЫ ПРЯМО В ТАЙЛ');
+  Add('Двойной щелчок по клетке карты открывает тайл, которым она нарисована.');
+  Add('Под курсором житель — откроется его собственный тайл, враг из точки');
+  Add('появления — его; пусто — тайл самой местности. Если файла ещё нет,');
+  Add('редактор предложит завести его сразу с нужным именем, чтобы Сохранить');
+  Add('положило тайл туда, куда смотрит игра.');
+  Add('Второй щелчок пары обычного дела инструмента не делает: иначе двойной');
+  Add('щелчок инструментом объектов ставил бы два объекта разом.');
   Add('');
   Add('ИНДЕКСНАЯ ПАЛИТРА');
   Add('Клавиша I связывает пиксели тайла с ячейками палитры того же цвета.');
@@ -4043,7 +4378,7 @@ begin
   Add('X поменять местами цвета. P точный выбор цвета по каналам ARGB.');
   Add('G сетка, C шахматка, B бесшовность, W заворот, F и D оси симметрии.');
   Add('E режим замены вместо смешивания. R случайные цвета.');
-  Add('I индексная палитра. T набор тайлов Andors-Love.');
+  Add('I индексная палитра. T наборы тайлов.');
   Add('Delete очистить тайл. Tab переключить режим тайла и карты.');
   Add('Цифры от 1 выбирают инструмент. Плюс и минус — масштаб.');
   Add('Стрелки двигают изображение, пробел возвращает его в центр.');
@@ -4383,7 +4718,7 @@ begin
         ShowMapPropertiesScreen;
     end
     else
-      if UIButton(bx, y, bw, bh, 'Набор тайлов Andors-Love', true) then
+      if UIButton(bx, y, bw, bh, 'Наборы тайлов', true) then
         if ShowTilesetScreen then done := true;
 
     if not isMap then
@@ -4709,8 +5044,124 @@ begin
   if moved then NeedRepaint := true else SwapColors;
 end;
 
-procedure HandleMapCanvas(mx, my: integer);
+///Файл тайла, которым нарисована эта клетка карты. Под объектом — тайл
+///объекта, а у жителя и врага ещё и свой собственный: строка объекта хранит
+///id существа, и по нему сразу получается npc_elder или mob_rat. Пустая
+///строка означает, что открывать нечего.
+function MapCellTileFile(x, y: integer): string;
+var
+  idx: integer;
+  kind, id: string;
 begin
+  Result := '';
+  if (x < 0) or (y < 0) or (x >= MapW) or (y >= MapH) then exit;
+
+  idx := MapObjectAt(x, y);
+  if idx >= 0 then
+  begin
+    kind := MapObjects[idx].Kind;
+    // Первое слово хвоста строки — id существа. Дальше идут числа зоны
+    // и количества, они здесь не нужны.
+    id := Trim(MapObjects[idx].Rest);
+    var sp := Pos(' ', id);
+    if sp > 0 then id := Copy(id, 1, sp - 1);
+
+    if (kind = 'npc') and (id <> '') then Result := 'npc_' + id
+    else if (kind = 'spawn') and (id <> '') then Result := 'mob_' + id
+    else if kind = 'npc' then Result := 'npc'
+    else if kind = 'spawn' then Result := 'mob'
+    else Result := kind;
+    exit;
+  end;
+
+  // Под курсором пусто — значит, речь о самой местности. Коды клеток идут
+  // в том же порядке, что и основные слоты набора, поэтому номер годится
+  // как есть.
+  Result := TsetBaseFile(MapGrid[x, y]);
+end;
+
+///Открывает тайл клетки карты в редакторе тайла. Возвращает true, если
+///открыл: вызывающий тогда не выполняет обычное действие инструмента.
+function OpenTileOfMapCell(x, y: integer): boolean;
+var
+  base, path: string;
+  nw, nh: integer;
+begin
+  Result := false;
+  base := MapCellTileFile(x, y);
+  if base = '' then exit;
+
+  path := TsetPathOf(TS_BASE, base);
+  if path = '' then
+  begin
+    ShowMessage('Папка набора не задана',
+                'Чтобы открывать тайлы прямо с карты, укажите папку набора — ' +
+                'например data/tiles игры. Это делается в настройках или на ' +
+                'экране наборов.');
+    exit;
+  end;
+
+  // Правки тайла не должны потеряться из-за щелчка по карте.
+  if TileModified then
+    if not AskYesNo('Несохранённый тайл',
+                    'В открытом тайле есть изменения, которых нет в файле. ' +
+                    'Открыть ' + base + '.png и потерять их?',
+                    'Открыть', 'Отмена') then exit;
+
+  if FileThere(path) then
+  begin
+    Result := LoadTileFrom(path, false, true);
+    exit;
+  end;
+
+  // Файла нет — обычное дело: этот тайл ещё не рисовали. Предложим завести.
+  if not AskYesNo('Тайла ещё нет',
+                  'Файла ' + base + '.png в папке набора нет. Создать пустой ' +
+                  'и начать рисовать? Он попадёт в игру, как только вы его ' +
+                  'сохраните.',
+                  'Создать', 'Отмена') then exit;
+
+  nw := CfgDefaultWidth;
+  nh := CfgDefaultHeight;
+  NewTileOfSize(nw, nh);
+  // Имя задаётся сразу, чтобы «Сохранить» положило тайл туда, куда смотрит
+  // игра, и не пришлось искать папку в диалоге.
+  CurrentFile := path;
+  TileModified := true;
+  Result := true;
+end;
+
+procedure HandleMapCanvas(mx, my: integer);
+var
+  now: integer;
+  twice: boolean;
+begin
+  // Двойной щелчок левой кнопкой открывает тайл этой клетки в редакторе
+  // тайла. Считается только он: правая кнопка — пипетка местности, и два
+  // взятия подряд не должны никуда уводить.
+  //
+  // Второй щелчок пары своё обычное дело не выполняет: иначе двойной щелчок
+  // инструментом объектов ставил бы два объекта разом. Первый выполняет —
+  // отменить его нечем, но у местности повторная покраска той же клетки
+  // ничего не меняет, а лишний объект убирается одним Z.
+  now := Milliseconds;
+  twice := (ClickButton = MB_LEFT) and (not AltDown) and
+           (mx = LastClickCX) and (my = LastClickCY) and
+           (now - LastClickMs >= 0) and (now - LastClickMs <= DOUBLE_CLICK_MS);
+  LastClickMs := now;
+  LastClickCX := mx;
+  LastClickCY := my;
+  if twice then
+  begin
+    // Пара засчитана: следующий щелчок начинает новую, а не продолжает эту.
+    LastClickCX := -100000;
+    if OpenTileOfMapCell(mx, my) then exit;
+    // Не открылось — значит, отказались в вопросе. Обычное действие
+    // инструмента всё равно пропускаем: щелчок был про другое.
+    NeedRepaint := true;
+    exit;
+  end;
+
   // Правая кнопка и Alt берут вид местности из-под курсора.
   // Инструмент объектов обрабатывает правую кнопку сам.
   if ((ClickButton = MB_RIGHT) or AltDown) and (ToolMap <> M_OBJ) then
@@ -5151,6 +5602,7 @@ begin
     FitScale;
   end;
 
+  EnsureIcons;
   SyncTitle;
   Repaint;
 
@@ -5165,6 +5617,9 @@ procedure AppStep;
 var
   wheel, key, tx, ty: integer;
 begin
+  ///Значки перечитываются здесь, а не там, где их правят: правка приходит
+  ///из экрана наборов, а он в это время сам занимает окно.
+  EnsureIcons;
   if NeedRepaint then Repaint;
   SyncTitle;
 

@@ -49,6 +49,9 @@ var
   ///Папка с набором тайлов игры, например data/tiles игры Andors-Love.
   ///Экран набора читает и пишет файлы прямо в неё.
   CfgTilesFolder: string;
+  ///Папка со значками кнопок редактора. Своя, а не общая с игрой:
+  ///значки — имущество редактора, и в наборе игры им делать нечего.
+  CfgIconsFolder: string;
 
 ///Сбрасывает все настройки к значениям по умолчанию.
 procedure ConfigSetDefaults;
@@ -82,6 +85,7 @@ begin
   CfgMapsFolder := '';
   CfgLastMapFile := '';
   CfgTilesFolder := '';
+  CfgIconsFolder := 'Resources/Icons';
 end;
 
 function RuBool(b: boolean): string;
@@ -186,7 +190,9 @@ begin
     else if key = 'lastmapfile' then
       begin CfgLastMapFile := val; n := n + 1 end
     else if key = 'tilesfolder' then
-      begin CfgTilesFolder := val; n := n + 1 end;
+      begin CfgTilesFolder := val; n := n + 1 end
+    else if key = 'iconsfolder' then
+      begin CfgIconsFolder := val; n := n + 1 end;
   end;
 
   Result := n;
@@ -288,6 +294,9 @@ begin
   AddLine(lines, '# Папка с набором тайлов, например data/tiles игры Andors-Love.');
   AddLine(lines, '# Экран набора открывает и сохраняет тайлы прямо в ней.');
   AddLine(lines, 'TilesFolder = ' + CfgTilesFolder);
+  AddLine(lines, '');
+  AddLine(lines, '# Папка со значками кнопок редактора. Пусто — кнопки с подписями.');
+  AddLine(lines, 'IconsFolder = ' + CfgIconsFolder);
   AddLine(lines, '');
   AddLine(lines, '# Изображение, загружаемое при запуске. Пусто — не загружать.');
   AddLine(lines, '# Размер тайла берётся из самого изображения.');
