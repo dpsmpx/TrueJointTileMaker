@@ -252,6 +252,17 @@ var
   MousePressed: boolean;
   ClickPending: boolean;
   ClickX, ClickY, ClickButton: integer;
+  ///Замок только на ввод. Обработчики мыши выполняются в потоке интерфейса
+  ///параллельно основному циклу, поэтому снимок надо брать целиком, а не
+  ///по полю: иначе можно увидеть флаг от нового клика вместе с координатами
+  ///от старого.
+  InputLock: object := new System.Object;
+  ///Снимок клика на кадр. Кнопки спрашивают его, а не живой флаг: клик,
+  ///пришедший посреди отрисовки, раньше стирался в конце кадра, так и не
+  ///дойдя ни до одной кнопки. Отсюда и жалобы, что кнопка срабатывает не
+  ///с первого раза: чем дольше перерисовка, тем шире окно потери.
+  FrameClick: boolean;
+  FrameClickX, FrameClickY, FrameClickButton: integer;
   WheelAccum: integer;
   ///Распознавание двойного щелчка по карте: время и клетка прошлого щелчка.
   ///Клетка, а не пиксель: на мелком масштабе палец легко съезжает на точку-две,
@@ -281,19 +292,37 @@ var
   LastStatX: integer := -100000;
   LastStatY: integer := -100000;
 
-  ///Цвета интерфейса.
-  cBack := RGB(238, 238, 240);
-  cFace := RGB(225, 226, 230);
-  cHover := RGB(250, 250, 252);
-  cBorder := RGB(150, 152, 158);
-  cText := RGB(24, 24, 28);
-  cTextDim := RGB(140, 142, 148);
-  cPanel := RGB(205, 206, 212);
-  cCanvas := RGB(120, 122, 128);
-  cCheckA := RGB(200, 200, 206);
-  cCheckB := RGB(168, 168, 176);
-  cAccent := RGB(60, 110, 200);
-  cWarn := RGB(190, 60, 40);
+  ///Цвета интерфейса. Оттенки уведены в холодную сторону и разведены по
+  ///светлоте сильнее прежнего: панель, кнопка и фон отличались на несколько
+  ///единиц и сливались, а рамка была темнее подписи — глаз цеплялся за
+  ///обводку вместо содержимого. Холст оставлен нейтрально серым: любой
+  ///оттенок вокруг картинки врёт о её собственных цветах.
+  ///Фон страницы и поле кнопки — разные тона нарочно. Совпадая, они
+  ///оставляли кнопку висеть на одной обводке, и ряд кнопок читался
+  ///как размеченная линейка, а не как ряд нажимаемых мест.
+  cWindow := RGB(240, 242, 246);    // фон окна: страница
+  cBack := RGB(253, 253, 254);      // поле кнопки: карточка на странице
+  cFace := RGB(237, 239, 243);      // выключенное, подложки полей
+  cHover := RGB(231, 240, 253);     // под курсором — холодный отсвет
+  cBorder := RGB(205, 210, 218);    // обводка тише подписи
+  cText := RGB(28, 32, 38);
+  cTextDim := RGB(122, 130, 141);
+  cPanel := RGB(243, 245, 248);     // подложка панели инструментов
+  cCanvas := RGB(120, 122, 128);    // вокруг холста — нейтральный серый
+  cCheckA := RGB(214, 214, 218);
+  cCheckB := RGB(184, 184, 190);
+  cAccent := RGB(36, 104, 216);
+  cWarn := RGB(198, 58, 46);
+  ///Тень под кнопкой и тонкие разделители. Отдельные цвета, а не оттенки
+  ///обводки: обводка очерчивает, тень отделяет от фона, линия делит — и
+  ///менять их приходится порознь.
+  cShadow := RGB(219, 222, 229);
+  cLine := RGB(230, 233, 238);
+
+///Скругление углов. Одно на кнопки, поля и подложки: разные радиусы в
+///одном окне читаются как разные наборы элементов, случайно оказавшиеся
+///рядом.
+const BTN_R = 7;
 
 ///Опережающие объявления: обе процедуры нужны раньше, чем описана отрисовка.
 procedure DrawTilePixel(x, y: integer); forward;
@@ -308,6 +337,37 @@ procedure DrawPreviewPixel(x, y: integer); forward;
 procedure Idle;
 begin
   System.Threading.Thread.Sleep(4);
+end;
+
+///Снимает накопленный клик в начало кадра. Дальше весь кадр — и отрисовка,
+///и проверка попаданий — работает с этим снимком, а живой флаг снова копит
+///то, что приходит. Клик, пришедший посреди кадра, поэтому не пропадает:
+///он достанется следующему.
+procedure BeginFrameInput;
+begin
+  System.Threading.Monitor.Enter(InputLock);
+  try
+    FrameClick := ClickPending;
+    FrameClickX := ClickX;
+    FrameClickY := ClickY;
+    FrameClickButton := ClickButton;
+    ClickPending := false;
+  finally
+    System.Threading.Monitor.Exit(InputLock);
+  end;
+end;
+
+///Забыть и накопленное, и снятое. Нужно на входе в экран: клик, которым его
+///открыли, не должен тут же нажать кнопку, случайно оказавшуюся под курсором.
+procedure DropInput;
+begin
+  System.Threading.Monitor.Enter(InputLock);
+  try
+    ClickPending := false;
+  finally
+    System.Threading.Monitor.Exit(InputLock);
+  end;
+  FrameClick := false;
 end;
 
 function DetectBaseDir: string;
@@ -401,10 +461,15 @@ begin
   MouseX := x;
   MouseY := y;
   MousePressed := true;
-  ClickX := x;
-  ClickY := y;
-  ClickButton := mb;
-  ClickPending := true;
+  System.Threading.Monitor.Enter(InputLock);
+  try
+    ClickX := x;
+    ClickY := y;
+    ClickButton := mb;
+    ClickPending := true;
+  finally
+    System.Threading.Monitor.Exit(InputLock);
+  end;
 end;
 
 procedure OnMouseMoveHandler(x, y, mb: integer);
@@ -1791,22 +1856,53 @@ end;
 ///Рисует кнопку и сообщает, был ли по ней клик в этом кадре.
 function UIButton(x, y, bw, bh: integer; caption: string; enabled: boolean): boolean;
 var
-  over: boolean;
+  over, down: boolean;
 begin
   Result := false;
   over := enabled and (MouseX >= x) and (MouseX < x + bw) and
                       (MouseY >= y) and (MouseY < y + bh);
+  down := over and MousePressed;
+
+  // Мягкая тень под кнопкой: одна полоса на пиксель ниже. Она отделяет
+  // кнопку от фона там, где обводка уже не справляется, — обводка теперь
+  // тише подписи нарочно, чтобы взгляд шёл к тексту, а не к рамке.
+  // У нажатой кнопки тени нет: так она выглядит вдавленной, без сдвига
+  // подписи, который сбивал бы прицел на следующий клик.
+  if enabled and not down then
+  begin
+    GraphABC.Brush.Color := cShadow;
+    FillRoundRect(x + 1, y + 2, x + bw - 1, y + bh + 1, BTN_R, BTN_R);
+  end;
+
   GraphABC.Brush.Color := cBorder;
-  FillRoundRect(x, y, x + bw, y + bh, 6, 6);
+  FillRoundRect(x, y, x + bw, y + bh, BTN_R, BTN_R);
   if not enabled then GraphABC.Brush.Color := cFace
+  else if down then GraphABC.Brush.Color := cFace
   else if over then GraphABC.Brush.Color := cHover
   else GraphABC.Brush.Color := cBack;
-  FillRoundRect(x + 1, y + 1, x + bw - 1, y + bh - 1, 6, 6);
+  FillRoundRect(x + 1, y + 1, x + bw - 1, y + bh - 1, BTN_R, BTN_R);
+
+  // Под курсором обводка набирает цвет: наведение видно и без движения мыши,
+  // на скриншоте и в записи экрана тоже.
+  if enabled and over then
+  begin
+    GraphABC.Brush.Color := cAccent;
+    FillRoundRect(x, y + bh - 2, x + bw, y + bh, BTN_R, BTN_R);
+    GraphABC.Brush.Color := cHover;
+    FillRoundRect(x + 1, y + bh - 3, x + bw - 1, y + bh - 2, BTN_R, BTN_R);
+  end;
+
   if enabled then GraphABC.Font.Color := cText else GraphABC.Font.Color := cTextDim;
   DrawTextCentered(x + 4, y, x + bw - 4, y + bh, caption);
-  if enabled and ClickPending and
-     (ClickX >= x) and (ClickX < x + bw) and (ClickY >= y) and (ClickY < y + bh) then
+  // Клик забирается кнопкой: одно нажатие приводит в действие ровно одну
+  // кнопку, даже если экран успел смениться посреди кадра.
+  if enabled and FrameClick and
+     (FrameClickX >= x) and (FrameClickX < x + bw) and
+     (FrameClickY >= y) and (FrameClickY < y + bh) then
+  begin
+    FrameClick := false;
     Result := true;
+  end;
 end;
 
 procedure UILabel(x, y, bw, bh: integer; caption: string; c: Color);
@@ -2440,11 +2536,26 @@ begin
   UIButton(PANEL_X + 4, MENU_Y0, PANEL_W - 8, MENU_Y1 - MENU_Y0, caption, true);
 end;
 
+///Тонкая линия во всю ширину панели. Разделяет разделы: инструменты,
+///цвет, обзор и сведения шли встык, и панель читалась одним длинным
+///столбцом, в котором глазу не за что зацепиться.
+procedure PanelDivider(y: integer);
+begin
+  GraphABC.Brush.Color := cLine;
+  FillRect(PANEL_X + 6, y, PANEL_X + PANEL_W - 6, y + 1);
+end;
+
 procedure DrawPanel;
 begin
   GraphABC.Brush.Color := cPanel;
   FillRect(PANEL_X, 0, PANEL_X + PANEL_W, H);
+  ///Панель отделена от холста собственной границей, а не только цветом:
+  ///на светлой теме разница тонов мала, и край терялся.
+  GraphABC.Brush.Color := cBorder;
+  FillRect(PANEL_X, 0, PANEL_X + 1, H);
+
   DrawToolsSection;
+  PanelDivider(TOOLS_Y1 + 2);
   if DocMode = DOC_MAP then
   begin
     DrawTerrainSection;
@@ -2455,8 +2566,11 @@ begin
     DrawPaletteSection;
     DrawColorSection;
   end;
+  PanelDivider(OVER_Y0 - 3);
   DrawOverviewSection;
+  PanelDivider(INFO_Y0 - 2);
   DrawInfoSection;
+  PanelDivider(MENU_Y0 - 3);
   DrawMenuButtonSection;
 end;
 
@@ -2614,7 +2728,7 @@ var
 begin
   done := false;
   top := 0;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
   lineH := TextHeight('Wg') + 2;
   if lineH < 8 then lineH := 8;
@@ -2624,15 +2738,20 @@ begin
 
   while not done do
   begin
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
     maxTop := Max(0, Length(lines) - visible);
     top := ClampI(top, 0, maxTop);
 
-    ClearWindow(cBack);
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, 14, WIN_W, 44, title);
 
-    GraphABC.Brush.Color := cFace;
-    FillRoundRect(24, 52, WIN_W - 24, H - 56, 6, 6);
+    GraphABC.Brush.Color := cBorder;
+    FillRoundRect(24, 52, WIN_W - 24, H - 56, BTN_R, BTN_R);
+    GraphABC.Brush.Color := cBack;
+    FillRoundRect(25, 53, WIN_W - 25, H - 57, BTN_R, BTN_R);
     GraphABC.Font.Color := cText;
     for var i := 0 to visible - 1 do
     begin
@@ -2652,7 +2771,6 @@ begin
     if UIButton(WIN_W div 2 - 60, H - 50, 120, 28, 'Закрыть', true) then done := true;
 
     Redraw;
-    ClickPending := false;
 
     var key := TakeKey;
     if (key = KEY_ESC) or (key = KEY_ENTER) or (key = KEY_BACK) then done := true;
@@ -2685,11 +2803,14 @@ var
 begin
   res := -1;
   done := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
   while not done do
   begin
-    ClearWindow(cBack);
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, H div 2 - 90, WIN_W, H div 2 - 50, title);
     GraphABC.Font.Color := cText;
@@ -2712,7 +2833,6 @@ begin
     end;
 
     Redraw;
-    ClickPending := false;
     var key := TakeKey;
     if key = KEY_ESC then
     begin
@@ -2733,11 +2853,14 @@ var
 begin
   res := false;
   done := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
   while not done do
   begin
-    ClearWindow(cBack);
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, H div 2 - 90, WIN_W, H div 2 - 50, title);
     GraphABC.Font.Color := cText;
@@ -2755,7 +2878,6 @@ begin
     end;
 
     Redraw;
-    ClickPending := false;
     if TakeKey = KEY_ESC then
     begin
       res := false;
@@ -2784,12 +2906,15 @@ begin
   nh := ClampI(nh, MIN_TILE, MAX_TILE);
   done := false;
   ok := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
 
   while not done do
   begin
-    ClearWindow(cBack);
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, 30, WIN_W, 66, 'Создать новый тайл');
     UILabel(0, 70, WIN_W, 26,
@@ -2833,7 +2958,6 @@ begin
     end;
 
     Redraw;
-    ClickPending := false;
     var key := TakeKey;
     if key = KEY_ESC then
     begin
@@ -2885,12 +3009,15 @@ begin
   ch[3] := FirstColor.B; names[3] := 'Синий';
 
   done := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
 
   while not done do
   begin
-    ClearWindow(cBack);
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, 16, WIN_W, 50, 'Точный выбор цвета');
 
@@ -2934,7 +3061,6 @@ begin
     if UIButton(WIN_W div 2 + 10, H - 80, 170, 38, 'Отмена', true) then done := true;
 
     Redraw;
-    ClickPending := false;
     var key := TakeKey;
     if (key = KEY_ESC) or (key = KEY_BACK) then done := true;
     if key = KEY_ENTER then
@@ -3018,7 +3144,7 @@ var
 begin
   done := false;
   ok := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
   fx := 60;
   fy := H div 2 - 20;
@@ -3035,7 +3161,10 @@ begin
   try
     while not done do
     begin
-      ClearWindow(cBack);
+      // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+      // достанется следующему кадру, а не пропадёт.
+      BeginFrameInput;
+      ClearWindow(cWindow);
       GraphABC.Font.Color := cText;
       DrawTextCentered(0, fy - 110, WIN_W, fy - 74, title);
       UILabel(0, fy - 70, WIN_W, 24, prompt, cTextDim);
@@ -3051,7 +3180,6 @@ begin
       if UIButton(WIN_W div 2 + 10, fy + 60, 170, 36, 'Отмена', true) then done := true;
 
       Redraw;
-      ClickPending := false;
       if EditDone then
       begin
         ok := true;
@@ -3082,7 +3210,7 @@ var
   caption: string;
 begin
   done := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
   bw := 420;
   bh := 30;
@@ -3091,7 +3219,10 @@ begin
 
   while not done do
   begin
-    ClearWindow(cBack);
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, 24, WIN_W, 60, 'Операции с цветом');
     UILabel(0, 62, WIN_W, 22,
@@ -3195,7 +3326,6 @@ begin
     if UIButton(WIN_W div 2 - 85, H - 56, 170, 36, 'Закрыть', true) then done := true;
 
     Redraw;
-    ClickPending := false;
     if TakeKey = KEY_ESC then done := true;
     Idle;
   end;
@@ -3599,7 +3729,7 @@ var
   nm: string;
 begin
   done := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
   bx := 60;
   nw := MapW;
@@ -3607,7 +3737,10 @@ begin
 
   while not done do
   begin
-    ClearWindow(cBack);
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, 24, WIN_W, 60, 'Свойства локации');
     UILabel(0, 62, WIN_W, 22,
@@ -3669,7 +3802,6 @@ begin
     if UIButton(WIN_W div 2 + 20, H - 60, 220, 36, 'Закрыть', true) then done := true;
 
     Redraw;
-    ClickPending := false;
     if TakeKey = KEY_ESC then done := true;
     Idle;
   end;
@@ -4315,13 +4447,16 @@ begin
   TsetBuild;
   done := false;
   note := '';
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
 
   while not done do
   begin
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
     dir := TsetDirOf(TsetKind);
-    ClearWindow(cBack);
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, 6, WIN_W, 40, 'Наборы тайлов');
 
@@ -4421,12 +4556,13 @@ begin
 
     // Клик по месту разбирается после кнопок: области не пересекаются,
     // поэтому порядок роли не играет, но так ближе к остальным экранам.
-    if ClickPending and TsetHit(ClickX, ClickY, slot) then
+    if FrameClick and TsetHit(FrameClickX, FrameClickY, slot) then
     begin
+      FrameClick := false;
       path := TsetPathOf(TsetKind, TsetFiles[slot]);
       if path = '' then
         note := 'Сначала укажите папку'
-      else if ClickButton = MB_RIGHT then
+      else if FrameClickButton = MB_RIGHT then
       begin
         if not FileThere(path) then
           note := 'Файла ' + TsetFiles[slot] + '.png ещё нет'
@@ -4439,7 +4575,7 @@ begin
           end;
         end;
       end
-      else if ClickButton = MB_LEFT then
+      else if FrameClickButton = MB_LEFT then
       begin
         if DocMode <> DOC_TILE then
           note := 'Записать можно только тайл, а сейчас открыта карта'
@@ -4465,7 +4601,6 @@ begin
     end;
 
     Redraw;
-    ClickPending := false;
     if TakeKey = KEY_ESC then done := true;
     Idle;
   end;
@@ -4712,12 +4847,15 @@ begin
   path1X := 200;
   ctlX := 400;
   done := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
 
   while not done do
   begin
-    ClearWindow(cBack);
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, 14, WIN_W, 46, 'Настройки');
     UILabel(0, 46, WIN_W, 20, 'Сохраняются в Config.txt рядом с программой', cTextDim);
@@ -4832,7 +4970,6 @@ begin
     if UIButton(WIN_W div 2 + 10, H - 52, 180, 36, 'Отмена', true) then done := true;
 
     Redraw;
-    ClickPending := false;
     if TakeKey = KEY_ESC then done := true;
     Idle;
   end;
@@ -4849,7 +4986,7 @@ var
   lastOk, isMap: boolean;
 begin
   done := false;
-  ClickPending := false;
+  DropInput;
   KeyPending := false;
   bw := 420;
   ///Кнопок в режиме тайла двенадцать, и они должны уместиться над подписью
@@ -4860,6 +4997,9 @@ begin
 
   while not done do
   begin
+    // Снимок ввода на кадр: клик, пришедший посреди отрисовки,
+    // достанется следующему кадру, а не пропадёт.
+    BeginFrameInput;
     isMap := DocMode = DOC_MAP;
     if isMap then
     begin
@@ -4883,7 +5023,7 @@ begin
     if isMap then info := info + '   объектов ' + IntToStr(Length(MapObjects));
     if IsModified then info := info + '   есть несохранённые изменения';
 
-    ClearWindow(cBack);
+    ClearWindow(cWindow);
     GraphABC.Font.Color := cText;
     DrawTextCentered(0, 16, WIN_W, 52, APP_TITLE);
     if isMap then
@@ -4989,7 +5129,6 @@ begin
             cTextDim);
 
     Redraw;
-    ClickPending := false;
     if TakeKey = KEY_ESC then done := true;
     Idle;
   end;
@@ -5228,7 +5367,7 @@ var
   idx: integer;
 begin
   idx := MapObjectAt(mx, my);
-  if ClickButton = MB_RIGHT then
+  if FrameClickButton = MB_RIGHT then
   begin
     if idx >= 0 then
     begin
@@ -5255,8 +5394,8 @@ var
   sx, sy, vx, vy: integer;
   moved: boolean;
 begin
-  sx := ClickX;
-  sy := ClickY;
+  sx := FrameClickX;
+  sy := FrameClickY;
   vx := ViewX;
   vy := ViewY;
   moved := false;
@@ -5376,7 +5515,7 @@ begin
   // отменить его нечем, но у местности повторная покраска той же клетки
   // ничего не меняет, а лишний объект убирается одним Z.
   now := Milliseconds;
-  twice := (ClickButton = MB_LEFT) and (not AltDown) and
+  twice := (FrameClickButton = MB_LEFT) and (not AltDown) and
            (mx = LastClickCX) and (my = LastClickCY) and
            (now - LastClickMs >= 0) and (now - LastClickMs <= DOUBLE_CLICK_MS);
   LastClickMs := now;
@@ -5395,7 +5534,7 @@ begin
 
   // Правая кнопка и Alt берут вид местности из-под курсора.
   // Инструмент объектов обрабатывает правую кнопку сам.
-  if ((ClickButton = MB_RIGHT) or AltDown) and (ToolMap <> M_OBJ) then
+  if ((FrameClickButton = MB_RIGHT) or AltDown) and (ToolMap <> M_OBJ) then
   begin
     MapBrush := MapGrid[mx, my];
     NeedRepaint := true;
@@ -5419,10 +5558,10 @@ procedure HandleCanvasClick;
 var
   mx, my, idx: integer;
 begin
-  mx := ScreenToTileX(ClickX);
-  my := ScreenToTileY(ClickY);
+  mx := ScreenToTileX(FrameClickX);
+  my := ScreenToTileY(FrameClickY);
 
-  if IsMiddle(ClickButton) then
+  if IsMiddle(FrameClickButton) then
   begin
     // Над объектом средняя кнопка открывает правку его строки.
     if (DocMode = DOC_MAP) and (ToolMap = M_OBJ) and InDoc(mx, my) then
@@ -5454,7 +5593,7 @@ begin
     exit;
   end;
 
-  if (ClickButton = MB_RIGHT) or AltDown or (ToolTile = T_PICK) then
+  if (FrameClickButton = MB_RIGHT) or AltDown or (ToolTile = T_PICK) then
   begin
     PickColorFromTile(mx, my);
     exit;
@@ -5520,15 +5659,15 @@ var
   idx: byte;
   oldC: Color;
 begin
-  if IsMiddle(ClickButton) then
+  if IsMiddle(FrameClickButton) then
   begin
     PaletteIO;
     exit;
   end;
-  if not PalHit(ClickX, ClickY, cj, ci) then exit;
+  if not PalHit(FrameClickX, FrameClickY, cj, ci) then exit;
   idx := PalIndexAt(cj, ci);
 
-  if ClickButton = MB_RIGHT then
+  if FrameClickButton = MB_RIGHT then
   begin
     PickColor(Palette[cj, ci]);
     ///Цвет взят из конкретной ячейки, поэтому привязка ставится точная,
@@ -5577,17 +5716,17 @@ procedure HandlePanelClick;
 var
   py, idx: integer;
 begin
-  py := ClickY;
+  py := FrameClickY;
 
   if (py >= TOOLS_Y0) and (py < TOOLS_Y1) then
   begin
-    if ToolHit(ClickX, ClickY, idx) then SetTool(idx);
+    if ToolHit(FrameClickX, FrameClickY, idx) then SetTool(idx);
   end
 
   else if (py >= OVER_Y0) and (py < OVER_Y1) then
   begin
-    if IsMiddle(ClickButton) then DoOverviewDrag
-    else OverviewCenterOn(ClickX, ClickY);
+    if IsMiddle(FrameClickButton) then DoOverviewDrag
+    else OverviewCenterOn(FrameClickX, FrameClickY);
   end
 
   else if (py >= MENU_Y0) and (py < MENU_Y1) then
@@ -5597,14 +5736,14 @@ begin
   begin
     if (py >= SLOT1_Y0) and (py < SLOT1_Y1) then
     begin
-      if TerrHit(ClickX, ClickY, idx) then
+      if TerrHit(FrameClickX, FrameClickY, idx) then
       begin
         MapBrush := idx;
         NeedRepaint := true;
       end;
     end
     else if (py >= SLOT2_Y0) and (py < ALPHA_Y1) then
-      if ObjHit(ClickX, ClickY, idx) then
+      if ObjHit(FrameClickX, FrameClickY, idx) then
       begin
         MapObjKind := idx;
         NeedRepaint := true;
@@ -5617,15 +5756,15 @@ begin
       HandlePaletteClick
     else if (py >= HSV_Y0) and (py < HSV_Y1) then
     begin
-      if IsMiddle(ClickButton) then ShowColorScreen else DragHSVSquare;
+      if IsMiddle(FrameClickButton) then ShowColorScreen else DragHSVSquare;
     end
     else if (py >= HUE_Y0) and (py < HUE_Y1) then
     begin
-      if IsMiddle(ClickButton) then ShowColorScreen else DragHueBar;
+      if IsMiddle(FrameClickButton) then ShowColorScreen else DragHueBar;
     end
     else if (py >= ALPHA_Y0) and (py < ALPHA_Y1) then
     begin
-      if IsMiddle(ClickButton) then ShowColorScreen else DragAlphaBar;
+      if IsMiddle(FrameClickButton) then ShowColorScreen else DragAlphaBar;
     end;
   end;
 end;
@@ -5848,6 +5987,11 @@ procedure AppStep;
 var
   wheel, key, tx, ty: integer;
 begin
+  // Снимок ввода — первым делом кадра, до всякой перерисовки. Перерисовка
+  // холста бывает долгой, и клик, пришедший во время неё, раньше стирался,
+  // так и не дойдя ни до кнопки, ни до холста.
+  BeginFrameInput;
+
   ///Значки перечитываются здесь, а не там, где их правят: правка приходит
   ///из экрана наборов, а он в это время сам занимает окно.
   EnsureIcons;
@@ -5881,10 +6025,10 @@ begin
   key := TakeKey;
   if key <> 0 then HandleEditorKey(key);
 
-  if ClickPending then
+  if FrameClick then
   begin
-    ClickPending := false;
-    if ClickX < W then HandleCanvasClick else HandlePanelClick;
+    FrameClick := false;
+    if FrameClickX < W then HandleCanvasClick else HandlePanelClick;
   end;
 
   // Координаты курсора обновляются точечно, без полной перерисовки окна.
