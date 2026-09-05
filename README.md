@@ -307,3 +307,5 @@ GNU General Public License версии 3, см. файл `LICENSE`.
 
 Группе [vk.com/programmer_ne_lamer](https://vk.com/programmer_ne_lamer) за
 сообщество и поддержку.
+
+###### **Активно использовался Claude Code Ultracode**
