@@ -14,11 +14,12 @@
 ///  ПКМ  — взять: пипетка цвета или местности, убрать объект;
 ///  ролик как кнопка — служебное: протяжка панорамирует, щелчок без
 ///         протяжки меняет местами рабочие цвета.
-uses GraphABC, System.Drawing, System.Drawing.Imaging, TJTMColor, TJTMConfig, TJTMMap;
+uses GraphABC, System.Drawing, System.Drawing.Imaging, System.Drawing.Drawing2D,
+     TJTMColor, TJTMConfig, TJTMMap;
 
 const
   APP_TITLE = 'True Joint Tile Maker';
-  APP_VERSION = '0.5.0';
+  APP_VERSION = '0.6.0';
 
   ///Холст редактирования и панель справа от него.
   CANVAS_W = 600;
@@ -90,9 +91,8 @@ const
 
   ///Верхняя граница памяти под историю отмен.
   UNDO_BUDGET_BYTES = 6 * 1024 * 1024;
-  ///Выше этого числа клеток бесшовный предпросмотр отключается:
-  ///перерисовка стала бы заметно медленнее пользы от неё.
-  SEAMLESS_CELL_LIMIT = 40000;
+  ///Шаг бега «муравьёв» по рамке выделения, в миллисекундах.
+  ANTS_STEP_MS = 90;
 
   ///Коды клавиш заданы числами, чтобы не зависеть от набора VK_* в GraphABC.
   KEY_BACK = 8;    KEY_TAB = 9;     KEY_ENTER = 13;  KEY_ESC = 27;
@@ -207,6 +207,20 @@ var
   ///иначе полупрозрачная кисть накладывалась бы сама на себя.
   StrokeMask: array[,] of boolean;
 
+  ///Тайл как картинка. Холст рисуется ею одним вызовом на любом масштабе,
+  ///а не вызовом на каждую клетку: при 512x512 клеток четверть миллиона,
+  ///и поклеточная отрисовка была самым медленным местом программы.
+  ///Заодно бесшовный режим получается сам собой — кисть замощает область
+  ///по определению, и порог по числу клеток стал не нужен.
+  TileBmp: Bitmap;
+  TileBmpDirty: boolean := true;
+  ///В каком режиме шахматки собрана картинка: она в неё заложена, поэтому
+  ///при переключении шахматки картинку надо пересобрать.
+  TileBmpChecker: boolean;
+  ///Фаза бега «муравьёв» и время её последнего сдвига.
+  AntsPhase: integer;
+  AntsMs: integer;
+
   ///Кэш полос выбора цвета.
   RawHSV: array of byte;
   RawHue: array of byte;
@@ -246,9 +260,16 @@ var
   LastClickCX: integer := -100000;
   LastClickCY: integer := -100000;
 
-  ///Приём текста работает только пока открыто поле ввода.
-  TextInputActive: boolean;
-  TextInputBuf: string;
+  ///Настоящее поле ввода поверх окна. Даёт вставку из буфера, выделение,
+  ///каретку и раскладки — ничего этого у самодельного сбора символов не было,
+  ///а строки объектов карты длинные, и их копируют между локациями.
+  EditBox: System.Windows.Forms.TextBox;
+  ///Взведены обработчиком клавиш поля: он живёт в потоке окна, а решение
+  ///принимается в основном цикле, поэтому это флаги, а не прямые действия.
+  EditDone, EditCancel: boolean;
+  ///Что показать в поле и где: заполняется до Invoke, читается в потоке окна.
+  EditText: string;
+  EditX, EditY, EditW: integer;
 
   NeedRepaint: boolean := true;
   ConfigPath: string;
@@ -374,15 +395,6 @@ begin
   if key = KEY_ALT then AltDown := false;
 end;
 
-///Символы собираются только когда открыто поле ввода. Управляющие коды
-///приходят через OnKeyDown, поэтому здесь они отбрасываются.
-procedure OnKeyPressHandler(ch: char);
-begin
-  if not TextInputActive then exit;
-  if ch < ' ' then exit;
-  if Length(TextInputBuf) > 400 then exit;
-  TextInputBuf := TextInputBuf + ch;
-end;
 
 procedure OnMouseDownHandler(x, y, mb: integer);
 begin
@@ -766,6 +778,9 @@ begin
   begin
     if (TW < 1) or (TH < 1) then exit;
     EnsureTileIdx;
+    ///Снимок берётся перед изменением, поэтому пометка здесь накрывает любую
+    ///отменяемую правку тайла разом и не требует помнить про каждую из них.
+    TileBmpDirty := true;
     SetLength(UndoStack, Length(UndoStack) + 1);
     UndoStack[Length(UndoStack) - 1] := CloneGrid(Tile);
     SetLength(UndoIdx, Length(UndoIdx) + 1);
@@ -836,6 +851,7 @@ begin
   ResetSelection;
   ClampView;
   MarkModified;
+  TileBmpDirty := true;
   NeedRepaint := true;
 end;
 
@@ -884,6 +900,7 @@ begin
   ResetSelection;
   ClampView;
   MarkModified;
+  TileBmpDirty := true;
   NeedRepaint := true;
 end;
 
@@ -896,6 +913,7 @@ begin
   Tile := newTile;
   TW := Length(Tile, 0);
   TH := Length(Tile, 1);
+  TileBmpDirty := true;
   ///Открытый файл ничего не знает о палитре, поэтому привязки выводятся
   ///из его же цветов: совпал с ячейкой — значит, ею и управляется.
   RebindTileToPalette;
@@ -1016,6 +1034,7 @@ begin
     if StrokeMask[x, y] then exit;
     StrokeMask[x, y] := true;
   end;
+  TileBmpDirty := true;
   c := BrushColorAt(x, y);
   if BrushReplaces then
   begin
@@ -1835,60 +1854,167 @@ begin
            TileToScreenX(x + 1) - g, TileToScreenY(y + 1) - g);
 end;
 
-///Клетки тайла. При включённом бесшовном режиме рисуется не один тайл,
-///а повторяющийся узор, и швы видно сразу во время работы.
-procedure DrawTileCells;
+///Деление с округлением вниз. Штатное div отбрасывает дробную часть в сторону
+///нуля, и для отрицательных номеров копий это давало бы пропуск одной из них.
+function FloorDiv(a, b: integer): integer;
+begin
+  if b = 0 then Result := 0
+  else if (a < 0) <> (b < 0) then
+  begin
+    if a mod b = 0 then Result := a div b else Result := a div b - 1;
+  end
+  else Result := a div b;
+end;
+
+///Пересобирает картинку тайла, если она устарела, не того размера или
+///собрана в другом режиме шахматки. Собирается одним LockBits через
+///BytesToImage — тем же способом, каким собираются полосы выбора цвета
+///и обзорная панель.
+///
+///В картинку сразу заложена шахматка под прозрачными пикселями: тогда весь
+///холст — это один рисунок, а не два наложенных, и второй проход по экрану
+///не нужен.
+procedure EnsureTileBmp;
 var
-  j0, j1, i0, i1, g, sj, si: integer;
-  seamless: boolean;
+  raw: array of byte;
+  k: integer;
   c: Color;
 begin
-  g := GridGap;
-  j0 := ScreenToTileX(0);
-  j1 := ScreenToTileX(W - 1);
-  i0 := ScreenToTileY(0);
-  i1 := ScreenToTileY(H - 1);
+  if (TileBmp <> nil) and (not TileBmpDirty) and
+     (TileBmpChecker = CheckerOn) and
+     (TileBmp.Width = TW) and (TileBmp.Height = TH) then exit;
+  if TileBmp <> nil then TileBmp.Dispose;
+  TileBmp := nil;
+  TileBmpDirty := false;
+  TileBmpChecker := CheckerOn;
+  if (TW < 1) or (TH < 1) then exit;
+  SetLength(raw, TW * TH * 4);
+  for var i := 0 to TH - 1 do
+    for var j := 0 to TW - 1 do
+    begin
+      c := DisplayColor(j, i);
+      k := (i * TW + j) * 4;
+      // Раскладка BGRA с прямой, не домноженной альфой: картинка создаётся
+      // в формате Format32bppArgb, а он хранит альфу именно так.
+      raw[k + 0] := c.B;
+      raw[k + 1] := c.G;
+      raw[k + 2] := c.R;
+      raw[k + 3] := c.A;
+    end;
+  TileBmp := BytesToImage(raw, TW);
+end;
 
-  // Повтор во весь холст на мелком масштабе стоил бы слишком много клеток,
-  // поэтому за пределом бесшовный режим просто не включается.
-  seamless := SeamlessOn and (TW > 0) and (TH > 0) and
-              ((j1 - j0 + 1) * (i1 - i0 + 1) <= SEAMLESS_CELL_LIMIT);
-  if not seamless then
+///Клетки тайла. При включённом бесшовном режиме рисуется не один тайл,
+///а повторяющийся узор, и швы видно сразу во время работы.
+///
+///Весь холст закрывается двумя заливками — шахматкой и самим тайлом, —
+///поэтому стоимость отрисовки не зависит ни от размера тайла, ни от
+///масштаба. Прежний поклеточный цикл упирался в четверть миллиона вызовов
+///на крупном тайле, из-за чего бесшовный режим приходилось отключать порогом.
+procedure DrawTileCells;
+var
+  ox, oy, sw, sh, g: integer;
+  cl, ct, cr, cb: integer;
+  k0, k1, gp: integer;
+  kx0, kx1, ky0, ky1: integer;
+begin
+  if (TW < 1) or (TH < 1) then exit;
+  EnsureTileBmp;
+  if TileBmp = nil then exit;
+
+  ox := TileToScreenX(0);
+  oy := TileToScreenY(0);
+  sw := TW * PixelSize;
+  sh := TH * PixelSize;
+
+  // Куда рисуем: только сам тайл или весь холст, если он повторяется.
+  if SeamlessOn then
   begin
-    j0 := Max(0, j0);
-    j1 := Min(TW - 1, j1);
-    i0 := Max(0, i0);
-    i1 := Min(TH - 1, i1);
+    cl := 0;
+    ct := 0;
+    cr := W;
+    cb := H;
+  end
+  else
+  begin
+    cl := Max(0, ox);
+    ct := Max(0, oy);
+    cr := Min(W, ox + sw);
+    cb := Min(H, oy + sh);
+  end;
+  if (cr <= cl) or (cb <= ct) then exit;
+
+  // Пиксель-арт нельзя сглаживать: при увеличении вместо пикселей вышло бы
+  // мыло. Режимы ставятся каждый раз — их мог поменять кто-то ещё.
+  GraphBufferGraphics.InterpolationMode := InterpolationMode.NearestNeighbor;
+  GraphBufferGraphics.PixelOffsetMode := PixelOffsetMode.Half;
+
+  // Копии тайла, попадающие на холст. Без бесшовного режима она одна.
+  // Рисуется именно DrawImage, а не текстурная кисть: кисть в разных
+  // реализациях GDI+ по-разному слушается режима интерполяции, и на проверке
+  // пиксель-арт у неё размывался. DrawImage держит ближайшего соседа честно,
+  // а копий на холсте всё равно единицы — это не поклеточный цикл.
+  if SeamlessOn then
+  begin
+    kx0 := FloorDiv(-ox, sw);
+    kx1 := FloorDiv(W - 1 - ox, sw);
+    ky0 := FloorDiv(-oy, sh);
+    ky1 := FloorDiv(H - 1 - oy, sh);
+  end
+  else
+  begin
+    kx0 := 0;
+    kx1 := 0;
+    ky0 := 0;
+    ky1 := 0;
   end;
 
-  for var i := i0 to i1 do
-    for var j := j0 to j1 do
-    begin
-      if seamless then
-      begin
-        sj := ((j mod TW) + TW) mod TW;
-        si := ((i mod TH) + TH) mod TH;
-      end
-      else
-      begin
-        sj := j;
-        si := i;
-      end;
-      c := DisplayColor(sj, si);
-      if seamless and ((j < 0) or (j >= TW) or (i < 0) or (i >= TH)) then
-        // Соседние копии слегка притушены, чтобы было видно, где сам тайл.
-        c := BlendOver(ARGB(56, 0, 0, 0), c);
-      if HasSelection and (j >= SelX) and (j < SelX + SelW) and
-                          (i >= SelY) and (i < SelY + SelH) then
-        c := BlendOver(ARGB(64, cAccent.R, cAccent.G, cAccent.B), c);
-      GraphABC.Brush.Color := c;
-      FillRect(TileToScreenX(j), TileToScreenY(i),
-               TileToScreenX(j + 1) - g, TileToScreenY(i + 1) - g);
-    end;
+  for var ky := ky0 to ky1 do
+    for var kx := kx0 to kx1 do
+      GraphBufferGraphics.DrawImage(TileBmp, ox + kx * sw, oy + ky * sh, sw, sh);
 
-  if seamless then
-    FrameRect(TileToScreenX(0) - 1, TileToScreenY(0) - 1,
-              TileToScreenX(TW) + 1, TileToScreenY(TH) + 1, cAccent);
+  // Соседние копии притушены, чтобы было видно, где сам тайл. Четыре полосы
+  // вокруг него: так не нужны ни область отсечения, ни второй проход кистью.
+  if SeamlessOn then
+  begin
+    GraphABC.Brush.Color := ARGB(56, 0, 0, 0);
+    if oy > 0 then FillRect(0, 0, W, Min(oy, H));
+    if oy + sh < H then FillRect(0, Max(0, oy + sh), W, H);
+    if ox > 0 then FillRect(0, Max(0, oy), Min(ox, W), Min(H, oy + sh));
+    if ox + sw < W then FillRect(Max(0, ox + sw), Max(0, oy), W, Min(H, oy + sh));
+    FrameRect(ox - 1, oy - 1, ox + sw + 1, oy + sh + 1, cAccent);
+  end;
+
+  // Выделение подкрашивается одним прямоугольником поверх, а не по клетке.
+  if HasSelection and (SelW > 0) and (SelH > 0) then
+  begin
+    GraphABC.Brush.Color := ARGB(64, cAccent.R, cAccent.G, cAccent.B);
+    FillRect(TileToScreenX(SelX), TileToScreenY(SelY),
+             TileToScreenX(SelX + SelW), TileToScreenY(SelY + SelH));
+  end;
+
+  // Сетку между пикселями раньше давал зазор между клетками. Клетки теперь
+  // рисуются одной заливкой и зазоров не имеют, поэтому это линии поверх.
+  g := GridGap;
+  if g > 0 then
+  begin
+    GraphABC.Pen.Color := cCanvas;
+    GraphABC.Pen.Width := 1;
+    k0 := (cl - ox) div PixelSize - 1;
+    k1 := (cr - ox) div PixelSize + 1;
+    for var k := k0 to k1 do
+    begin
+      gp := ox + k * PixelSize - 1;
+      if (gp >= cl) and (gp < cr) then Line(gp, ct, gp, cb - 1);
+    end;
+    k0 := (ct - oy) div PixelSize - 1;
+    k1 := (cb - oy) div PixelSize + 1;
+    for var k := k0 to k1 do
+    begin
+      gp := oy + k * PixelSize - 1;
+      if (gp >= ct) and (gp < cb) then Line(cl, gp, cr - 1, gp);
+    end;
+  end;
 end;
 
 ///Клетки карты и значки объектов поверх них.
@@ -1935,6 +2061,32 @@ begin
   end;
 end;
 
+///Рамка выделения «бегущими муравьями»: сплошная светлая линия и поверх неё
+///тёмный пунктир, сдвигающийся по фазе от кадра к кадру. Статическая рамка
+///на пёстром тайле теряется, а бегущая читается на любом фоне и сразу
+///показывает, что выделение живое, а не остаток прошлой операции.
+procedure DrawAnts(x0, y0, x1, y1: integer);
+var
+  p: System.Drawing.Pen;
+  dash: array of single;
+begin
+  if (x1 <= x0) or (y1 <= y0) then exit;
+  GraphBufferGraphics.SmoothingMode := SmoothingMode.None;
+
+  p := new System.Drawing.Pen(ARGB(255, 245, 245, 250), 1);
+  GraphBufferGraphics.DrawRectangle(p, x0, y0, x1 - x0, y1 - y0);
+  p.Dispose;
+
+  SetLength(dash, 2);
+  dash[0] := 4;
+  dash[1] := 4;
+  p := new System.Drawing.Pen(ARGB(255, 20, 20, 24), 1);
+  p.DashPattern := dash;
+  p.DashOffset := AntsPhase;
+  GraphBufferGraphics.DrawRectangle(p, x0, y0, x1 - x0, y1 - y0);
+  p.Dispose;
+end;
+
 procedure DrawCanvas;
 var
   g, bw, bh: integer;
@@ -1962,8 +2114,8 @@ begin
   end;
 
   if HasSelection and (SelW > 0) and (SelH > 0) then
-    FrameRect(TileToScreenX(SelX) - 1, TileToScreenY(SelY) - 1,
-              TileToScreenX(SelX + SelW) + 1, TileToScreenY(SelY + SelH) + 1, cAccent);
+    DrawAnts(TileToScreenX(SelX) - 1, TileToScreenY(SelY) - 1,
+             TileToScreenX(SelX + SelW) + 1, TileToScreenY(SelY + SelH) + 1);
 
   // Оси симметрии видно на холсте, иначе легко забыть, что они включены.
   if SymX then
@@ -2800,74 +2952,122 @@ end;
 
 
 // ---------------------------------------------------------------------------
-// Ввод строки. Символы собираются в OnKeyPress, управляющие клавиши приходят
-// обычным путём через TakeKey.
+// Ввод строки. Поле — настоящий элемент управления, положенный поверх окна,
+// а остальной экран по-прежнему рисуется на холсте.
 // ---------------------------------------------------------------------------
 
+///Клавиши поля ввода. Обработчик живёт в потоке окна, поэтому он только
+///взводит флаги, а решение принимает основной цикл AskText.
+procedure EditKeyDown(sender: Object; e: System.Windows.Forms.KeyEventArgs);
+begin
+  if e.KeyCode = System.Windows.Forms.Keys.Enter then
+  begin
+    EditDone := true;
+    // Иначе поле пикнет: перевод строки однострочному полю некуда деть.
+    e.SuppressKeyPress := true;
+  end
+  else if e.KeyCode = System.Windows.Forms.Keys.Escape then
+  begin
+    EditCancel := true;
+    e.SuppressKeyPress := true;
+  end;
+end;
+
+///Создание и снятие поля идут через Invoke, а не напрямую.
+///
+///Элементы управления обслуживает поток окна, а весь остальной код программы
+///работает в основном: Idle — это только сон, сообщения качает окно. TextBox,
+///созданный не своим потоком, получает окно с чужой очередью сообщений и
+///просто не перерисовывается — на экране остаётся то, что было под ним.
+///Поэтому создание, показ и снятие выполняются на потоке окна целиком.
+procedure EditBoxAdd;
+begin
+  EditBox := new System.Windows.Forms.TextBox();
+  EditBox.SetBounds(EditX, EditY, EditW, 30);
+  // Моноширинный шрифт по семейству, а не по имени: строка объекта — это
+  // разделённые пробелами поля, и в них считают позиции.
+  EditBox.Font := new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, 11);
+  EditBox.Text := EditText;
+  EditBox.KeyDown += EditKeyDown;
+  MainForm.Controls.Add(EditBox);
+  EditBox.BringToFront;
+  EditBox.Focus;
+  EditBox.SelectionStart := Length(EditText);
+end;
+
+procedure EditBoxRemove;
+begin
+  if EditBox = nil then exit;
+  // Текст забирается здесь же: читать чужой элемент из другого потока
+  // так же неправильно, как и создавать его там.
+  EditText := EditBox.Text;
+  EditBox.KeyDown -= EditKeyDown;
+  MainForm.Controls.Remove(EditBox);
+  EditBox.Dispose;
+  EditBox := nil;
+end;
+
+///Ввод строки. Поле — настоящий элемент управления поверх окна, а не рисунок:
+///самодельный сбор символов не умел ни вставки из буфера, ни выделения, ни
+///каретки, ни раскладок. Для строк объектов карты это не мелочь — они длинные
+///и их переносят между локациями.
 function AskText(title, prompt, initial: string; var value: string): boolean;
 var
   done, ok: boolean;
-  fx, fy, fw, tick: integer;
-  shown: string;
+  fx, fy, fw: integer;
 begin
-  TextInputBuf := initial;
-  TextInputActive := true;
   done := false;
   ok := false;
-  tick := 0;
   ClickPending := false;
   KeyPending := false;
   fx := 60;
   fy := H div 2 - 20;
   fw := WIN_W - 120;
 
-  while not done do
-  begin
-    tick := tick + 1;
-    ClearWindow(cBack);
-    GraphABC.Font.Color := cText;
-    DrawTextCentered(0, fy - 110, WIN_W, fy - 74, title);
-    UILabel(0, fy - 70, WIN_W, 24, prompt, cTextDim);
+  EditDone := false;
+  EditCancel := false;
+  EditText := initial;
+  EditX := fx;
+  EditY := fy;
+  EditW := fw;
+  MainForm.Invoke(System.Windows.Forms.MethodInvoker(EditBoxAdd));
 
-    GraphABC.Brush.Color := cBorder;
-    FillRoundRect(fx - 2, fy - 2, fx + fw + 2, fy + 36, 5, 5);
-    GraphABC.Brush.Color := RGB(252, 252, 253);
-    FillRoundRect(fx, fy, fx + fw, fy + 34, 5, 5);
-    // Строка обрезается слева: при наборе интересен конец, а не начало.
-    shown := FitText(TextInputBuf, fw - 22);
-    if (tick div 60) mod 2 = 0 then shown := shown + '|';
-    GraphABC.Font.Color := cText;
-    TextOut(fx + 8, fy + 8, shown);
-
-    if UIButton(WIN_W div 2 - 180, fy + 60, 170, 36, 'Готово', true) then
+  try
+    while not done do
     begin
-      ok := true;
-      done := true;
+      ClearWindow(cBack);
+      GraphABC.Font.Color := cText;
+      DrawTextCentered(0, fy - 110, WIN_W, fy - 74, title);
+      UILabel(0, fy - 70, WIN_W, 24, prompt, cTextDim);
+      UILabel(0, fy + 34, WIN_W, 20,
+              'Enter — готово, Escape — отмена. Работают выделение и буфер обмена',
+              cTextDim);
+
+      if UIButton(WIN_W div 2 - 180, fy + 60, 170, 36, 'Готово', true) then
+      begin
+        ok := true;
+        done := true;
+      end;
+      if UIButton(WIN_W div 2 + 10, fy + 60, 170, 36, 'Отмена', true) then done := true;
+
+      Redraw;
+      ClickPending := false;
+      if EditDone then
+      begin
+        ok := true;
+        done := true;
+      end;
+      if EditCancel then done := true;
+      Idle;
     end;
-    if UIButton(WIN_W div 2 + 10, fy + 60, 170, 36, 'Отмена', true) then done := true;
-
-    Redraw;
-    ClickPending := false;
-
-    var key := TakeKey;
-    if key = KEY_ENTER then
-    begin
-      ok := true;
-      done := true;
-    end
-    else if key = KEY_ESC then
-      done := true
-    else if key = KEY_BACK then
-      if Length(TextInputBuf) > 0 then
-        TextInputBuf := TextInputBuf.Substring(0, Length(TextInputBuf) - 1);
-
-    Idle;
+  finally
+    // Поле снимается всегда: оставшееся на форме, оно закрыло бы собой холст.
+    MainForm.Invoke(System.Windows.Forms.MethodInvoker(EditBoxRemove));
   end;
+  if ok then value := EditText;
 
-  TextInputActive := false;
   WaitMouseRelease;
   NeedRepaint := true;
-  if ok then value := TextInputBuf;
   Result := ok;
 end;
 
@@ -3936,9 +4136,12 @@ begin
       k := (py * size + px) * 4;
       // Формат буфера — BGRA с домноженной альфой: GDI+ ждёт именно её,
       // иначе полупрозрачные края значка светлеют ореолом.
-      raw[k + 0] := Round(c.B * c.A / 255);
-      raw[k + 1] := Round(c.G * c.A / 255);
-      raw[k + 2] := Round(c.R * c.A / 255);
+      // Прямая, не домноженная альфа: картинка создаётся в Format32bppArgb,
+      // а он хранит её именно так. Домноженная здесь затемняла бы
+      // полупрозрачные края значка.
+      raw[k + 0] := c.B;
+      raw[k + 1] := c.G;
+      raw[k + 2] := c.R;
       raw[k + 3] := c.A;
     end;
   Result := BytesToImage(raw, size);
@@ -4314,7 +4517,8 @@ begin
   Add('виден предпросмотр. Ctrl во время протяжки делает фигуру заполненной,');
   Add('Shift приводит её к квадрату или кругу.');
   Add('Дизеринг кладёт шахматку из первого и второго цветов.');
-  Add('Выделение: протяните рамку, чтобы выделить область и скопировать её');
+  Add('Выделение: рамка бежит «муравьями», поэтому её видно на любом фоне.');
+  Add('Протяните рамку, чтобы выделить область и скопировать её');
   Add('в буфер. Щелчок без протяжки вставляет буфер. Протяжка за выделенную');
   Add('область копирует её на новое место.');
   Add('');
@@ -4323,6 +4527,8 @@ begin
   Add('из-под курсора. Заливка и прямоугольник работают тем же видом.');
   Add('Объект: левая кнопка ставит объект выбранного вида или перетаскивает');
   Add('уже стоящий, правая убирает, средняя открывает правку строки.');
+  Add('Строка правится настоящим полем ввода: работают выделение, Ctrl+C');
+  Add('и Ctrl+V, так что длинные строки переносятся между локациями целиком.');
   Add('Выделение копирует и вставляет куски местности.');
   Add('');
   Add('НАБОРЫ ТАЙЛОВ');
@@ -5559,7 +5765,7 @@ begin
 
   OnKeyDown := OnKeyDownHandler;
   OnKeyUp := OnKeyUpHandler;
-  OnKeyPress := OnKeyPressHandler;
+
   OnMouseDown := OnMouseDownHandler;
   OnMouseMove := OnMouseMoveHandler;
   OnMouseUp := OnMouseUpHandler;
@@ -5622,6 +5828,17 @@ begin
   EnsureIcons;
   if NeedRepaint then Repaint;
   SyncTitle;
+
+  // Муравьи бегут, пока есть выделение. Перерисовывается только холст и
+  // только раз в ANTS_STEP_MS: сама отрисовка теперь стоит одну заливку,
+  // поэтому анимация обходится дёшево.
+  if HasSelection and (SelW > 0) and (SelH > 0) then
+    if Milliseconds - AntsMs >= ANTS_STEP_MS then
+    begin
+      AntsMs := Milliseconds;
+      AntsPhase := (AntsPhase + 1) mod 8;
+      RepaintCanvasOnly;
+    end;
 
   // Колесо могло провернуться на несколько щелчков между кадрами.
   wheel := TakeWheel;
