@@ -110,6 +110,9 @@ const
   KEY_U = 85;      KEY_V = 86;      KEY_W = 87;      KEY_X = 88;
   KEY_Y = 89;      KEY_Z = 90;
   KEY_SHIFT = 16;  KEY_CTRL = 17;   KEY_ALT = 18;
+  ///Наибольший код, который может прийти от клавиатуры. Самый большой из
+  ///используемых — KEY_MINUS = 189; берём с запасом до конца байта.
+  KEY_CODE_MAX = 255;
   KEY_NUMPLUS = 107; KEY_NUMMINUS = 109;
   KEY_PLUS = 187;  KEY_MINUS = 189;
 
@@ -247,7 +250,17 @@ var
   KeyPressed: boolean;
   KeyPending: boolean;
   PendingKey: integer;
-  ShiftDown, CtrlDown, AltDown: boolean;
+  ///Какие клавиши сейчас удерживаются. Раньше на это стояли три отдельные
+  ///переменные — Shift, Ctrl, Alt, — и добавить четвёртую значило завести
+  ///четвёртую переменную и не забыть погасить её в двух местах. Здесь набор:
+  ///спросить можно про любую клавишу, а обработчикам знать про неё незачем.
+  ///
+  ///Именно карта по коду, а не список нажатых: список пришлось бы искать
+  ///перебором и дописывать при каждом повторе автоповтора — система шлёт
+  ///KeyDown снова и снова, пока клавишу держат, — заново выделяя под него
+  ///память. Карта отвечает за одно обращение, повтор пишет в неё то же
+  ///значение, и расти ей некуда.
+  KeyHeld: array [0..KEY_CODE_MAX] of boolean;
   MouseX, MouseY: integer;
   MousePressed: boolean;
   ClickPending: boolean;
@@ -440,19 +453,44 @@ end;
 procedure OnKeyDownHandler(key: integer);
 begin
   KeyPressed := true;
-  if key = KEY_SHIFT then ShiftDown := true;
-  if key = KEY_CTRL then CtrlDown := true;
-  if key = KEY_ALT then AltDown := true;
-  PendingKey := key;
-  KeyPending := true;
+  System.Threading.Monitor.Enter(InputLock);
+  try
+    if (key >= 0) and (key <= KEY_CODE_MAX) then KeyHeld[key] := true;
+    PendingKey := key;
+    KeyPending := true;
+  finally
+    System.Threading.Monitor.Exit(InputLock);
+  end;
 end;
 
 procedure OnKeyUpHandler(key: integer);
 begin
   KeyPressed := false;
-  if key = KEY_SHIFT then ShiftDown := false;
-  if key = KEY_CTRL then CtrlDown := false;
-  if key = KEY_ALT then AltDown := false;
+  System.Threading.Monitor.Enter(InputLock);
+  try
+    if (key >= 0) and (key <= KEY_CODE_MAX) then KeyHeld[key] := false;
+  finally
+    System.Threading.Monitor.Exit(InputLock);
+  end;
+end;
+
+///Удерживается ли клавиша прямо сейчас. Спрашивать можно про любую.
+function IsKeyPressed(key: integer): boolean;
+begin
+  Result := (key >= 0) and (key <= KEY_CODE_MAX) and KeyHeld[key];
+end;
+
+///Окно потеряло клавиатуру — все клавиши считаются отпущенными. Без этого
+///переключение окна во время удержания оставляло бы клавишу «нажатой»
+///навсегда: отпускание уходит уже другому окну, и снять её нечем.
+procedure ReleaseAllKeys;
+begin
+  System.Threading.Monitor.Enter(InputLock);
+  try
+    for var i := 0 to KEY_CODE_MAX do KeyHeld[i] := false;
+  finally
+    System.Threading.Monitor.Exit(InputLock);
+  end;
 end;
 
 
@@ -5191,7 +5229,7 @@ procedure EmitShape(ax, ay, bx, by: integer);
 var
   filled: boolean;
 begin
-  filled := CtrlDown;
+  filled := IsKeyPressed(KEY_CTRL);
   if DocMode = DOC_MAP then
   begin
     ShapeRect(ax, ay, bx, by, filled);
@@ -5217,7 +5255,7 @@ begin
   begin
     nx := ScreenToTileX(MouseX);
     ny := ScreenToTileY(MouseY);
-    if ShiftDown then SquarifyTo(ax, ay, nx, ny);
+    if IsKeyPressed(KEY_SHIFT) then SquarifyTo(ax, ay, nx, ny);
     if (nx <> bx) or (ny <> by) then
     begin
       bx := nx;
@@ -5515,7 +5553,7 @@ begin
   // отменить его нечем, но у местности повторная покраска той же клетки
   // ничего не меняет, а лишний объект убирается одним Z.
   now := Milliseconds;
-  twice := (FrameClickButton = MB_LEFT) and (not AltDown) and
+  twice := (FrameClickButton = MB_LEFT) and (not IsKeyPressed(KEY_ALT)) and
            (mx = LastClickCX) and (my = LastClickCY) and
            (now - LastClickMs >= 0) and (now - LastClickMs <= DOUBLE_CLICK_MS);
   LastClickMs := now;
@@ -5534,7 +5572,7 @@ begin
 
   // Правая кнопка и Alt берут вид местности из-под курсора.
   // Инструмент объектов обрабатывает правую кнопку сам.
-  if ((FrameClickButton = MB_RIGHT) or AltDown) and (ToolMap <> M_OBJ) then
+  if ((FrameClickButton = MB_RIGHT) or IsKeyPressed(KEY_ALT)) and (ToolMap <> M_OBJ) then
   begin
     MapBrush := MapGrid[mx, my];
     NeedRepaint := true;
@@ -5593,7 +5631,7 @@ begin
     exit;
   end;
 
-  if (FrameClickButton = MB_RIGHT) or AltDown or (ToolTile = T_PICK) then
+  if (FrameClickButton = MB_RIGHT) or IsKeyPressed(KEY_ALT) or (ToolTile = T_PICK) then
   begin
     PickColorFromTile(mx, my);
     exit;
@@ -5934,6 +5972,9 @@ begin
   OnMouseMove := OnMouseMoveHandler;
   OnMouseUp := OnMouseUpHandler;
   GraphABC.GraphABCControl.MouseWheel += OnWheelHandler;
+  // Уход фокуса гасит все удерживаемые клавиши: отпускание после
+  // переключения окна придёт уже не нам, и снять их было бы нечем.
+  MainForm.Deactivate += procedure(sender: object; e: System.EventArgs) -> ReleaseAllKeys;
 
   // Отсутствующий файл настроек не ошибка: берутся значения по умолчанию
   // и файл создаётся, чтобы его было легко найти и поправить.
