@@ -1,0 +1,1286 @@
+Обработка заняла 2 m 48 s
+
+Я посмотрел текущий main репозитория именно как редактор растровой Pixel Art-графики, не оценивая качество Pascal-кода, карты Andors-Love или архитектуру за пределами редакторского функционала.
+
+Использовал текущие README.md, TJTM.pas, TJTMColor.pas, TJTMConfig.pas, TJTMMap.pas, а для сравнения — актуальную документацию Aseprite и Pixelorama и практические рекомендации Pixel Joint. [README.md](https://github.com/dpsmpx/TrueJointTileMaker/blob/main/README.md?utm_source=chatgpt.com) [TJTM.pas](https://github.com/dpsmpx/TrueJointTileMaker/blob/main/TJTM.pas?utm_source=chatgpt.com)
+
+Главный вывод
+
+У тебя уже не «простой редактор с карандашом», а довольно цельный специализированный Pixel Art / tile editor. Особенно хорошо реализованы те вещи, которые непосредственно влияют на точность рисования тайлов:
+
+nearest-neighbor отображение;
+
+масштабирование и панорамирование;
+
+бесшовный preview + wrap-around;
+
+горизонтальная/вертикальная симметрия;
+
+нормальная растеризация линий;
+
+интерактивный preview фигур;
+
+защита от повторного смешивания полупрозрачной кисти в одном stroke;
+
+палитра и привязка цветов;
+
+undo/redo;
+
+быстрый tileset workflow.
+
+
+При этом до полноценного общего Pixel Art editor тебе не хватает прежде всего не ещё десяти обычных инструментов рисования, а более фундаментальных вещей: нормальной системы выделений и трансформаций, полноценной палитры/indexed mode, слоёв, кадров, project format, экспорта и нескольких специфических Pixel Art-инструментов.
+
+Причём часть этих функций я бы не добавлял просто «потому что они есть в Aseprite». Некоторые из них действительно нужны именно для качественного Pixel Art workflow, а некоторые важны только в случае, если ты хочешь превратить TJTM из tile editor в общий sprite editor.
+
+
+---
+
+1. Что у тебя уже сделано действительно хорошо
+
+1.1. Само рисование уже хорошо ориентировано именно на Pixel Art
+
+Это сильная сторона проекта.
+
+У тебя есть:
+
+Pencil;
+
+Eraser;
+
+Fill;
+
+Picker;
+
+Line;
+
+Rectangle;
+
+Ellipse;
+
+Dither;
+
+Selection.
+
+
+Причём линия реализована растеризацией Брезенхэма, а не обычной графической линией, а stroke дополнительно достраивается между предыдущей и текущей клеткой. Это именно тот принцип, который нужен для пиксельного холста: быстрый mouse movement не должен оставлять дырки. [TJTM.pas](https://github.com/dpsmpx/TrueJointTileMaker/blob/main/TJTM.pas?utm_source=chatgpt.com)
+
+Очень хорошая деталь — StrokeMask. Для обычного полностью непрозрачного карандаша она почти незаметна, но для полупрозрачного цвета это важно: одна и та же клетка не смешивается с собой несколько раз в рамках одного мазка.
+
+Это уже более серьёзная реализация, чем типичный самописный pixel editor.
+
+Что особенно удачно
+
+Предпросмотр фигур сделан тем же растеризатором, который потом применяет фигуру.
+
+Это правильный подход. Preview не должен показывать одну геометрию, а после отпускания мыши давать другую.
+
+У тебя:
+
+ShapeLine
+
+ShapeRect
+
+ShapeEllipse
+
+
+используются и для preview, и для финального результата. Это хороший функциональный фундамент. [TJTM.pas](https://github.com/dpsmpx/TrueJointTileMaker/blob/main/TJTM.pas?utm_source=chatgpt.com)
+
+
+---
+
+2. Бесшовность и симметрия — одна из сильнейших частей
+
+Для tile-oriented Pixel Art это вообще одна из самых полезных особенностей.
+
+У тебя есть:
+
+B — seamless preview
+
+Тайл отображается повторяющимся, поэтому шов виден прямо во время работы.
+
+W — wrap-around drawing
+
+Мазок, вышедший за правую границу, появляется с левой, и аналогично по другим сторонам.
+
+Это очень правильный workflow для тайлов.
+
+Дополнительно есть:
+
+F — horizontal symmetry
+
+D — vertical symmetry
+
+и их комбинация.
+
+Pixelorama также считает горизонтальную/вертикальную симметрию базовым инструментом Pixel Art workflow. 
+
+А твоя комбинация symmetry + wrap + seamless preview особенно хорошо соответствует именно созданию игровых тайлов.
+
+Что здесь ещё можно улучшить
+
+Главная проблема не в наличии симметрии, а в её примитивности.
+
+Сейчас оси фактически задаются относительно центра:
+
+x -> width - 1 - x
+y -> height - 1 - y
+
+То есть у пользователя нет полноценной перемещаемой оси симметрии.
+
+Для общего Pixel Art редактора полезно иметь:
+
+movable horizontal axis;
+
+movable vertical axis;
+
+возможность поставить ось между двумя пикселями;
+
+визуальные маркеры осей;
+
+возможно радиальную/многосекторную симметрию.
+
+
+Aseprite, например, позволяет двигать ось симметрии, а не только использовать фиксированный центр. 
+
+Для тайлов это не критично. Для персонажей, объектов и оружия уже гораздо полезнее.
+
+
+---
+
+3. Масштабирование и отображение — сделаны правильно
+
+Тут у тебя правильный приоритет:
+
+integer pixel zoom;
+
+nearest-neighbor;
+
+zoom вокруг курсора;
+
+pan;
+
+overview;
+
+grid;
+
+checkerboard transparency.
+
+
+Это важнее, чем многие «модные» инструменты.
+
+Особенно хорошо, что ты не используешь сглаживание изображения при масштабировании. Для Pixel Art это принципиально: рабочий canvas не должен визуально превращать один исходный пиксель в размытую группу пикселей.
+
+Кроме того, твой переход от поклеточной отрисовки к cached Bitmap — правильное решение именно для большого тайла и seamless preview.
+
+
+---
+
+4. Палитра у тебя уже интереснее, чем кажется
+
+Есть:
+
+8×8 palette;
+
+foreground/background colors;
+
+swap colors;
+
+HSV;
+
+alpha;
+
+exact ARGB picker;
+
+сохранение/загрузка палитры;
+
+замена одного цвета другим;
+
+quantization к палитре;
+
+привязка пикселей к ячейкам;
+
+изменение palette entry с автоматическим изменением связанных пикселей.
+
+
+Последний пункт особенно важен.
+
+Ты фактически уже реализовал частичный indexed-color workflow.
+
+Но здесь находится один из наиболее серьёзных моментов для дальнейшей переработки.
+
+
+---
+
+5. Индексная палитра сейчас реализована как надстройка, а не как настоящий indexed mode
+
+Сейчас у тебя есть:
+
+Tile[x,y] = Color
+TileIdx[x,y] = palette index / IDX_NONE
+
+То есть источником истины всё равно остаётся настоящий RGBA/Color.
+
+TileIdx — вспомогательная привязка.
+
+Это работает, но это не то же самое, что настоящий indexed image.
+
+В настоящем indexed mode:
+
+pixel = index 17
+palette[17] = RGB(...)
+
+Изменение palette[17] автоматически меняет внешний цвет всех таких пикселей.
+
+Именно так описан indexed mode в Aseprite и Pixelorama. 
+
+Почему твой вариант всё-таки хорош
+
+Для текущего TJTM он позволяет получить важную практическую функцию:
+
+> «изменил цвет палитры → связанные пиксели тоже изменились»
+
+
+
+не ломая текущую полноценную RGBA-модель.
+
+То есть как промежуточное решение это разумно.
+
+Что я бы изменил
+
+В перспективе стоит перейти к двум настоящим режимам:
+
+RGBA
+Indexed
+
+Причём не обязательно переделывать всё сразу.
+
+Нужно иметь:
+
+RGBA mode
+
+любой цвет;
+
+полноценная alpha;
+
+свободное рисование.
+
+
+Indexed mode
+
+каждый пиксель хранит индекс;
+
+цвет определяется палитрой;
+
+рисовать можно только цветами палитры;
+
+свободно выбранный RGB автоматически маппится на ближайший допустимый цвет или предлагает добавить цвет.
+
+
+Это существенно надёжнее для palette-driven Pixel Art.
+
+
+---
+
+6. Фиксированная 8×8 палитра — уже ограничение
+
+Для твоего текущего проекта это удобно.
+
+Но для общего Pixel Art editor:
+
+64 цвета максимум
+
+становятся искусственным ограничением.
+
+Pixelorama, например, поддерживает полноценную работу с проектными палитрами, а Aseprite — сортировку палитры и генерацию градиентов. 
+
+Тебе я бы добавил:
+
+произвольное число цветов;
+
+project palette;
+
+palette slots;
+
+добавление/удаление цвета;
+
+перемещение цвета;
+
+duplicate;
+
+color picker из canvas;
+
+сортировку по Hue/Saturation/Value/Luminance/R/G/B/Alpha;
+
+генерацию ramp между двумя цветами;
+
+сохранение палитры отдельно;
+
+встроенное хранение палитры в project file;
+
+возможность определить transparent index в indexed mode.
+
+
+Особенно важны color ramps
+
+Для Pixel Art важна не просто совокупность цветов, а организованные цветовые ряды:
+
+shadow → base → light → highlight
+
+Pixel Joint прямо выделяет palette construction, hue shifting и color ramps как значимую часть Pixel Art workflow, а также рассматривает noise, banding и неудачный dithering как распространённые проблемы. 
+
+
+---
+
+7. Самая заметная функциональная проблема — Selection
+
+Вот здесь TJTM уже заметно отстаёт.
+
+Сейчас у тебя:
+
+прямоугольное выделение;
+
+marching ants;
+
+copy;
+
+paste;
+
+drag-copy;
+
+flip H/V;
+
+rotate 90°.
+
+
+Это уже полезно, но система остаётся очень простой.
+
+Aseprite, например, поддерживает:
+
+replace selection;
+
+add;
+
+subtract;
+
+intersect;
+
+select all;
+
+invert;
+
+select content;
+
+перемещение;
+
+трансформацию выделения. 
+
+
+Pixelorama также имеет гораздо более богатую систему выделения, включая прямоугольник, эллипс, polygonal, lasso, select-by-color и magic-wand-подобные варианты. 
+
+Что добавить сюда в первую очередь
+
+P 0
+
+Move selection
+
+Сейчас drag selection фактически делает:
+
+copy → paste
+
+а исходник остаётся.
+
+Нужно разделить:
+
+Move
+
+Copy
+
+Duplicate
+
+Cut
+
+
+P 0
+
+Cut
+
+Ctrl+X
+
+P 0
+
+Selection modifiers
+
+Replace
+Add
+Subtract
+Intersect
+
+P 1
+
+Select All
+
+Deselect
+
+Invert
+
+Reselect
+
+P 1
+
+Select by Color
+
+Это для Pixel Art исключительно полезно.
+
+Например:
+
+выбрать весь зелёный
+→ заменить все зелёные участки
+
+P 1
+
+Select opaque
+
+То есть выбрать все непрозрачные пиксели.
+
+P 2
+
+lasso;
+
+polygonal selection;
+
+magic wand / contiguous color selection;
+
+expand selection;
+
+shrink selection.
+
+
+Это уже превращает выделение в действительно рабочий инструмент.
+
+
+---
+
+8. Transform — сейчас явно недостаточен
+
+Тут у тебя есть только:
+
+Flip H;
+
+Flip V;
+
+Rotate 90° буфера.
+
+
+При этом нормальные Pixel Art редакторы позволяют работать с самой selection/cel, включая move, resize и rotation. Aseprite отдельно документирует flip, resize, crop, trim и rotate для изображения и выделения. 
+
+Тебе нужны как минимум
+
+Flip Horizontal
+Flip Vertical
+Rotate 90°
+Rotate 180°
+Rotate 270°
+Scale
+
+Причём Scale должен иметь:
+
+1×
+2×
+3×
+4×
+...
+
+с nearest-neighbor.
+
+Например:
+
+16×16 sprite
+→ 32×32
+→ 48×48
+→ 64×64
+
+Это очень частая операция именно в Pixel Art.
+
+Для более продвинутого режима
+
+Можно добавить arbitrary rotation, но здесь нужно именно Pixel Art rotation, а не обычный bilinear transform.
+
+Aseprite использует специальные алгоритмы для таких случаев, а Pixelorama также подчёркивает отдельные pixel-art-oriented алгоритмы вращения и масштабирования. 
+
+
+---
+
+9. У тебя отсутствуют Crop / Resize Canvas
+
+Это один из очевидных пробелов.
+
+Сейчас есть создание нового тайла заданного размера, но нет нормального workflow:
+
+Resize Canvas
+Crop to Selection
+Crop to Content
+Trim
+Offset
+
+Для редактора это базовые операции.
+
+В актуальном Pixelorama даже в интерфейсе явно выделены Crop to Selection, Crop to Content, Resize Canvas и операции offset/scale. 
+
+Я бы добавил их довольно рано.
+
+Особенно:
+
+Crop to Selection
+
+Crop to Content
+
+Второй очень удобен для sprite extraction.
+
+
+---
+
+10. Есть функциональная семантическая проблема с Clear/New
+
+Сейчас новый тайл и ClearTile делают его непрозрачным белым.
+
+То есть:
+
+New → вся картинка белая
+Clear → вся картинка белая
+
+Для универсального Pixel Art editor это плохой default.
+
+Гораздо естественнее:
+
+New transparent canvas
+
+и отдельные команды:
+
+Fill with foreground
+Fill with background
+Fill opaque white
+Fill transparent
+
+В Aseprite прозрачный слой и opaque background являются разными сущностями, и clear для прозрачного слоя делает именно прозрачность. 
+
+Для TJTM я бы сделал:
+
+Default
+
+Transparent
+
+Дополнительно
+
+Background color
+
+Opaque document
+
+Fill background
+
+То есть white больше не должен быть скрытым смыслом Clear.
+
+
+---
+
+11. Ещё одна важная проблема — поведение Pencil по умолчанию
+
+У тебя по умолчанию:
+
+BrushReplace = false
+
+а значит карандаш использует BlendOver.
+
+То есть основной Pixel Art Pencil по умолчанию не является жёстким pixel replacement tool.
+
+При этом отдельный E переключает режим replacement.
+
+Для обычного цифрового рисования это логично.
+
+Для Pixel Art я бы сделал наоборот:
+
+Pencil = Replace
+
+по умолчанию.
+
+А смешивание оставить как отдельную функциональность:
+
+Blend
+Alpha brush
+Opacity
+
+Причина простая: классический Pixel Art workflow должен давать автору очень предсказуемое состояние пикселя. Pixel Joint отдельно рассматривает антиалиасинг, noise и нежелательные полутона как потенциальные источники проблем Pixel Art. 
+
+Твой нынешний механизм BlendOver полезен, но его лучше считать дополнительным режимом, а не базовым поведением Pencil.
+
+
+---
+
+12. Dither у тебя слишком простой
+
+Сейчас Dither — это буквально:
+
+(x + y) mod 2
+
+то есть фиксированная шахматка FirstColor/SecondColor.
+
+Для первого рабочего варианта это нормально.
+
+Но как полноценный Pixel Art tool он слишком ограничен.
+
+Pixel Art dithering должен быть управляемым паттерном, а не просто одним постоянным checkerboard.
+
+Pixel Joint отдельно предупреждает, что чрезмерный или случайный dithering быстро превращается в noise, а хороший dithering должен быть осмысленным и соответствовать форме. 
+
+Полезнее сделать
+
+Набор паттернов:
+
+25%
+50%
+75%
+
+2×2
+3×3
+4×4
+
+horizontal
+vertical
+diagonal
+
+checker
+cluster
+
+И желательно:
+
+Dither brush
+
+где пользователь реально выбирает pattern.
+
+Это существенно полезнее, чем просто добавлять ещё несколько фильтров.
+
+
+---
+
+13. Нужен pixel-perfect brush / line mode
+
+Обычный Bresenham — хорошая база.
+
+Но это не то же самое, что специализированная логика pixel-perfect stroke.
+
+Например, в современных Pixel Art редакторах отдельное внимание уделяется предотвращению нежелательных одиночных пикселей и плохих ступенек. Pixelorama прямо заявляет perfect pixel lines среди Pixel Art-focused возможностей. 
+
+У тебя стоит добавить отдельный режим:
+
+Pixel Perfect
+
+для Pencil/Line.
+
+Он должен убирать:
+
+случайные одиночные пиксели;
+
+неоднозначные диагональные ступеньки;
+
+некоторые формы двойного пикселя.
+
+
+Обычный режим при этом можно оставить неизменным.
+
+
+---
+
+14. Очень не хватает Layers
+
+Вот здесь уже начинается граница между:
+
+> tile editor
+
+
+
+и
+
+> полноценный sprite editor.
+
+
+
+Сейчас модель тайла у тебя по сути:
+
+один Tile[,]
+
+без слоя изображения.
+
+То есть невозможно удобно сделать:
+
+Body
+Shadow
+Outline
+Highlight
+Details
+
+отдельно.
+
+Aseprite рассматривает слой как базовый объект sprite workflow, с visibility, lock, именованием, группами и т. д. 
+
+Pixelorama тоже строит редактор вокруг layer system. 
+
+Минимальная версия для TJTM
+
+Я бы не делал сразу Photoshop-подобную систему.
+
+Хватит:
+
+Layer 1
+Layer 2
+Layer 3
+...
+
+с:
+
+New;
+
+Delete;
+
+Duplicate;
+
+Move Up/Down;
+
+Visibility;
+
+Lock;
+
+Rename;
+
+Merge Down.
+
+
+Это уже радикально расширит возможности.
+
+
+---
+
+15. Animation / Frames отсутствуют
+
+Здесь всё зависит от твоей цели.
+
+Если TJTM должен остаться:
+
+> редактором тайлов
+
+
+
+то это можно вообще не добавлять.
+
+Если же цель:
+
+> полноценный Pixel Art editor для игровых спрайтов
+
+
+
+то Animation становится очень важной частью.
+
+Aseprite строит документ вокруг:
+
+layers × frames = cels
+
+и имеет timeline, frame copying/moving, tags и onion skin. 
+
+Onion skin особенно полезен для Pixel Art animation. 
+
+Тогда нужны
+
+Frames
+Timeline
+Frame duration
+Play
+Loop
+Animation tags
+Duplicate frame
+Move frame
+Onion skin
+
+Но я бы не ставил это в первую очередь, если основная задача проекта всё-таки tiles.
+
+
+---
+
+16. Нет native project format
+
+Это, на мой взгляд, одна из наиболее важных недостающих вещей.
+
+Сейчас рабочий графический файл фактически живёт как PNG.
+
+Но PNG не знает:
+
+палитру;
+
+palette bindings;
+
+selection;
+
+project state;
+
+будущие layers;
+
+frames;
+
+tool state;
+
+tileset metadata;
+
+guides;
+
+animation timing.
+
+
+Aseprite поэтому сохраняет рабочий документ в .aseprite, а PNG/GIF использует как export. 
+
+Тебе в дальнейшем нужен собственный формат, например:
+
+.tjt
+
+где хранятся:
+
+document
+palette
+color mode
+layers
+frames
+metadata
+guides
+canvas settings
+
+а PNG становится именно:
+
+Export
+
+Это особенно важно, если когда-нибудь появятся Layers/Animation.
+
+
+---
+
+17. Import/Export сейчас слишком узкий
+
+Сейчас UX ориентирован на PNG.
+
+AskOpenFile/AskSaveFile используют PNG filter, а рабочая модель загружает изображение в Color[,]. [TJTM.pas](https://github.com/dpsmpx/TrueJointTileMaker/blob/main/TJTM.pas?utm_source=chatgpt.com)
+
+Для именно Pixel Art editor я бы разделил:
+
+Native project
+
+TJT
+
+Raster import/export
+
+PNG
+BMP
+GIF
+TIFF
+APNG
+
+Но здесь есть важное разделение:
+
+не все эти форматы должны быть форматами проекта.
+
+Например:
+
+PNG → import/export
+TIFF → import/export
+GIF → export / animation import
+APNG → animation import/export
+TJT → полноценный проект
+
+Для игровых ассетов особенно нужен Sprite Sheet Export
+
+Например:
+
+4×2 grid
+padding
+spacing
+margin
+background
+nearest-neighbor scale
+
+и отдельный export:
+
+individual sprites
+sprite sheet
+
+Aseprite рассматривает sprite-sheet export и экспорт последовательности кадров как нормальную часть игрового workflow. 
+
+
+---
+
+18. Нужны Palette/Pixel Art-specific операции
+
+Сейчас у тебя есть:
+
+Replace Color;
+
+Quantize;
+
+Flip.
+
+
+Я бы добавил именно операции, которые помогают улучшать Pixel Art, а не обычные фото-фильтры.
+
+Полезны:
+
+Цвет
+
+Hue Shift;
+
+Saturation;
+
+Value/Brightness;
+
+ограничение оттенков;
+
+Replace Color;
+
+Color Ramp;
+
+Reduce Colors;
+
+Posterize к palette;
+
+Palette Extract;
+
+Palette Sort;
+
+Palette Merge.
+
+
+Геометрия
+
+Outline;
+
+Remove Isolated Pixels;
+
+Remove Single Pixel Noise;
+
+Expand/Contract outline;
+
+Flood Fill;
+
+Replace contiguous color.
+
+
+Pixel cleanup
+
+Например:
+
+Remove isolated pixels
+
+когда один пиксель стоит одиноко среди другого цвета.
+
+Это уже непосредственно помогает исправлять Pixel Art, а не просто редактировать bitmap.
+
+
+---
+
+19. Нужен отдельный Outline tool
+
+У тебя сейчас нет специализированного:
+
+Outline
+
+Для игровых sprites это очень полезная операция:
+
+selection
+→ generate outline
+
+с настройками:
+
+4-neighbor;
+
+8-neighbor;
+
+thickness;
+
+inside/outside;
+
+color;
+
+preserve existing pixels.
+
+
+Pixelorama, например, уже имеет визуальные эффекты вроде outline/shadow в своей системе эффектов. 
+
+Я бы при этом не делал outline через обычный blur/graphics API. Он должен работать по пикселям.
+
+
+---
+
+20. Нужны Guides / rulers / coordinate tools
+
+Сейчас у тебя хороший overview, но нет полноценной вспомогательной геометрии.
+
+Полезно добавить:
+
+X/Y coordinate readout
+center guide
+horizontal guide
+vertical guide
+custom guides
+origin
+grid subdivisions
+
+Pixelorama, например, отдельно предлагает guides, grids и tile mode как рабочие средства точного Pixel Art workflow. 
+
+Для TJTM особенно полезен будет:
+
+0,0
+center
+tile center
+
+и координаты курсора:
+
+X: 15
+Y: 23
+RGB: #7A9C52
+A: 255
+
+
+---
+
+21. То, что у тебя сейчас является большим преимуществом перед обычным Pixel Art editor
+
+Это важно не потерять при расширении.
+
+Интеграция с tileset
+
+Твой:
+
+T
+
+открывает наборы тайлов, а редактор умеет напрямую работать с игровыми ресурсами.
+
+Map → Tile
+
+Двойной щелчок по клетке карты сразу ведёт к соответствующему asset.
+
+Файлы NPC/MOB
+
+Редактор не дублирует список существ, а сканирует реальные игровые assets.
+
+Это очень хороший принцип.
+
+Tiles + map editor в одном приложении
+
+Для твоего конкретного игрового workflow это сильная специализация.
+
+Aseprite, например, тоже уже имеет tilemap layers и tilesets, то есть направление само по себе вполне соответствует современному Pixel Art workflow. 
+
+Поэтому режим карты я бы не удалял ради превращения TJTM в «чистый» графический редактор. Наоборот, можно сделать его отдельным специализированным режимом.
+
+
+---
+
+22. Сводная матрица
+
+Функция	Сейчас	Что делать
+
+Pencil	Есть	Сделать Replace default
+Eraser	Есть	Оставить
+Fill	Есть	Оставить
+Picker	Есть	Оставить
+Line	Есть	Добавить Pixel Perfect mode
+Rectangle	Есть	Оставить
+Ellipse	Есть	Оставить
+Dither	Есть	Расширить паттерны
+Symmetry	Есть	Сделать movable axes
+Seamless preview	Есть	Оставить
+Wrap drawing	Есть	Оставить
+Grid	Есть	Расширить guides/subgrid
+Checkerboard	Есть	Оставить
+Zoom/pan	Есть	Уже хорошо
+Undo/Redo	Есть	Уже хорошо
+Rectangular selection	Есть	Сильно расширить
+Add/Subtract/Intersect selection	Нет	Добавить
+Lasso	Нет	Добавить позже
+Select by color	Нет	Добавить
+Select opaque	Нет	Добавить
+Move selection	Частично	Сделать настоящим Move
+Cut/Copy/Paste	Частично	Развести semantics
+Transform	Очень ограничен	Существенно расширить
+Scale	Нет	Добавить
+Rotate 180/270	Нет	Добавить
+Arbitrary pixel-art rotation	Нет	Добавить позже
+Crop	Нет	Добавить
+Resize canvas	Только через New	Добавить
+Crop to content	Нет	Добавить
+Palette	Есть	Расширить
+Indexed mode	Частичный	Сделать настоящим
+Palette sorting	Нет	Добавить
+Color ramps	Нет	Добавить
+Hue shifting	Нет	Добавить
+Outline	Нет	Добавить
+Pixel cleanup	Нет	Добавить
+Layers	Нет	Если нужен общий sprite editor
+Animation	Нет	Если нужен sprite workflow
+Onion skin	Нет	Вместе с animation
+Native project	Нет	Желательно добавить
+PNG	Есть	Оставить
+Другие raster formats	Ограниченно	Расширить
+Sprite sheet export	Нет	Добавить
+Tilemap	Есть, специализированно	Сильная сторона
+Game tileset integration	Есть	Сохранить и расширять
+
+
+
+---
+
+23. Я бы расставил развитие именно так
+
+Этап 1 — довести основное рисование до очень хорошего Pixel Art workflow
+
+1. Pencil → Replace по умолчанию.
+
+
+2. Transparent New/Clear.
+
+
+3. Selection modifiers.
+
+
+4. Move/Cut/Duplicate.
+
+
+5. Select by Color.
+
+
+6. Crop.
+
+
+7. Resize Canvas.
+
+
+8. Scale integer.
+
+
+9. Rotate 180/270.
+
+
+10. Pixel Perfect brush/line.
+
+
+11. Несколько dithering patterns.
+
+
+
+Это даст очень большой прирост качества именно ежедневной работы.
+
+Этап 2 — нормальная система цвета
+
+1. Arbitrary-size palette.
+
+
+2. True Indexed mode.
+
+
+3. Palette sorting.
+
+
+4. Color ramps.
+
+
+5. Hue shifting.
+
+
+6. Palette extraction.
+
+
+7. Palette replace/merge.
+
+
+8. Transparent index.
+
+
+
+Это особенно хорошо сочетается с твоей уже существующей концепцией TileIdx.
+
+Этап 3 — нормальный формат документа
+
+Например:
+
+.tjt
+
+с поддержкой:
+
+RGBA / Indexed
+palette
+layers
+selection
+canvas
+metadata
+
+И только после этого имеет смысл серьёзно расширять внутреннюю модель.
+
+Этап 4 — превращение в полноценный sprite editor
+
+Layers
+Timeline
+Frames
+Onion Skin
+Animation Tags
+Sprite Sheet Export
+GIF/APNG
+
+Aseprite и Pixelorama именно вокруг таких сущностей строят полноценный sprite/animation workflow. 
+
+
+---
+
+24. Что я бы НЕ добавлял сейчас
+
+Не стоит превращать TJTM в Photoshop.
+
+Для Pixel Art тебе почти не нужны:
+
+blur;
+
+photographic filters;
+
+arbitrary antialiasing;
+
+soft airbrush;
+
+сложные цветокоррекционные кривые на первом этапе;
+
+обычные vector tools;
+
+тяжёлые non-pixel transforms.
+
+
+Главный принцип должен остаться:
+
+> каждая операция должна иметь предсказуемое пиксельное представление.
+
+
+
+Pixel Joint как раз подчёркивает, что Pixel Art — это не просто «картинка маленького разрешения»: важны pixel clusters, контроль ступенек, dithering, palette construction, отсутствие лишнего noise и тому подобное. 
+
+
+---
+
+Итоговая оценка текущего состояния
+
+По функциональной части я бы описал TJTM так:
+
+как редактор игровых тайлов — уже очень хорошо сформированный специализированный инструмент;
+
+как общий Pixel Art editor — хорошее ядро, но пока заметно не хватает второго уровня инструментов.
+
+Самые удачные части сейчас:
+
+canvas + pixel input + seamless/wrap + symmetry + basic raster tools + palette workflow + tileset integration.
+
+Самые большие реальные пробелы:
+
+selection/transform, project/document model, palette/indexed mode, transparency semantics, crop/resize, export, layers/animation.
+
+И я бы не начинал с Animation. В текущем проекте наибольший прирост дадут именно Selection → Transform → Palette → Project Format → Pixel-perfect tools. Они полезны одновременно и для обычного Pixel Art, и для твоих игровых тайлов.
+
+Отдельно важен ещё один момент: у тебя уже есть довольно редкая сильная база для дальнейшего развития — seamless tile workflow + wrap + palette rebinding + прямое взаимодействие с игровым tileset. Я бы развивал редактор вокруг этого, а не пытался просто копировать весь набор функций Aseprite.
