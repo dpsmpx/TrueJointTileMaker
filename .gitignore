@@ -9,3 +9,8 @@ obj/
 # Резервные копии среды
 *.bak
 *~
+
+# Сборка C++ и эталона
+build/
+.cache/
+compile_commands.json
