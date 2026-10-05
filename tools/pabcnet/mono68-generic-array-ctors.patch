@@ -1,0 +1,29 @@
+Заплатка компилятора PascalABC.NET для Mono 6.8 (пакет mono-complete Ubuntu 24.04).
+
+Без неё компилятор аварийно завершается ещё на сборке PABCSystem:
+  * Assertion at class-accessors.c:41, condition `mono_class_is_ginst (klass)' not met
+Падение — в Type.GetConstructors() для массива открытого обобщённого
+параметра (T[]): это ошибка самого Mono 6.8. Конструкторы таких массивов
+компилятору не нужны — массивы создаются инструкцией newarr, — поэтому
+их запрос просто пропускается. Заплатка нужна только эталонной сборке
+в Linux-контейнере: на Windows PascalABC.NET ставится обычным установщиком
+и в ней не нуждается.
+
+Проверено на коммите 643514c2d9b843ffb4971345b117dd2f6df6369c (v4.0.0.3882).
+Применяется командой git apply; текст до строки diff она пропускает.
+
+diff --git a/TreeConverter/TreeRealization/types.cs b/TreeConverter/TreeRealization/types.cs
+index 8ee5b68..3ce5cdc 100644
+--- a/TreeConverter/TreeRealization/types.cs
++++ b/TreeConverter/TreeRealization/types.cs
+@@ -3376,6 +3376,10 @@ namespace PascalABCCompiler.TreeRealization
+ 		{
+             //if (ctors_inited) return;
+             //ctors_inited = true;
++			// Mono 6.8: GetConstructors() on an array of an open generic parameter (T[])
++			// aborts the runtime (class-accessors.c assertion). Such arrays are created
++			// with newarr, not through reflected constructors, so skip them.
++			if (_compiled_type.IsArray && _compiled_type.ContainsGenericParameters) return;
+ 			System.Reflection.ConstructorInfo[] cons_arr=_compiled_type.GetConstructors();
+ 			System.Reflection.ConstructorInfo[] prot_consttr_arr = _compiled_type.GetConstructors(BindingFlags.FlattenHierarchy|BindingFlags.Instance|BindingFlags.Public | BindingFlags.NonPublic);
+ 			List<System.Reflection.ConstructorInfo> cnstrs = new List<System.Reflection.ConstructorInfo>();
