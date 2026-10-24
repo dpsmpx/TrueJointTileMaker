@@ -403,4 +403,44 @@ void Model::adjustImageHSV(int dh, int ds, int dv) {
     needRepaint = true;
 }
 
+int Model::reduceImageColors(int n) {
+    if (docMode != DOC_TILE || tile.empty() || n < 1) return 0;
+    // Цвета считаются только с тех точек, что меняются: выделенный кусок
+    // сводится к своим n цветам, а не к цветам всего тайла.
+    Grid<Color> sample(tile.w, tile.h, argb(0, 0, 0, 0));
+    for (int y = 0; y < tile.h; ++y) {
+        for (int x = 0; x < tile.w; ++x) {
+            if (!hasSelection || isSelected(x, y)) sample.at(x, y) = tile.at(x, y);
+        }
+    }
+    const std::vector<Color> target = pal::extract(sample, n);
+    if (target.empty()) return 0;
+    int changed = 0;
+    Grid<Color> next = tile;
+    for (std::size_t k = 0; k < next.d.size(); ++k) {
+        const Color c = sample.d[k];
+        if (c.a == 0) continue;
+        const int i = pal::nearest(target, c);
+        if (i < 0) continue;
+        // Прозрачность точки остаётся своей: разрез идёт по цвету.
+        const Color t = target[static_cast<std::size_t>(i)];
+        const Color v = argb(c.a, t.r, t.g, t.b);
+        if (v.argb() != next.d[k].argb()) {
+            next.d[k] = v;
+            ++changed;
+        }
+    }
+    if (changed == 0) return 0;
+    pushUndo();
+    ensureTileIdx();
+    for (std::size_t k = 0; k < next.d.size(); ++k) {
+        if (next.d[k].argb() != tile.d[k].argb()) tileIdx.d[k] = indexOfColor(next.d[k]);
+    }
+    tile = std::move(next);
+    enforceIndexed();
+    tileBmpDirty = true;
+    needRepaint = true;
+    return changed;
+}
+
 }  // namespace tjtm

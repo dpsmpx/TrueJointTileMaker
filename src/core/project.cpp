@@ -102,6 +102,14 @@ struct Parsed {
     int onionNext = 1;
     Color first;
     Color second;
+    bool haveGuides = false;
+    unsigned guideFlags = 0;
+    int majorW = 0, majorH = 0;
+    int originX = 0, originY = 0;
+    std::vector<int> guidesX2, guidesY2;
+    int radial = 0;
+    int opacity = 255;
+    std::vector<std::pair<std::string, std::string>> meta;
 };
 
 bool parseBody(const std::vector<std::uint8_t>& body, Parsed& out, std::string& error) {
@@ -223,6 +231,28 @@ bool parseBody(const std::vector<std::uint8_t>& body, Parsed& out, std::string& 
             out.first = Color::fromArgb(s.u32());
             out.second = Color::fromArgb(s.u32());
             out.haveView = !s.bad;
+        } else if (tag == "GUID") {
+            out.guideFlags = static_cast<unsigned>(s.u8());
+            out.majorW = static_cast<int>(s.u32());
+            out.majorH = static_cast<int>(s.u32());
+            out.originX = s.i32();
+            out.originY = s.i32();
+            for (auto* list : {&out.guidesX2, &out.guidesY2}) {
+                const std::uint32_t n = s.u32();
+                for (std::uint32_t k = 0; k < n && k < 4096 && !s.bad; ++k)
+                    list->push_back(s.i32());
+            }
+            out.radial = s.u8();
+            out.opacity = std::max(1, s.u8());
+            out.haveGuides = !s.bad;
+        } else if (tag == "META") {
+            const std::uint32_t n = s.u32();
+            for (std::uint32_t k = 0; k < n && k < 4096 && !s.bad; ++k) {
+                std::string key = s.str();
+                std::string value = s.str();
+                // Имя программы пишется заново при каждом сохранении.
+                if (!s.bad && key != "app") out.meta.emplace_back(std::move(key), std::move(value));
+            }
         }
         // Незнакомый раздел пропускается целиком: длина его известна.
     }
@@ -365,10 +395,32 @@ std::vector<std::uint8_t> projectEncode(Model& m) {
     view.u32(m.secondColor.argb());
     all.section("VIEW", view);
 
+    // Направляющие, сетка, начало координат, лучи и сила кисти (этап 5) —
+    // отдельным разделом: версия 1.0 его пропустит, не потеряв остального.
+    Writer guid;
+    guid.u8((m.guidesOn ? 1 : 0) | (m.guideCenter ? 2 : 0) | (m.guideCellCenters ? 4 : 0) |
+            (m.rulersOn ? 8 : 0));
+    guid.u32(static_cast<std::uint32_t>(std::max(0, m.majorGridW)));
+    guid.u32(static_cast<std::uint32_t>(std::max(0, m.majorGridH)));
+    guid.i32(m.originX);
+    guid.i32(m.originY);
+    for (const auto* list : {&m.guidesX2, &m.guidesY2}) {
+        guid.u32(static_cast<std::uint32_t>(list->size()));
+        for (const int v : *list)
+            guid.i32(v);
+    }
+    guid.u8(std::clamp(m.symRadial, 0, 255));
+    guid.u8(std::clamp(m.brushOpacity, 1, 255));
+    all.section("GUID", guid);
+
     Writer meta;
-    meta.u32(1);
+    meta.u32(static_cast<std::uint32_t>(1 + m.docMeta.size()));
     meta.str("app");
     meta.str(std::string(kAppTitle) + " " + kAppVersion);
+    for (const auto& [k, v] : m.docMeta) {
+        meta.str(k);
+        meta.str(v);
+    }
     all.section("META", meta);
 
     // Картинка файла — сведённый первый кадр: так проект узнают в
@@ -420,13 +472,30 @@ bool projectDecode(const std::vector<std::uint8_t>& file, Model& m, std::string&
         m.symAxisY2 = p.axisY2;
         m.ditherPattern = p.dither;
         m.onionSkin = p.onion;
-        m.onionPrev = std::clamp(p.onionPrev, 1, 8);
+        m.onionPrev = std::clamp(p.onionPrev, 0, 8);
         m.onionNext = std::clamp(p.onionNext, 0, 8);
         m.firstColor = p.first;
         m.secondColor = p.second;
         m.firstIdx = m.indexOfColor(m.firstColor);
         m.secondIdx = m.indexOfColor(m.secondColor);
         m.syncHSVFromColor();
+    }
+    // Направляющие и метаданные — свои у документа: у проекта без раздела
+    // GUID их просто нет.
+    m.guidesX2 = p.guidesX2;
+    m.guidesY2 = p.guidesY2;
+    m.originX = p.originX;
+    m.originY = p.originY;
+    m.docMeta = p.meta;
+    if (p.haveGuides) {
+        m.guidesOn = (p.guideFlags & 1U) != 0;
+        m.guideCenter = (p.guideFlags & 2U) != 0;
+        m.guideCellCenters = (p.guideFlags & 4U) != 0;
+        m.rulersOn = (p.guideFlags & 8U) != 0;
+        m.majorGridW = std::clamp(p.majorW, 0, MAX_TILE);
+        m.majorGridH = std::clamp(p.majorH, 0, MAX_TILE);
+        m.symRadial = std::clamp(p.radial, 0, 32);
+        m.brushOpacity = std::clamp(p.opacity, 1, 255);
     }
     m.clearTileHistory();
     m.tileModified = false;

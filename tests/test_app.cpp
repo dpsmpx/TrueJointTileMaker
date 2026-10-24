@@ -20,6 +20,7 @@
 #include "core/model.h"
 #include "core/png.h"
 #include "core/project.h"
+#include "core/rasterfmt.h"
 
 namespace fs = std::filesystem;
 
@@ -160,7 +161,7 @@ TEST_P(AppScreens, MatchOriginal) {
 
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
-                                           "anim4"));
+                                           "anim4", "prec5"));
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.
@@ -251,6 +252,29 @@ TEST(AppScreens, AnimationExports) {
     // Второй слой есть только в третьем кадре.
     EXPECT_EQ(m.doc.cel(1, 0), nullptr);
     EXPECT_NE(m.doc.cel(1, 2), nullptr);
+    fs::remove_all(base);
+}
+
+/// Этап 5: «Сохранить как» с расширениями .bmp и .tif пишет эти форматы,
+/// а TIFF открывается обратно своим чтением.
+TEST(AppScreens, BmpAndTiffSaved) {
+    const fs::path base = makeBase("prec5x");
+    ASSERT_TRUE(runScenario("prec5", base));
+    auto bytesOf = [](const fs::path& p) {
+        std::ifstream in(p, std::ios::binary);
+        return std::vector<std::uint8_t>((std::istreambuf_iterator<char>(in)),
+                                         std::istreambuf_iterator<char>());
+    };
+    const auto bmp = bytesOf(base / "out.bmp");
+    ASSERT_GE(bmp.size(), 54U);
+    EXPECT_EQ(bmp[0], 'B');
+    EXPECT_EQ(bmp[18], 79);  // ширина после поворота на 15°
+    std::vector<tjtm::Grid<tjtm::Color>> pages;
+    std::string err;
+    ASSERT_TRUE(tjtm::tiffDecode(bytesOf(base / "out.tif"), pages, err)) << err;
+    ASSERT_EQ(pages.size(), 1U);
+    EXPECT_EQ(pages[0].w, 79);
+    EXPECT_EQ(pages[0].h, 79);
     fs::remove_all(base);
 }
 

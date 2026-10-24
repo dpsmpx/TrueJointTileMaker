@@ -30,24 +30,31 @@ SpriteSheet buildSheet(const std::vector<AnimFrame>& frames, const SheetOptions&
     const int scale = clampI(o.scale, 1, 16);
     const int margin = std::max(0, o.margin);
     const int spacing = std::max(0, o.spacing);
+    const int pad = std::max(0, o.padding);
     const int fw = frames.front().image.w * scale;
     const int fh = frames.front().image.h * scale;
+    // Клетка — кадр с отступом со всех сторон.
+    const int cw = fw + 2 * pad;
+    const int ch = fh + 2 * pad;
     int cols = 1;
     int rows = 1;
     sheetGrid(static_cast<int>(frames.size()), o, cols, rows);
-    s.image = Grid<Color>(margin * 2 + cols * fw + (cols - 1) * spacing,
-                          margin * 2 + rows * fh + (rows - 1) * spacing, argb(0, 0, 0, 0));
+    s.image = Grid<Color>(margin * 2 + cols * cw + (cols - 1) * spacing,
+                          margin * 2 + rows * ch + (rows - 1) * spacing, o.background);
     for (std::size_t i = 0; i < frames.size(); ++i) {
         const int c = static_cast<int>(i) % cols;
         const int r = static_cast<int>(i) / cols;
-        SheetCell cell{margin + c * (fw + spacing), margin + r * (fh + spacing), fw, fh,
+        SheetCell cell{margin + c * (cw + spacing) + pad, margin + r * (ch + spacing) + pad, fw, fh,
                        frames[i].durationMs};
         const Grid<Color>& src = frames[i].image;
         const Grid<Color> big =
             scale == 1 ? src : img::scaleNearest(src, src.w * scale, src.h * scale);
         for (int y = 0; y < std::min(fh, big.h); ++y) {
-            for (int x = 0; x < std::min(fw, big.w); ++x)
-                s.image.at(cell.x + x, cell.y + y) = big.at(x, y);
+            for (int x = 0; x < std::min(fw, big.w); ++x) {
+                // Фон виден под прозрачными точками кадра.
+                Color& dst = s.image.at(cell.x + x, cell.y + y);
+                dst = blendOver(big.at(x, y), dst);
+            }
         }
         s.cells.push_back(cell);
     }

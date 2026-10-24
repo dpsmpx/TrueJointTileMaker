@@ -36,6 +36,7 @@ std::string shapeName(int s) {
         case SS_LASSO: return "Лассо";
         case SS_WAND: return "Палочка";
         case SS_COLOR: return "По цвету";
+        case SS_POLYGON: return "Многоугольник";
         default: return "Рамка";
     }
 }
@@ -117,7 +118,103 @@ void Editor::selectToolPro(int mx, int my) {
         moveSelectionPro(mx, my, isKeyPressed(KEY_CTRL));
         return;
     }
+    if (m.selShape == SS_POLYGON) {
+        definePolygonSelection(mx, my, op);
+        return;
+    }
     defineSelectionPro(mx, my, op);
+}
+
+/// Многоугольник по вершинам: щелчок ставит вершину, щелчок по первой,
+/// двойной щелчок или Enter замыкают, Backspace снимает последнюю,
+/// Escape и правая кнопка отменяют. Отрезок к курсору виден всё время.
+void Editor::definePolygonSelection(int ax, int ay, int op) {
+    const Grid<std::uint8_t> base = m.selectionMask();
+    const bool had = m.hasSelection;
+    std::vector<std::pair<int, int>> pts{{ax, ay}};
+    waitMouseRelease();
+    dropInput();
+    pf_.input().keys.clear();
+    bool closed = false;
+    bool cancelled = false;
+    int lastMs = pf_.milliseconds();
+    auto previewLine = [&](int x0, int y0, int x1, int y1) {
+        const int dx = std::abs(x1 - x0);
+        const int dy = -std::abs(y1 - y0);
+        const int sx = x0 < x1 ? 1 : -1;
+        const int sy = y0 < y1 ? 1 : -1;
+        int err = dx + dy;
+        while (true) {
+            drawPreviewPixel(x0, y0);
+            if (x0 == x1 && y0 == y1) break;
+            const int e2 = 2 * err;
+            if (e2 >= dy) {
+                err += dy;
+                x0 += sx;
+            }
+            if (e2 <= dx) {
+                err += dx;
+                y0 += sy;
+            }
+        }
+    };
+    while (!closed && !cancelled && !quitNow_) {
+        beginFrameInput();
+        const int cx = std::clamp(m.screenToTileX(mouseX()), 0, m.docW() - 1);
+        const int cy = std::clamp(m.screenToTileY(mouseY()), 0, m.docH() - 1);
+        drawCanvas();
+        for (std::size_t k = 1; k < pts.size(); ++k)
+            previewLine(pts[k - 1].first, pts[k - 1].second, pts[k].first, pts[k].second);
+        previewLine(pts.back().first, pts.back().second, cx, cy);
+        // Первая вершина обведена: щелчок по ней замыкает фигуру.
+        const int fx = m.tileToScreenX(pts.front().first);
+        const int fy = m.tileToScreenY(pts.front().second);
+        fb_.setClip(canvasRect());
+        fb_.frameRect(fx - 3, fy - 3, fx + m.pixelSize + 3, fy + m.pixelSize + 3, cAccent);
+        fb_.resetClip();
+        redraw();
+        if (frameClick_) {
+            frameClick_ = false;
+            const int px = std::clamp(m.screenToTileX(frameClickX_), 0, m.docW() - 1);
+            const int py = std::clamp(m.screenToTileY(frameClickY_), 0, m.docH() - 1);
+            const int now = pf_.milliseconds();
+            if (frameClickButton_ == MB_RIGHT) {
+                cancelled = true;
+            } else if (pts.size() >= 3 && std::abs(px - pts.front().first) <= 1 &&
+                       std::abs(py - pts.front().second) <= 1) {
+                closed = true;
+            } else if (std::make_pair(px, py) == pts.back() && now - lastMs <= DOUBLE_CLICK_MS) {
+                closed = pts.size() >= 3;
+            } else {
+                pts.emplace_back(px, py);
+            }
+            lastMs = now;
+        }
+        switch (takeKey()) {
+            case KEY_ENTER: closed = pts.size() >= 3; break;
+            case KEY_ESC: cancelled = true; break;
+            case KEY_BACK:
+                if (pts.size() > 1) pts.pop_back();
+                break;
+            default: break;
+        }
+        idle();
+    }
+    waitMouseRelease();
+    if (cancelled || !closed) {
+        if (had) {
+            m.setSelectionMask(base);
+        } else {
+            m.resetSelection();
+        }
+        m.needRepaint = true;
+        return;
+    }
+    Grid<std::uint8_t> cur = base;
+    img::combine(cur, img::maskPolygon(m.docW(), m.docH(), pts), op);
+    m.setSelectionMask(cur);
+    if (m.hasSelection) m.copySelection();
+    m.needRepaint = true;
 }
 
 void Editor::defineSelectionPro(int ax, int ay, int op) {
@@ -210,7 +307,7 @@ void Editor::moveSelectionPro(int mx, int my, bool copy) {
 /// границе. Прямоугольник рисуется кодом оригинала, и его вид не меняется.
 void Editor::drawSelectionMask() {
     if (m.selMask.empty() || !m.hasSelection) return;
-    fb_.setClip(gfx::Rect{0, 0, m.W, m.H});
+    fb_.setClip(canvasRect());
     const Color tint = argb(64, cAccent.r, cAccent.g, cAccent.b);
     for (int y = m.selY; y < m.selY + m.selH; ++y) {
         int x = m.selX;
@@ -345,13 +442,26 @@ void Editor::showToolOptions() {
         if (uiToggle(LX + 170, 72, 160, 30, "Смешивание", !m.brushReplace)) m.brushReplace = false;
         if (uiToggle(LX, 110, 330, 30, "«Пиксель-перфект»: без углов в мазке  (Q)", m.pixelPerfect))
             m.pixelPerfect = !m.pixelPerfect;
+        // Сила кисти в процентах: так её задают во всех редакторах.
+        {
+            const int before = pround(m.brushOpacity * 100.0 / 255);
+            int pct = before;
+            uiLabelLeft(LX, 148, 30, "Сила кисти", cText);
+            if (uiButton(LX + 110, 148, 44, 30, "−10", pct > 1)) pct = std::max(1, pct - 10);
+            if (uiButton(LX + 158, 148, 36, 30, "−1", pct > 1)) pct = std::max(1, pct - 1);
+            fb_.fillRoundRect(LX + 198, 148, LX + 254, 178, 6, 6, cFace);
+            uiLabel(LX + 198, 148, 56, 30, std::to_string(pct) + "%", cText);
+            if (uiButton(LX + 258, 148, 36, 30, "+1", pct < 100)) pct = std::min(100, pct + 1);
+            if (uiButton(LX + 298, 148, 44, 30, "+10", pct < 100)) pct = std::min(100, pct + 10);
+            if (pct != before) m.brushOpacity = std::clamp(pround(pct * 255.0 / 100), 1, 255);
+        }
 
         // --- узоры ---
-        uiLabelLeft(LX, 150, 24, "Узор инструмента «Узор»  ([ и ] — листать)", cTextDim);
+        uiLabelLeft(LX, 186, 24, "Узор инструмента «Узор»  ([ и ] — листать)", cTextDim);
         const int n = img::ditherPatternCount();
         for (int p = 0; p < n; ++p) {
             const int cx = LX + (p % 2) * 170;
-            const int cy = 178 + (p / 2) * 38;
+            const int cy = 212 + (p / 2) * 38;
             if (uiToggle(cx, cy, 160, 34, "", m.ditherPattern == p)) m.ditherPattern = p;
             // Образец узора первым и вторым цветом, по две точки экрана на точку.
             for (int py = 0; py < 12; ++py) {
@@ -395,6 +505,16 @@ void Editor::showToolOptions() {
             axisRow(330, m.symX, m.symAxisX2, m.tile.w, "Ось X  (F)");
             axisRow(368, m.symY, m.symAxisY2, m.tile.h, "Ось Y  (D)");
         }
+        // Радиальная: лучи вокруг точки пересечения осей.
+        uiLabelLeft(RX, 406, 30, "Лучей", cText);
+        static const int kRays[5] = {0, 3, 4, 6, 8};
+        for (int k = 0; k < 5; ++k) {
+            const std::string cap = kRays[k] == 0 ? "нет" : std::to_string(kRays[k]);
+            if (uiToggle(RX + 60 + k * 54, 406, 50, 30, cap,
+                         m.symRadial == kRays[k] || (kRays[k] == 0 && m.symRadial < 2)))
+                m.symRadial = kRays[k];
+        }
+        if (uiButton(RX, 450, 330, 30, "Сетка и направляющие…   Ctrl+G", true)) showGridScreen();
 
         if (uiButton(WIN_W / 2 - 90, WIN_H - 52, 180, 36, "Закрыть", true)) done = true;
         redraw();
@@ -487,6 +607,121 @@ bool Editor::askNumbers(const std::string& title, const std::string& hint,
     return ok;
 }
 
+/// Поворот на любой угол: угол, способ, рост холста.
+void Editor::showRotateDialog() {
+    int deg = rotateDeg_;
+    bool done = false;
+    bool ok = false;
+    dropInput();
+    pf_.input().keys.clear();
+    const bool sel = m.hasSelection;
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        fb_.clear(cWindow);
+        textCentered(0, 30, WIN_W, 66, "Поворот на любой угол", cText);
+        uiLabel(0, 70, WIN_W, 26,
+                std::string("По часовой стрелке, ") + (sel ? "выделенное" : "все слои и кадры") +
+                    "; новых цветов не появляется",
+                cTextDim);
+        uiLabel(40, 120, 180, 34, "Угол, градусы", cText);
+        if (uiButton(230, 120, 46, 34, "−15", deg > -180)) deg = std::max(-180, deg - 15);
+        if (uiButton(282, 120, 46, 34, "−1", deg > -180)) --deg;
+        fb_.fillRoundRect(334, 120, 434, 154, 6, 6, cFace);
+        uiLabel(334, 120, 100, 34, std::to_string(deg) + "°", cText);
+        if (uiButton(440, 120, 46, 34, "+1", deg < 180)) ++deg;
+        if (uiButton(492, 120, 46, 34, "+15", deg < 180)) deg = std::min(180, deg + 15);
+        if (uiButton(548, 120, 46, 34, "0", deg != 0)) deg = 0;
+        uiLabel(40, 170, 180, 34, "Способ", cText);
+        if (uiToggle(230, 170, 200, 34, "RotSprite", rotateMethod_ == img::ROT_SPRITE))
+            rotateMethod_ = img::ROT_SPRITE;
+        if (uiToggle(436, 170, 200, 34, "Ближайший сосед", rotateMethod_ == img::ROT_NEAREST))
+            rotateMethod_ = img::ROT_NEAREST;
+        uiLabel(0, 210, WIN_W, 22,
+                rotateMethod_ == img::ROT_SPRITE
+                    ? "RotSprite держит линии и контур целыми — для спрайтов"
+                    : "Ближайший сосед быстрее и честнее к точкам, но рвёт тонкие линии",
+                cTextDim);
+        if (!sel) {
+            uiLabel(40, 250, 180, 34, "Холст", cText);
+            if (uiToggle(230, 250, 200, 34, "Вырастить", rotateExpand_)) rotateExpand_ = true;
+            if (uiToggle(436, 250, 200, 34, "Оставить размер", !rotateExpand_))
+                rotateExpand_ = false;
+        }
+        if (uiButton(WIN_W / 2 - 180, 320, 170, 38, "Повернуть", deg != 0)) {
+            ok = true;
+            done = true;
+        }
+        if (uiButton(WIN_W / 2 + 10, 320, 170, 38, "Отмена", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC) done = true;
+        if (key == KEY_ENTER && deg != 0) {
+            ok = true;
+            done = true;
+        }
+        idle();
+    }
+    waitMouseRelease();
+    m.needRepaint = true;
+    rotateDeg_ = deg;
+    if (!ok) return;
+    if (!m.rotateImageBy(deg, rotateMethod_, rotateExpand_)) {
+        showMessage("Не помещается",
+                    "Повёрнутый тайл больше " + std::to_string(MAX_TILE) +
+                        " точек по стороне. "
+                        "Поверните с прежним размером холста или уменьшите картинку.");
+    }
+}
+
+/// Контур первым цветом: снаружи или внутри, толщина, соседи.
+void Editor::showOutlineDialog() {
+    bool done = false;
+    bool ok = false;
+    dropInput();
+    pf_.input().keys.clear();
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        fb_.clear(cWindow);
+        textCentered(0, 30, WIN_W, 66, "Контур первым цветом", cText);
+        uiLabel(0, 70, WIN_W, 26,
+                std::string("По точкам, без сглаживания; ") +
+                    (m.hasSelection ? "в пределах выделения" : "по всему тайлу"),
+                cTextDim);
+        uiLabel(40, 120, 180, 34, "Где", cText);
+        if (uiToggle(230, 120, 200, 34, "Снаружи", outlineOutside_)) outlineOutside_ = true;
+        if (uiToggle(436, 120, 200, 34, "Внутри", !outlineOutside_)) outlineOutside_ = false;
+        uiLabel(40, 170, 180, 34, "Соседи", cText);
+        if (uiToggle(230, 170, 200, 34, "Четыре — углы открыты", !outlineEight_))
+            outlineEight_ = false;
+        if (uiToggle(436, 170, 200, 34, "Восемь — сплошной", outlineEight_)) outlineEight_ = true;
+        uiLabel(40, 220, 180, 34, "Толщина", cText);
+        if (uiButton(282, 220, 46, 34, "−1", outlineThick_ > 1)) --outlineThick_;
+        fb_.fillRoundRect(334, 220, 434, 254, 6, 6, cFace);
+        uiLabel(334, 220, 100, 34, std::to_string(outlineThick_), cText);
+        if (uiButton(440, 220, 46, 34, "+1", outlineThick_ < 16)) ++outlineThick_;
+        uiLabel(40, 270, 180, 34, "Цвет", cText);
+        fb_.fillRect(230, 272, 290, 302, blendOver(m.firstColor, cCheckA));
+        fb_.frameRect(230, 272, 290, 302, cBorder);
+        uiLabelLeft(300, 270, 34, "первый рабочий", cTextDim);
+        if (uiButton(WIN_W / 2 - 180, 340, 170, 38, "Обвести", true)) {
+            ok = true;
+            done = true;
+        }
+        if (uiButton(WIN_W / 2 + 10, 340, 170, 38, "Отмена", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC) done = true;
+        if (key == KEY_ENTER) {
+            ok = true;
+            done = true;
+        }
+        idle();
+    }
+    waitMouseRelease();
+    m.needRepaint = true;
+    if (ok) m.outlineImage(m.firstColor, outlineEight_, outlineOutside_, outlineThick_);
+}
+
 void Editor::showImageScreen() {
     bool done = false;
     dropInput();
@@ -565,6 +800,8 @@ void Editor::showImageScreen() {
         y += ST;
         if (act(c2, y, "Повернуть на 90° против", tile)) m.transformImage(TF_ROT270);
         y += ST;
+        if (act(c2, y, "Повернуть на любой угол…", tile)) showRotateDialog();
+        y += ST;
         const int sw = sel ? m.selW : m.tile.w;
         const int sh = sel ? m.selH : m.tile.h;
         for (int f = 2; f <= 4; ++f) {
@@ -577,11 +814,7 @@ void Editor::showImageScreen() {
                 tile && sw >= 2 && sh >= 2 && (sel || (sw / 2 >= MIN_TILE && sh / 2 >= MIN_TILE))))
             m.scaleBy(1, 2);
         y += ST;
-        if (act(c2, y, "Контур первым цветом снаружи", tile))
-            m.outlineImage(m.firstColor, outlineEight_, true);
-        y += ST;
-        if (act(c2, y, "Контур первым цветом внутри", tile))
-            m.outlineImage(m.firstColor, outlineEight_, false);
+        if (act(c2, y, "Контур первым цветом…", tile)) showOutlineDialog();
 
         // --- холст ---
         y = 78;
@@ -646,9 +879,18 @@ void Editor::showImageScreen() {
                 m.adjustImageHSV(dh, ds, dv);
         }
 
-        // --- низ ---
-        if (uiToggle(c2, 444, CW, BH, "Контур по восьми соседям", outlineEight_))
-            outlineEight_ = !outlineEight_;
+        // --- край и цвета ---
+        if (act(c1, 447, "Нарастить край", tile)) m.growImageEdge(outlineEight_);
+        if (act(c1, 478, "Срезать край", tile)) m.shrinkImageEdge(outlineEight_);
+        if (act(c2, 447, "Сократить цвета…", tile)) {
+            int n = 16;
+            if (askNumbers("Сократить цвета",
+                           std::string("Медианный разрез цветов ") +
+                               (sel ? "выделения" : "всего тайла") +
+                               "; прозрачность точек остаётся",
+                           {{"Цветов", &n, 1, 256}}, "Применить", nullptr))
+                m.reduceImageColors(n);
+        }
         if (uiButton(c1, WIN_H - 50, CW / 2 - 3, 34, "Цвет…", tile)) showColorOpsScreen();
         if (uiButton(c1 + CW / 2 + 3, WIN_H - 50, CW / 2 - 3, 34, "Палитра…", tile))
             showPaletteScreen();

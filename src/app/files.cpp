@@ -6,7 +6,9 @@
 #include <SDL3_image/SDL_image.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 #include "app/editor.h"
 #include "core/anim.h"
@@ -14,18 +16,25 @@
 #include "core/gif.h"
 #include "core/png.h"
 #include "core/project.h"
+#include "core/rasterfmt.h"
 #include "core/text.h"
 #include "core/theme.h"
 
 namespace tjtm {
+
+using namespace theme;
 
 namespace {
 
 // Проект .tjt открывается тем же «Загрузить»: это тоже PNG, только с
 // куском проекта внутри.
 const std::vector<FileFilter> kPngFilter = {
-    {"Картинки, анимации и проекты (PNG, GIF, TJT)", "png;gif;tjt"},
+    {"Картинки, анимации и проекты", "png;gif;tjt;bmp;tif;tiff;jpg;jpeg"},
+    {"PNG и APNG", "png"},
     {"Проекты редактора", "tjt"},
+    {"GIF", "gif"},
+    {"BMP", "bmp"},
+    {"TIFF", "tif;tiff"},
     {"Все файлы", "*"}};
 const std::vector<FileFilter> kMapFilter = {{"Карты локаций", "map"}, {"Все файлы", "*"}};
 
@@ -108,6 +117,11 @@ bool Editor::readImageGrid(const std::string& path, Grid<Color>& g, bool quiet) 
     if (bytes.size() >= 8 && bytes[0] == 137 && bytes[1] == 'P' && bytes[2] == 'N' &&
         bytes[3] == 'G') {
         ok = pngDecode(bytes, img, err);
+    } else if (isTiff(bytes)) {
+        // TIFF — своим чтением: SDL_image собран без libtiff.
+        std::vector<Grid<Color>> pages;
+        ok = tiffDecode(bytes, pages, err);
+        if (ok) img = std::move(pages.front());
     } else {
         SDL_IOStream* io = SDL_IOFromConstMem(bytes.data(), bytes.size());
         SDL_Surface* s = io != nullptr ? IMG_Load_IO(io, true) : nullptr;
@@ -196,32 +210,77 @@ bool Editor::saveTileTo(const std::string& path) {
     if (path.empty()) return false;
     const int nf = m.doc.frameCount();
     if (pathExtLower(path) == ".tjt") return saveProjectTo(path);
-    // Открытый GIF сохраняется в GIF, анимация из одного слоя в PNG — в
-    // APNG: так «Сохранить» возвращает файл в том виде, в каком его открыли.
-    if (pathExtLower(path) == ".gif") return saveAnimationTo(path, true, 0, nf - 1, 1, 0, true);
-    std::string err;
-    if (m.multiCel() && m.doc.layerCount() == 1)
-        return saveAnimationTo(path, false, 0, nf - 1, 1, 0, true);
-    if (m.multiCel()) {
-        // Слои в PNG не помещаются: либо проект, либо сведённая картинка
-        // (у анимации — APNG). Тогда документ остаётся несохранённым.
-        const int a = ask3("Слои и кадры",
-                           nf > 1 ? "PNG хранит картинки, а не слои: кадры сведутся в анимацию "
-                                    "APNG. Слои, кадры и метки сохраняет проект .tjt."
-                                  : "PNG хранит одну картинку: слои сведутся. Слои, кадры и метки "
-                                    "сохраняет проект .tjt.",
-                           "Сохранить проект", "Сохранить картинку", "Отмена");
-        if (a < 0) return false;
-        if (a == 1) return saveProjectTo(replaceExtension(path, ".tjt"));
-        return saveAnimationTo(path, false, 0, nf - 1, 1, 0, false);
+    const int fmt = imageFormatOf(path);
+    if (!m.multiCel()) {
+        // Одна картинка — сама картинка тайла, как у оригинала, в формате
+        // по расширению.
+        if (!writeImageFile(path, {AnimFrame{m.tile, m.doc.frames.front().durationMs}}, 0))
+            return false;
+        m.currentFile = path;
+        m.tileModified = false;
+        rememberFile(path, false);
+        return true;
     }
-    if (!pngSave(path, m.tile, err)) {
-        showMessage("Не удалось сохранить файл", path + ": " + err);
+    // Кадры помещаются в GIF, APNG и TIFF страницами, в BMP — нет.
+    const bool framesFit = fmt != FMT_BMP;
+    // Открытая анимация из одного слоя сохраняется в том же виде, в
+    // каком её открыли.
+    if (m.doc.layerCount() == 1 && framesFit) return saveAnimationTo(path, 0, nf - 1, 1, 0, true);
+    const std::string name = fmt == FMT_GIF    ? "GIF"
+                             : fmt == FMT_TIFF ? "TIFF"
+                             : fmt == FMT_BMP  ? "BMP"
+                                               : "PNG";
+    const std::string what = m.doc.layerCount() > 1
+                                 ? name + " хранит картинки, а не слои: слои сведутся"
+                                 : name + " хранит одну картинку";
+    const std::string frames =
+        nf > 1 ? (framesFit ? ", кадры сохранятся по одному" : ", сохранится только текущий кадр")
+               : "";
+    const int a =
+        ask3("Слои и кадры", what + frames + ". Слои, кадры и метки целиком сохраняет проект .tjt.",
+             "Сохранить проект", "Сохранить картинку", "Отмена");
+    if (a < 0) return false;
+    if (a == 1) return saveProjectTo(replaceExtension(path, ".tjt"));
+    if (framesFit) return saveAnimationTo(path, 0, nf - 1, 1, 0, false);
+    return saveAnimationTo(path, m.activeFrame, m.activeFrame, 1, 0, false);
+}
+
+int Editor::imageFormatOf(const std::string& path) {
+    const std::string ext = pathExtLower(path);
+    if (ext == ".gif") return FMT_GIF;
+    if (ext == ".bmp") return FMT_BMP;
+    if (ext == ".tif" || ext == ".tiff") return FMT_TIFF;
+    return FMT_PNG;
+}
+
+bool Editor::writeImageFile(const std::string& path, const std::vector<AnimFrame>& frames,
+                            int plays) {
+    if (frames.empty()) return false;
+    std::vector<std::uint8_t> bytes;
+    switch (imageFormatOf(path)) {
+        case FMT_GIF:
+            // Цвета палитры идут в GIF первыми и в её порядке.
+            bytes = gifEncode(frames, plays, m.palette);
+            break;
+        case FMT_BMP: bytes = bmpEncode(frames.front().image); break;
+        case FMT_TIFF: {
+            std::vector<Grid<Color>> pages;
+            pages.reserve(frames.size());
+            for (const AnimFrame& f : frames)
+                pages.push_back(f.image);
+            bytes = tiffEncode(pages);
+            break;
+        }
+        default:
+            bytes = frames.size() > 1 ? apngEncode(frames, plays) : pngEncode(frames.front().image);
+            break;
+    }
+    if (!writeFile(path,
+                   std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()))) {
+        showMessage("Не удалось сохранить файл",
+                    path + ": не удалось записать файл. Проверьте права на запись.");
         return false;
     }
-    m.currentFile = path;
-    m.tileModified = false;
-    rememberFile(path, false);
     return true;
 }
 
@@ -241,6 +300,15 @@ int Editor::tryLoadAnimation(const std::string& path, bool quiet) {
             if (!quiet) showMessage("Не удалось открыть GIF", path + ": " + err);
             return -1;
         }
+    } else if (isTiff(bytes)) {
+        // Страницы TIFF — кадры; длительностей в TIFF нет.
+        std::vector<Grid<Color>> pages;
+        if (!tiffDecode(bytes, pages, err)) {
+            if (!quiet) showMessage("Не удалось открыть TIFF", path + ": " + err);
+            return -1;
+        }
+        for (Grid<Color>& g : pages)
+            frames.push_back(AnimFrame{std::move(g), 100});
     } else if (pngFindChunk(bytes, "acTL", actl)) {
         if (!apngDecode(bytes, frames, err)) {
             if (!quiet) showMessage("Не удалось открыть APNG", path + ": " + err);
@@ -265,26 +333,11 @@ int Editor::tryLoadAnimation(const std::string& path, bool quiet) {
     return 1;
 }
 
-bool Editor::saveAnimationTo(const std::string& path, bool gif, int from, int to, int scale,
-                             int plays, bool asDocument) {
+bool Editor::saveAnimationTo(const std::string& path, int from, int to, int scale, int plays,
+                             bool asDocument) {
     if (path.empty()) return false;
     const std::vector<AnimFrame> frames = scaleFrames(m.animationFrames(from, to), scale);
-    if (frames.empty()) return false;
-    std::vector<std::uint8_t> bytes;
-    if (gif) {
-        // Цвета палитры идут в GIF первыми и в её порядке.
-        bytes = gifEncode(frames, plays, m.palette);
-    } else if (frames.size() > 1) {
-        bytes = apngEncode(frames, plays);
-    } else {
-        bytes = pngEncode(frames.front().image);
-    }
-    if (!writeFile(path,
-                   std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()))) {
-        showMessage("Не удалось сохранить файл",
-                    path + ": не удалось записать файл. Проверьте права на запись.");
-        return false;
-    }
+    if (frames.empty() || !writeImageFile(path, frames, plays)) return false;
     // Документом файл становится, только если в нём ничего не потеряно:
     // один слой, все кадры, без увеличения.
     if (asDocument && m.doc.layerCount() == 1 && from == 0 && to >= m.doc.frameCount() - 1 &&
@@ -331,30 +384,85 @@ void Editor::exportSheetAsk() {
     exportRange(from, to);
     int first = from + 1;
     int last = to + 1;
-    int cols = 0;
-    int margin = 0;
-    int spacing = 0;
-    int scale = 1;
-    if (!askNumbers("Лист спрайтов",
-                    "Столбцов 0 — все кадры в строку. Рядом ляжет описание .json для движка",
-                    {{"С кадра", &first, 1, nf},
-                     {"По кадр", &last, 1, nf},
-                     {"Столбцов", &cols, 0, nf},
-                     {"Поле вокруг", &margin, 0, 64},
-                     {"Промежуток", &spacing, 0, 64},
-                     {"Увеличение", &scale, 1, 8}},
-                    "Дальше…", nullptr))
-        return;
+    int& cols = sheetCols_;
+    int& margin = sheetMargin_;
+    int& spacing = sheetSpacing_;
+    int& padding = sheetPadding_;
+    int& scale = sheetScale_;
+    bool done = false;
+    bool ok = false;
+    dropInput();
+    pf_.input().keys.clear();
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        fb_.clear(cWindow);
+        textCentered(0, 16, WIN_W, 48, "Лист спрайтов", cText);
+        uiLabel(0, 46, WIN_W, 22, "Рядом ляжет описание .json в виде Aseprite — его читают движки",
+                cTextDim);
+        uiStepper(24, 90, "С кадра", first, 1, nf, 10);
+        uiStepper(24, 128, "По кадр", last, 1, nf, 10);
+        uiLabelLeft(24, 176, 30, "Раскладка", cText);
+        if (uiToggle(154, 176, 104, 30, "Строкой", cols == 0)) cols = 0;
+        if (uiToggle(262, 176, 104, 30, "Столбцом", cols == 1)) cols = 1;
+        if (cols >= 2 || cols < 0) {
+            uiStepper(24, 214, "Столбцов", cols, 2, std::max(2, nf), 4);
+        } else if (uiButton(154, 214, 212, 30, "Сеткой…", nf >= 2)) {
+            cols = std::max(2, static_cast<int>(std::ceil(std::sqrt(static_cast<double>(nf)))));
+        }
+        uiStepper(400, 90, "Поле вокруг", margin, 0, 64, 8);
+        uiStepper(400, 128, "Промежуток", spacing, 0, 64, 8);
+        uiStepper(400, 166, "Отступ в клетке", padding, 0, 32, 4);
+        uiStepper(400, 204, "Увеличение", scale, 1, 8, 2, "×");
+        uiLabelLeft(24, 262, 30, "Фон", cText);
+        static const char* kBg[3] = {"Прозрачный", "Второй цвет", "Первый цвет"};
+        for (int k = 0; k < 3; ++k) {
+            if (uiToggle(154 + k * 150, 262, 144, 30, kBg[k], sheetBg_ == k)) sheetBg_ = k;
+        }
+        // Размер листа — сразу, чтобы не гадать, влезет ли он в атлас движка.
+        {
+            SheetOptions o;
+            o.layout = cols == 0 ? SHEET_ROW : (cols == 1 ? SHEET_COLUMN : SHEET_GRID);
+            o.columns = cols;
+            int gc = 1;
+            int gr = 1;
+            sheetGrid(std::abs(last - first) + 1, o, gc, gr);
+            const int cw = m.tile.w * scale + 2 * padding;
+            const int ch = m.tile.h * scale + 2 * padding;
+            uiLabel(0, 310, WIN_W, 24,
+                    "Лист " + std::to_string(margin * 2 + gc * cw + (gc - 1) * spacing) + " × " +
+                        std::to_string(margin * 2 + gr * ch + (gr - 1) * spacing) + " точек",
+                    cTextDim);
+        }
+        if (uiButton(WIN_W / 2 - 180, 360, 170, 38, "Дальше…", true)) {
+            ok = true;
+            done = true;
+        }
+        if (uiButton(WIN_W / 2 + 10, 360, 170, 38, "Отмена", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC) done = true;
+        if (key == KEY_ENTER) {
+            ok = true;
+            done = true;
+        }
+        idle();
+    }
+    waitMouseRelease();
+    m.needRepaint = true;
+    if (!ok) return;
     if (first > last) std::swap(first, last);
     const std::string path = askExportFile("Сохранить лист спрайтов",
                                            exportBase(m.currentFile) + "_sheet.png", "png", "PNG");
     if (path.empty()) return;
     SheetOptions o;
-    o.layout = cols == 0 ? SHEET_ROW : SHEET_GRID;
+    o.layout = cols == 0 ? SHEET_ROW : (cols == 1 ? SHEET_COLUMN : SHEET_GRID);
     o.columns = cols;
     o.margin = margin;
     o.spacing = spacing;
+    o.padding = padding;
     o.scale = scale;
+    o.background =
+        sheetBg_ == 1 ? m.secondColor : (sheetBg_ == 2 ? m.firstColor : argb(0, 0, 0, 0));
     const SpriteSheet sheet = buildSheet(m.animationFrames(first - 1, last - 1), o);
     std::string err;
     if (!pngSave(path, sheet.image, err)) {
@@ -396,7 +504,7 @@ void Editor::exportAnimationAsk(bool gif) {
     const std::string path = askExportFile(gif ? "Сохранить GIF" : "Сохранить APNG",
                                            exportBase(m.currentFile) + (gif ? ".gif" : ".png"),
                                            gif ? "gif" : "png", gif ? "GIF" : "APNG");
-    if (!path.empty()) saveAnimationTo(path, gif, first - 1, last - 1, scale, plays, false);
+    if (!path.empty()) saveAnimationTo(path, first - 1, last - 1, scale, plays, false);
 }
 
 void Editor::exportFramesAsk() {
@@ -428,6 +536,24 @@ void Editor::exportFramesAsk() {
         if (!pngSave(name, frames[k].image, err)) failed = name;
     }
     if (!failed.empty()) showMessage("Не удалось сохранить кадр", failed + ": " + err);
+}
+
+void Editor::exportToTilesetSlot() {
+    const std::string slot = m.metaValue("tileset.slot");
+    const int kind = std::atoi(m.metaValue("tileset.kind").c_str());
+    if (slot.empty() || kind < 0 || kind >= TS_KINDS) return;
+    const std::string path = tsetPathOf(kind, slot);
+    if (path.empty()) {
+        showMessage("Папка набора не задана", "Укажите её на экране «Наборы тайлов».");
+        return;
+    }
+    std::string err;
+    if (!pngSave(path, m.compositeFrame(0), err)) {
+        showMessage("Не удалось записать тайл", path + ": " + err);
+        return;
+    }
+    if (kind == TS_ICON) iconsDirty_ = true;
+    showMessage("Тайл в наборе", "Первый кадр записан в " + path + ".");
 }
 
 bool Editor::saveGridTo(const Grid<Color>& g, const std::string& path) {

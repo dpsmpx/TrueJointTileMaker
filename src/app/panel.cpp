@@ -268,8 +268,9 @@ void Editor::drawInfoSection() {
     const int ty = m.screenToTileY(mouseY());
     std::string s;
     std::string alpha;
-    if (mouseX() < m.W && m.inDoc(tx, ty)) {
-        s = std::to_string(tx) + " : " + std::to_string(ty);
+    if (overCanvas(mouseX(), mouseY()) && m.inDoc(tx, ty)) {
+        // Координаты — от начала, которое можно сдвинуть (этап 5).
+        s = std::to_string(tx - m.originX) + " : " + std::to_string(ty - m.originY);
         if (m.docMode == DOC_MAP) {
             s += "  " + mapTileName(m.map.at(tx, ty));
         } else {

@@ -71,12 +71,16 @@ bool blankGrid(const Grid<Color>& g) {
 
 void Editor::applyLayout() {
     const int h = timelineShown() ? TL_Y0 : CANVAS_H;
-    if (m.H == h) return;
+    const int r = m.rulersOn ? RULER_SIZE : 0;
+    if (m.H == h && m.X0 == r && m.Y0 == r) return;
     // Тайл, что влезал в холст целиком, влезает и в укороченный; иначе
     // масштаб остаётся прежним, а вид лишь поджимается к краям.
-    const bool fitted = m.docW() * m.pixelSize <= m.W && m.docH() * m.pixelSize <= m.H;
+    const bool fitted =
+        m.docW() * m.pixelSize <= m.W - m.X0 && m.docH() * m.pixelSize <= m.H - m.Y0;
     m.H = h;
-    if (fitted && m.docH() * m.pixelSize > m.H) {
+    m.X0 = r;
+    m.Y0 = r;
+    if (fitted && (m.docW() * m.pixelSize > m.W - m.X0 || m.docH() * m.pixelSize > m.H - m.Y0)) {
         m.fitScale();
     } else {
         m.clampView();
@@ -695,6 +699,13 @@ void Editor::showAnimationScreen() {
         if (act(c3, y, "Кадры отдельными PNG…", tile)) exportFramesAsk();
         y += ST;
         if (act(c3, y, "Проект .tjt…", tile)) commandSaveAs();
+        y += ST;
+        // Документ, открытый из набора тайлов, помнит свой слот: первый
+        // кадр сведённым PNG уходит туда, где его ищет игра.
+        const std::string slot = m.metaValue("tileset.slot");
+        if (act(c3, y, slot.empty() ? "В набор игры — слота нет" : "В набор игры: " + slot + ".png",
+                tile && !slot.empty()))
+            exportToTilesetSlot();
 
         if (uiButton(c3, WIN_H - 50, CW, 34, "Закрыть", true)) done = true;
         redraw();

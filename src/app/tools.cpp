@@ -77,7 +77,7 @@ void Editor::doShapeTool(int ax, int ay) {
             bx = nx;
             by = ny;
             drawCanvas();
-            fb_.setClip(gfx::Rect{0, 0, m.W, m.H});
+            fb_.setClip(canvasRect());
             m.shapePreview = true;
             emitShape(ax, ay, bx, by);
             m.shapePreview = false;
@@ -523,6 +523,7 @@ void Editor::handlePanelClick() {
 // ---------------------------------------------------------------------------
 
 void Editor::handleEditorKey(int key) {
+    if (handleGuideKey(key)) return;
     if (handleProKey(key)) return;
     if (handleTimelineKey(key)) return;
     const int step = std::max(1, m.pixelSize * 4);

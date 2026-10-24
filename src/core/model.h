@@ -29,8 +29,9 @@ namespace tjtm {
 
 inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
-// RoadToProLevel поднимают младший номер; 1.0 — когда пройдены все четыре.
-inline constexpr const char* kAppVersion = "1.0.0";
+// RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
+// 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
+inline constexpr const char* kAppVersion = "1.1.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -41,6 +42,9 @@ inline constexpr int PANEL_X = CANVAS_W;
 inline constexpr int PANEL_W = 180;
 inline constexpr int WIN_W = CANVAS_W + PANEL_W;
 inline constexpr int WIN_H = CANVAS_H;
+
+/// Ширина линеек слева и сверху холста (этап 5).
+inline constexpr int RULER_SIZE = 20;
 
 inline constexpr int MIN_TILE = 4;
 inline constexpr int MAX_TILE = 512;
@@ -95,9 +99,10 @@ inline constexpr int DOC_TILE = 0, DOC_MAP = 1;
 
 /// Преобразования картинки или содержимого выделения (этап 1).
 inline constexpr int TF_FLIP_H = 0, TF_FLIP_V = 1, TF_ROT90 = 2, TF_ROT180 = 3, TF_ROT270 = 4;
-/// Вид выделения: рамка, овал, лассо, волшебная палочка, по цвету.
+/// Вид выделения: рамка, овал, лассо, волшебная палочка, по цвету,
+/// многоугольник по вершинам (этап 5).
 inline constexpr int SS_RECT = 0, SS_ELLIPSE = 1, SS_LASSO = 2, SS_WAND = 3, SS_COLOR = 4,
-                     SS_COUNT = 5;
+                     SS_POLYGON = 5, SS_COUNT = 6;
 
 inline constexpr int MIN_ZOOM = 1;
 inline constexpr int MAX_ZOOM = 64;
@@ -233,6 +238,36 @@ public:
     /// никто не трогал, повторное вынимание возвращает то, что было под
     /// вставкой, а не прозрачность. Проверка — сравнением с результатом.
     Grid<Color> floatUnder, floatResult;
+
+    // --- этап 5: точность ---
+
+    /// Радиальная симметрия: столько секторов вокруг точки пересечения
+    /// осей. 0 и 1 — её нет.
+    int symRadial = 0;
+    /// Непрозрачность кисти, 1..255. Точка мазка ложится один раз, поэтому
+    /// повторный проход по ней в том же мазке не сгущает цвет.
+    int brushOpacity = 255;
+    /// Начало холста в окне: справа и снизу его край — W и H, слева и
+    /// сверху — линейки, когда они видны.
+    int X0 = 0, Y0 = 0;
+    bool rulersOn = false;
+    bool guidesOn = true;
+    /// Свои направляющие в половинах точки: 2·x — граница перед точкой x.
+    std::vector<int> guidesX2, guidesY2;
+    /// Направляющие через середину документа.
+    bool guideCenter = false;
+    /// Крупная сетка: клетка в точках, 0 — её нет. Для листа тайлов 16x16
+    /// это границы тайлов.
+    int majorGridW = 0, majorGridH = 0;
+    /// Направляющие через середины клеток крупной сетки.
+    bool guideCellCenters = false;
+    /// Начало координат линеек и строки координат.
+    int originX = 0, originY = 0;
+    /// Пары «ключ = значение» документа: слот набора тайлов, откуда он
+    /// открыт, и всё, что проект принёс и чего эта версия не знает.
+    std::vector<std::pair<std::string, std::string>> docMeta;
+    std::string metaValue(const std::string& key) const;
+    void setMeta(const std::string& key, const std::string& value);
     Grid<PalIndex> floatUnderIdx;
     Grid<std::uint8_t> floatSel;
 
@@ -542,6 +577,9 @@ public:
     // --- симметрия ---
     int mirrorX(int x) const;
     int mirrorY(int y) const;
+    /// Точка и все её отражения и повороты по включённой симметрии, в том
+    /// порядке, в каком их рисовал оригинал; повороты — после.
+    void forEachSymmetric(int x, int y, const std::function<void(int, int)>& fn) const;
     /// Ось там, где её рисовать на холсте, в половинах точки.
     int axisX2() const { return symAxisX2 < 0 ? docW() : symAxisX2; }
     int axisY2() const { return symAxisY2 < 0 ? docH() : symAxisY2; }
@@ -595,8 +633,16 @@ public:
     bool cropToContent();
     bool resizeCanvas(int nw, int nh, int anchorX, int anchorY);
     void offsetImage(int dx, int dy);
-    int outlineImage(Color c, bool eightWay, bool outside);
+    int outlineImage(Color c, bool eightWay, bool outside, int thickness = 1);
     int removeIsolatedPixels();
+    /// Нарастить или срезать край непрозрачного на точку (этап 5).
+    int growImageEdge(bool eightWay);
+    int shrinkImageEdge(bool eightWay);
+    /// Поворот на любой угол (img::ROT_*): выделенного или всех ячеек.
+    /// false — повёрнутое не помещается в MAX_TILE.
+    bool rotateImageBy(double degrees, int method, bool expand);
+    /// Свести цвета выделенного или всего тайла к n медианным разрезом.
+    int reduceImageColors(int n);
 
     // --- карта и набор тайлов ---
     /// Файл тайла, которым нарисована клетка карты, без расширения.
