@@ -1,0 +1,18 @@
+# Редактор тайла: холст, сетка, точный выбор цвета, выделение.
+key Escape
+sleep 0.4
+move 300 300
+shot 01_editor
+key g
+sleep 0.3
+shot 02_grid
+key p
+sleep 0.5
+shot 03_color
+key Escape
+sleep 0.3
+key g 9
+drag 100 100 180 160
+sleep 0.4
+move 700 300
+shot 04_select

@@ -37,3 +37,14 @@ endif()
 
 include(GoogleTest)
 gtest_discover_tests(tjtm_core_tests DISCOVERY_MODE PRE_TEST)
+
+# Программа целиком: сценарии без экрана и сверка снимков с оригиналом.
+if(TARGET tjtm)
+    add_executable(tjtm_app_tests test_app.cpp)
+    target_link_libraries(tjtm_app_tests PRIVATE tjtm_core GTest::gtest_main)
+    target_compile_definitions(tjtm_app_tests PRIVATE
+        TJTM_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+        TJTM_APP_EXE="$<TARGET_FILE:tjtm>")
+    add_dependencies(tjtm_app_tests tjtm)
+    gtest_discover_tests(tjtm_app_tests DISCOVERY_MODE PRE_TEST)
+endif()

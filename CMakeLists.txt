@@ -69,6 +69,41 @@ target_link_libraries(tjtm_core PUBLIC tjtm_options)
 
 if(TJTM_BUILD_APP)
     include(cmake/sdl3.cmake)
+
+    # Программный кадр и текст: всё рисование редактора.
+    add_library(tjtm_gfx STATIC
+        src/gfx/font.cpp
+        src/gfx/surface.cpp
+        src/platform/platform.cpp
+        src/platform/script.cpp
+    )
+    target_link_libraries(tjtm_gfx PUBLIC tjtm_core SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+
+    add_executable(tjtm
+        src/app/canvas.cpp
+        src/app/files.cpp
+        src/app/main.cpp
+        src/app/menu.cpp
+        src/app/panel.cpp
+        src/app/screens.cpp
+        src/app/tools.cpp
+        src/app/ui.cpp
+    )
+    target_link_libraries(tjtm PRIVATE tjtm_gfx SDL3_image::SDL3_image)
+    # На Windows — окно без консоли рядом.
+    set_target_properties(tjtm PROPERTIES WIN32_EXECUTABLE TRUE)
+
+    # Рядом с программой — то же, что было рядом с TJTM.exe: ресурсы,
+    # стартовая картинка и настройки. Config.txt копируется, только если
+    # его ещё нет: программа сама пишет в него, и сборка не должна затирать.
+    add_custom_command(TARGET tjtm POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${PROJECT_SOURCE_DIR}/Resources $<TARGET_FILE_DIR:tjtm>/Resources
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${PROJECT_SOURCE_DIR}/Картинки $<TARGET_FILE_DIR:tjtm>/Картинки
+        COMMAND ${CMAKE_COMMAND} -DSRC=${PROJECT_SOURCE_DIR}/Config.txt
+                -DDST=$<TARGET_FILE_DIR:tjtm>/Config.txt -P ${PROJECT_SOURCE_DIR}/cmake/copy_if_missing.cmake
+        VERBATIM)
 endif()
 
 if(BUILD_TESTING)

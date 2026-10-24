@@ -1,13 +1,16 @@
 # True Joint Tile Maker
 
 Редактор пиксельной графики и карт игры Andors-Love. Идёт перенос с
-PascalABC.NET на C++ (SDL2). Подробности — `docs/porting.md`.
+PascalABC.NET на C++ (SDL3). Подробности — `docs/porting.md`,
+намеренные расхождения с оригиналом — `docs/fixes.md`.
 
 ## Правила
 
 - `pascal/` — оригинал 0.6.0 и эталон. Не править: перенос сверяется с ним.
 - Поведение переносится по коду оригинала и по исходникам GraphABC и
   PABCSystem в `$PABCNET_DIR/bin/Lib`, а не по описаниям.
+- Ошибки оригинала исправляются, а не переносятся; каждое исправление —
+  строка в `docs/fixes.md`, иначе сверка примет его за ошибку переноса.
 - Язык комментариев, коммитов и документации — русский, как в оригинале.
   Комментарий объясняет, почему сделано так, а не что делает строка.
 - Формат карт — договор с игрой: перенос обязан читать и писать все карты
@@ -22,6 +25,8 @@ ctest --preset debug                                 # тесты; asan, clang �
 tools/lint.sh                                        # clang-format, clang-tidy, cppcheck, shellcheck
 tools/gui.sh ref|port start|key|click|drag|shot|stop # окна оригинала и переноса
 tools/gui.sh compare a.png b.png diff.png            # попиксельное сравнение
+tools/screens.sh tests/screens/menu.txt              # сценарий на обоих, снимки рядом
+tools/golden.sh                                      # эталонные данные с оригинала
 ```
 
 Пути к эталону и корпусу: `. ~/.local/share/tjtm-tools/env.sh`

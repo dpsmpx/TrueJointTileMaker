@@ -52,8 +52,10 @@ fi
 echo "== cppcheck"
 # useStlAlgorithm — совет заменить цикл алгоритмом, это вкус; unusedStructMember
 # ложно срабатывает на полях, которыми пользуются другие файлы.
+# Макросы GoogleTest (TEST_P, INSTANTIATE_TEST_SUITE_P) cppcheck понимает
+# только с их описанием, иначе видит в тестах синтаксическую ошибку.
 cppcheck --enable=warning,style,performance,portability --std=c++20 --language=c++ --quiet \
-    --inline-suppr --error-exitcode=1 \
+    --library=googletest --inline-suppr --error-exitcode=1 \
     --suppress=missingIncludeSystem --suppress=useStlAlgorithm --suppress=unusedStructMember \
     -I src "${FILES[@]}" || status=1
 
