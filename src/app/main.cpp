@@ -170,6 +170,8 @@ void Editor::appStep() {
     // Значки перечитываются здесь, а не там, где их правят: правка приходит
     // из экрана наборов, а он в это время сам занимает окно.
     ensureIcons();
+    applyLayout();
+    stepPlayback();
     if (m.needRepaint) repaint();
     syncTitle();
 
@@ -184,6 +186,10 @@ void Editor::appStep() {
     // Колесо могло провернуться на несколько щелчков между кадрами. Над
     // длинной палитрой оно её листает, а не меняет масштаб.
     int wheel = takeWheel();
+    if (wheel != 0 && timelineShown() && mouseX() < m.W && mouseY() >= m.H) {
+        timelineWheel(wheel);
+        wheel = 0;
+    }
     if (wheel != 0 && m.docMode == DOC_TILE && m.palMaxScroll() > 0 && mouseX() >= PANEL_X &&
         mouseY() >= PAL_Y0 && mouseY() < PAL_Y1) {
         m.scrollPalette(-wheel);
@@ -199,7 +205,12 @@ void Editor::appStep() {
 
     if (frameClick_) {
         frameClick_ = false;
-        if (frameClickX_ < m.W) {
+        if (frameClickX_ < m.W && timelineShown() && frameClickY_ >= m.H) {
+            handleTimelineClick();
+        } else if (frameClickX_ < m.W) {
+            // Рисовать по бегущим кадрам нельзя: щелчок по холсту
+            // останавливает проигрывание.
+            stopPlayback();
             handleCanvasClick();
         } else {
             handlePanelClick();

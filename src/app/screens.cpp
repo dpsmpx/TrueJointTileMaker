@@ -27,7 +27,7 @@ void Editor::showTextScreen(const std::string& title, const std::vector<std::str
     pf_.input().keys.clear();
     int lineH = textHeight() + 2;
     if (lineH < 8) lineH = 8;
-    const int visible = std::max(1, (m.H - 120) / lineH);
+    const int visible = std::max(1, (WIN_H - 120) / lineH);
     const std::vector<std::string> lines = layoutText(paragraphs, WIN_W - 80);
 
     while (!done && !quitNow_) {
@@ -37,8 +37,8 @@ void Editor::showTextScreen(const std::string& title, const std::vector<std::str
 
         fb_.clear(cWindow);
         textCentered(0, 14, WIN_W, 44, title, cText);
-        fb_.fillRoundRect(24, 52, WIN_W - 24, m.H - 56, BTN_R, BTN_R, cBorder);
-        fb_.fillRoundRect(25, 53, WIN_W - 25, m.H - 57, BTN_R, BTN_R, cBack);
+        fb_.fillRoundRect(24, 52, WIN_W - 24, WIN_H - 56, BTN_R, BTN_R, cBorder);
+        fb_.fillRoundRect(25, 53, WIN_W - 25, WIN_H - 57, BTN_R, BTN_R, cBack);
         for (int i = 0; i < visible; ++i) {
             const int k = top + i;
             if (k >= static_cast<int>(lines.size())) break;
@@ -46,15 +46,15 @@ void Editor::showTextScreen(const std::string& title, const std::vector<std::str
         }
 
         if (maxTop > 0) {
-            uiLabel(WIN_W - 220, m.H - 52, 200, 20,
+            uiLabel(WIN_W - 220, WIN_H - 52, 200, 20,
                     "строки " + std::to_string(top + 1) + "–" +
                         std::to_string(std::min(static_cast<int>(lines.size()), top + visible)) +
                         " из " + std::to_string(lines.size()),
                     cTextDim);
-            if (uiButton(24, m.H - 50, 60, 28, "▲", top > 0)) top -= visible;
-            if (uiButton(90, m.H - 50, 60, 28, "▼", top < maxTop)) top += visible;
+            if (uiButton(24, WIN_H - 50, 60, 28, "▲", top > 0)) top -= visible;
+            if (uiButton(90, WIN_H - 50, 60, 28, "▼", top < maxTop)) top += visible;
         }
-        if (uiButton(WIN_W / 2 - 60, m.H - 50, 120, 28, "Закрыть", true)) done = true;
+        if (uiButton(WIN_W / 2 - 60, WIN_H - 50, 120, 28, "Закрыть", true)) done = true;
 
         redraw();
         const int key = takeKey();
@@ -81,7 +81,7 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
     bool done = false;
     dropInput();
     pf_.input().keys.clear();
-    const int H = m.H;
+    const int H = WIN_H;
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
@@ -118,7 +118,7 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
     bool done = false;
     dropInput();
     pf_.input().keys.clear();
-    const int H = m.H;
+    const int H = WIN_H;
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
@@ -263,11 +263,11 @@ void Editor::showColorScreen() {
         }
         fb_.fillRect(71, 297, WIN_W - 69, 365, argb(ch[0], ch[1], ch[2], ch[3]));
 
-        if (uiButton(WIN_W / 2 - 180, m.H - 80, 170, 38, "Применить", true)) {
+        if (uiButton(WIN_W / 2 - 180, WIN_H - 80, 170, 38, "Применить", true)) {
             apply();
             done = true;
         }
-        if (uiButton(WIN_W / 2 + 10, m.H - 80, 170, 38, "Отмена", true)) done = true;
+        if (uiButton(WIN_W / 2 + 10, WIN_H - 80, 170, 38, "Отмена", true)) done = true;
         redraw();
         const int key = takeKey();
         if (key == KEY_ESC || key == KEY_BACK) done = true;
@@ -344,7 +344,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
     pf_.input().keys.clear();
     pf_.input().presses.clear();
     const int fx = 60;
-    const int fy = m.H / 2 - 20;
+    const int fy = WIN_H / 2 - 20;
     const int fw = WIN_W - 120;
     const int fh = 30;
     TextField tf;
@@ -603,7 +603,7 @@ void Editor::showColorOpsScreen() {
             m.needRepaint = true;
         }
 
-        if (uiButton(WIN_W / 2 - 85, m.H - 56, 170, 36, "Закрыть", true)) done = true;
+        if (uiButton(WIN_W / 2 - 85, WIN_H - 56, 170, 36, "Закрыть", true)) done = true;
         redraw();
         if (takeKey() == KEY_ESC) done = true;
         idle();
@@ -694,9 +694,9 @@ void Editor::showMapPropertiesScreen() {
             }
         }
 
-        if (uiButton(WIN_W / 2 - 240, m.H - 60, 220, 36, "Проверить локацию", true))
+        if (uiButton(WIN_W / 2 - 240, WIN_H - 60, 220, 36, "Проверить локацию", true))
             showMapReport();
-        if (uiButton(WIN_W / 2 + 20, m.H - 60, 220, 36, "Закрыть", true)) done = true;
+        if (uiButton(WIN_W / 2 + 20, WIN_H - 60, 220, 36, "Закрыть", true)) done = true;
         redraw();
         if (takeKey() == KEY_ESC) done = true;
         idle();

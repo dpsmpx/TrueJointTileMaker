@@ -64,7 +64,7 @@ struct AnimFrame {
 /// Читает APNG кадрами во весь холст. У обычного PNG — один кадр.
 bool apngDecode(const std::vector<std::uint8_t>& file, std::vector<AnimFrame>& frames,
                 std::string& error, int* loops = nullptr);
-/// Пишет APNG. loops — число повторов, 0 — бесконечно.
+/// Пишет APNG. loops — сколько раз проиграть (num_plays), 0 — бесконечно.
 std::vector<std::uint8_t> apngEncode(const std::vector<AnimFrame>& frames, int loops = 0,
                                      int level = 9);
 

@@ -107,6 +107,11 @@ SDL_VIDEODRIVER=offscreen build/debug/tjtm --base КАТАЛОГ \
 вырезки (`tests/screens/golden/`) сняты с оригинала тем же сценарием через
 `tools/screens.sh`.
 
+Диалоги выбора файла в сценарии отвечают по файлу `tests/screens/СЦЕНАРИЙ.dialogs`:
+строка — ответ очередному диалогу, `@BASE@` — каталог прогона, пустая
+строка — отмена. Тест и `tools/port-golden.sh` подставляют его через
+переменную `TJTM_TEST_DIALOGS`; настоящий диалог при этом не открывается.
+
 Проверка кода: `tools/lint.sh` — C++ и скрипты (с `--fix` правит оформление).
 
 Отладка: `gdb build/debug/tjtm`, `valgrind build/debug/tjtm --frames 2`,

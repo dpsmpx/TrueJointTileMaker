@@ -58,8 +58,13 @@ void Model::commitActiveCel() {
     ensureTileIdx();
     // Пустая картинка — пустая ячейка: файл короче, а на ленте кадров
     // видно, где рисунок есть.
+    const CelPtr cur = doc.cel(activeLayer, activeFrame);
     if (blankCel(tile, tileIdx)) {
         doc.setCel(activeLayer, activeFrame, nullptr);
+    } else if (cur && cur->img.sameSize(tile.w, tile.h) && cur->img.d == tile.d &&
+               cur->idx.d == tileIdx.d) {
+        // Не правили — ячейка остаётся прежней и общей с копиями кадра:
+        // листание кадров не плодит картинок и не рвёт связь копий.
     } else {
         doc.setCel(activeLayer, activeFrame, std::make_shared<const Cel>(Cel{tile, tileIdx}));
     }
@@ -367,6 +372,15 @@ void Model::setFrameDuration(int f, int ms) {
     doc.frames[static_cast<std::size_t>(f)].durationMs = clampI(ms, 10, 60000);
 }
 
+void Model::setFramesDuration(int from, int to, int ms) {
+    from = std::max(0, from);
+    to = std::min(doc.frameCount() - 1, to);
+    if (from > to) return;
+    pushUndo();
+    for (int f = from; f <= to; ++f)
+        doc.frames[static_cast<std::size_t>(f)].durationMs = clampI(ms, 10, 60000);
+}
+
 int Model::addTag(const std::string& name, int from, int to, int direction) {
     if (doc.frameCount() == 0) return -1;
     from = clampI(from, 0, doc.frameCount() - 1);
@@ -382,6 +396,62 @@ bool Model::deleteTag(int i) {
     pushUndo();
     doc.tags.erase(doc.tags.begin() + i);
     return true;
+}
+
+bool Model::setTag(int i, const AnimTag& t) {
+    if (i < 0 || i >= static_cast<int>(doc.tags.size()) || doc.frameCount() == 0) return false;
+    AnimTag v = t;
+    v.from = clampI(v.from, 0, doc.frameCount() - 1);
+    v.to = clampI(v.to, 0, doc.frameCount() - 1);
+    if (v.from > v.to) std::swap(v.from, v.to);
+    v.direction = clampI(v.direction, TAG_FORWARD, TAG_PINGPONG);
+    pushUndo();
+    doc.tags[static_cast<std::size_t>(i)] = v;
+    return true;
+}
+
+int Model::tagOfFrame(int f) const {
+    for (std::size_t i = 0; i < doc.tags.size(); ++i) {
+        if (f >= doc.tags[i].from && f <= doc.tags[i].to) return static_cast<int>(i);
+    }
+    return -1;
+}
+
+std::vector<AnimFrame> Model::animationFrames(int from, int to) const {
+    std::vector<AnimFrame> out;
+    from = std::max(0, from);
+    to = std::min(doc.frameCount() - 1, to);
+    for (int f = from; f <= to; ++f)
+        out.push_back(
+            AnimFrame{compositeFrame(f), doc.frames[static_cast<std::size_t>(f)].durationMs});
+    return out;
+}
+
+void Model::setAnimation(const std::vector<AnimFrame>& frames, const std::string& fileName) {
+    if (frames.empty()) return;
+    setTile(frames.front().image, fileName);
+    const int w = tile.w;
+    const int h = tile.h;
+    doc.frames.clear();
+    doc.cels.assign(1, {});
+    for (const AnimFrame& fr : frames) {
+        doc.frames.push_back(Frame{clampI(fr.durationMs, 10, 60000)});
+        // Кадры чужого файла могут быть меньше холста: недостающее прозрачно.
+        auto c =
+            std::make_shared<Cel>(Cel{Grid<Color>(w, h, kClear), Grid<PalIndex>(w, h, IDX_NONE)});
+        for (int y = 0; y < std::min(h, fr.image.h); ++y) {
+            for (int x = 0; x < std::min(w, fr.image.w); ++x) {
+                c->img.at(x, y) = fr.image.at(x, y);
+                c->idx.at(x, y) = indexOfColor(fr.image.at(x, y));
+            }
+        }
+        doc.cels[0].push_back(blankCel(c->img, c->idx) ? nullptr : CelPtr(std::move(c)));
+    }
+    activeLayer = 0;
+    activeFrame = 0;
+    loadActiveCel();
+    overDirty = true;
+    needRepaint = true;
 }
 
 int Model::nextPlayFrame(int f, int tag, int& pingDir) const {

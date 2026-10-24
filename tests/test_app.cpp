@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include "core/anim.h"
+#include "core/gif.h"
 #include "core/model.h"
 #include "core/png.h"
 #include "core/project.h"
@@ -56,20 +58,44 @@ fs::path makeBase(const std::string& name) {
     return base;
 }
 
+void setEnv(const char* name, const std::string& value) {
+#ifdef _WIN32
+    _putenv_s(name, value.c_str());
+#else
+    if (value.empty()) {
+        unsetenv(name);
+    } else {
+        setenv(name, value.c_str(), 1);
+    }
+#endif
+}
+
+/// Ответы диалогам файлов: tests/screens/СЦЕНАРИЙ.dialogs, где @BASE@ —
+/// каталог прогона. Нет файла — диалогов в сценарии нет.
+std::string prepareDialogs(const std::string& scenario, const fs::path& base) {
+    std::ifstream in(std::string(TJTM_SOURCE_DIR) + "/tests/screens/" + scenario + ".dialogs");
+    if (!in) return {};
+    const fs::path answers = base / "dialogs.txt";
+    std::ofstream out(answers, std::ios::binary);
+    std::string line;
+    while (std::getline(in, line)) {
+        const std::size_t at = line.find("@BASE@");
+        if (at != std::string::npos) line.replace(at, 6, base.string());
+        out << line << "\n";
+    }
+    return answers.string();
+}
+
 /// Пройти сценарий; снимки — в base/shots.
 bool runScenario(const std::string& scenario, const fs::path& base) {
     const fs::path shots = base / "shots";
     fs::create_directories(shots);
     const std::string script = std::string(TJTM_SOURCE_DIR) + "/tests/screens/" + scenario + ".txt";
-#ifdef _WIN32
-    _putenv_s("SDL_VIDEODRIVER", "offscreen");
-    _putenv_s("SDL_FRAMEBUFFER_ACCELERATION", "0");
-#else
-    setenv("SDL_VIDEODRIVER", "offscreen", 1);
+    setEnv("SDL_VIDEODRIVER", "offscreen");
     // Программный кадровый буфер: иначе SDL поднимает EGL, и утечки Mesa
     // в сборке asan достаются программе.
-    setenv("SDL_FRAMEBUFFER_ACCELERATION", "0", 1);
-#endif
+    setEnv("SDL_FRAMEBUFFER_ACCELERATION", "0");
+    setEnv("TJTM_TEST_DIALOGS", prepareDialogs(scenario, base));
     const std::string cmd = "\"" + std::string(TJTM_APP_EXE) + "\" --base \"" + base.string() +
                             "\" --script \"" + script + "\" --shots \"" + shots.string() + "\"";
 #ifdef _WIN32
@@ -133,7 +159,8 @@ TEST_P(AppScreens, MatchOriginal) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
-                         ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2"));
+                         ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
+                                           "anim4"));
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.
@@ -152,28 +179,16 @@ TEST(AppScreens, MenuScenarioRuns) {
 TEST(AppScreens, ProjectSaveAndReopen) {
     const fs::path base = makeBase("tjt");
     const fs::path project = base / "sprite.tjt";
-    const fs::path answers = base / "dialogs.txt";
-    {
-        std::ofstream f(answers, std::ios::binary);
-        f << project.string() << "\n" << project.string() << "\n";
-    }
-#ifdef _WIN32
-    _putenv_s("TJTM_TEST_DIALOGS", answers.string().c_str());
-#else
-    setenv("TJTM_TEST_DIALOGS", answers.string().c_str(), 1);
-#endif
-    const bool ran = runScenario("tjt", base);
-#ifdef _WIN32
-    _putenv_s("TJTM_TEST_DIALOGS", "");
-#else
-    unsetenv("TJTM_TEST_DIALOGS");
-#endif
-    ASSERT_TRUE(ran);
+    ASSERT_TRUE(runScenario("tjt", base));
 
-    std::ifstream in(project, std::ios::binary);
-    ASSERT_TRUE(in.good()) << "проект не записан";
-    const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(in)),
-                                          std::istreambuf_iterator<char>());
+    ASSERT_TRUE(fs::exists(project)) << "проект не записан";
+    std::vector<std::uint8_t> bytes;
+    {
+        // Файл закрывается сразу: открытый, он не дал бы Windows убрать
+        // каталог прогона.
+        std::ifstream in(project, std::ios::binary);
+        bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
     EXPECT_TRUE(tjtm::isProjectFile(bytes));
     tjtm::Model m;
     std::string err;
@@ -194,6 +209,48 @@ TEST(AppScreens, ProjectSaveAndReopen) {
             if (shots.at("01_drawn").at(x, y).argb() != shots.at("02_reopened").at(x, y).argb())
                 ++bad;
     EXPECT_EQ(bad, 0);
+    fs::remove_all(base);
+}
+
+/// Этап 4: выгрузки сценария anim4 — GIF, лист с описанием и проект —
+/// записаны и читаются обратно с нужными кадрами, слоями и меткой.
+TEST(AppScreens, AnimationExports) {
+    const fs::path base = makeBase("anim4x");
+    ASSERT_TRUE(runScenario("anim4", base));
+    auto bytesOf = [](const fs::path& p) {
+        std::ifstream in(p, std::ios::binary);
+        return std::vector<std::uint8_t>((std::istreambuf_iterator<char>(in)),
+                                         std::istreambuf_iterator<char>());
+    };
+    std::string err;
+    std::vector<tjtm::AnimFrame> frames;
+    int plays = -1;
+    ASSERT_TRUE(tjtm::gifDecode(bytesOf(base / "walk.gif"), frames, err, &plays)) << err;
+    EXPECT_EQ(frames.size(), 3U);
+    EXPECT_EQ(plays, 0);
+    EXPECT_EQ(frames[0].image.w, 64);
+
+    tjtm::Grid<tjtm::Color> sheet;
+    ASSERT_TRUE(tjtm::pngLoad((base / "walk_sheet.png").string(), sheet, err)) << err;
+    EXPECT_EQ(sheet.w, 3 * 64);
+    EXPECT_EQ(sheet.h, 64);
+    const auto json = bytesOf(base / "walk_sheet.json");
+    const std::string js(json.begin(), json.end());
+    EXPECT_NE(js.find("\"direction\": \"pingpong\""), std::string::npos);
+    EXPECT_NE(js.find("\"image\": \"walk_sheet.png\""), std::string::npos);
+
+    tjtm::Model m;
+    ASSERT_TRUE(tjtm::projectDecode(bytesOf(base / "walk.tjt"), m, err)) << err;
+    EXPECT_EQ(m.doc.layerCount(), 2);
+    EXPECT_EQ(m.doc.frameCount(), 3);
+    ASSERT_EQ(m.doc.tags.size(), 1U);
+    EXPECT_EQ(m.doc.tags[0].from, 0);
+    EXPECT_EQ(m.doc.tags[0].to, 2);
+    EXPECT_EQ(m.doc.tags[0].direction, tjtm::TAG_PINGPONG);
+    EXPECT_TRUE(m.onionSkin);
+    // Второй слой есть только в третьем кадре.
+    EXPECT_EQ(m.doc.cel(1, 0), nullptr);
+    EXPECT_NE(m.doc.cel(1, 2), nullptr);
     fs::remove_all(base);
 }
 

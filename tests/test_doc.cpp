@@ -81,6 +81,21 @@ TEST(Doc, MergeDownAndMoveLayer) {
     EXPECT_EQ(m.tile.at(1, 0), kGreen);
 }
 
+TEST(Doc, BrowsingFramesKeepsCopiesShared) {
+    Model m = spriteModel();
+    dot(m, 0, 0, kRed);
+    m.addFrame(true);
+    m.setActiveCel(0, 0);
+    m.setActiveCel(0, 1);
+    m.setActiveCel(0, 0);
+    // Без правок копия кадра и исходный делят одну картинку.
+    EXPECT_EQ(m.doc.cel(0, 0), m.doc.cel(0, 1));
+    m.setActiveCel(0, 1);
+    dot(m, 1, 1, kBlue);
+    m.setActiveCel(0, 0);
+    EXPECT_NE(m.doc.cel(0, 0), m.doc.cel(0, 1));
+}
+
 TEST(Doc, FramesCopyAndUndoReturnsToTheFrame) {
     Model m = spriteModel();
     dot(m, 0, 0, kRed);

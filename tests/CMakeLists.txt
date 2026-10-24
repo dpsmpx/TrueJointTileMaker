@@ -18,6 +18,7 @@ if(NOT GTest_FOUND)
 endif()
 
 add_executable(tjtm_core_tests
+    test_anim.cpp
     test_color.cpp
     test_config.cpp
     test_doc.cpp

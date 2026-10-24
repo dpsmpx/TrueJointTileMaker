@@ -27,16 +27,21 @@ Grid<Color> gridFromBgra(const std::vector<std::uint8_t>& raw, int w, int h) {
 void Editor::drawTilePixel(int x, int y) {
     if (!m.tile.inside(x, y)) return;
     const int g = m.gridGap();
+    // Под холстом может лежать лента кадров: мазок у края её не задевает.
+    fb_.setClip(gfx::Rect{0, 0, m.W, m.H});
     fb_.fillRect(m.tileToScreenX(x), m.tileToScreenY(y), m.tileToScreenX(x + 1) - g,
                  m.tileToScreenY(y + 1) - g, m.displayColor(x, y));
+    fb_.resetClip();
 }
 
 /// Клетка предпросмотра фигуры. В документ ничего не пишется.
 void Editor::drawPreviewPixel(int x, int y) {
     if (!m.inDoc(x, y)) return;
     const int g = m.gridGap();
+    fb_.setClip(gfx::Rect{0, 0, m.W, m.H});
     fb_.fillRect(m.tileToScreenX(x), m.tileToScreenY(y), m.tileToScreenX(x + 1) - g,
                  m.tileToScreenY(y + 1) - g, cAccent);
+    fb_.resetClip();
 }
 
 /// Пересобирает картинку тайла, если она устарела, не того размера или

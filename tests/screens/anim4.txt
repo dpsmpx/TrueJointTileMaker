@@ -1,0 +1,70 @@
+# Этап 4 RoadToProLevel: лента слоёв и кадров, луковая кожа, метка,
+# проигрывание, выгрузка GIF и листа спрайтов, проект и открытие GIF
+# кадрами. Ответы диалогам файлов — anim4.dialogs.
+# Лента: кнопки по y = 425, номера кадров — 465, первая строка слоёв —
+# 484, клетка кадра k — x = 163 + 26k.
+key Escape
+sleep 0.4
+key j                      # лента под холстом
+sleep 0.2
+key 1
+drag 150 100 300 250       # кадр 1
+click 71 425               # + Кадр, пустой
+drag 150 250 300 100       # кадр 2
+click 134 425              # копия кадра 2
+drag 140 300 320 300       # кадр 3 — копия и ещё линия
+click 263 425              # + Слой
+drag 360 60 360 360        # второй слой в кадре 3
+move 700 300
+sleep 0.2
+shot 01_layers
+click 385 425              # луковая кожа
+key comma                  # кадр 2: соседи по обе стороны
+move 700 300
+sleep 0.2
+shot 02_onion
+key period                 # снова кадр 3
+click 438 425              # метка на кадре 3
+sleep 0.3
+click 305 187              # с кадра 2
+click 305 187              # с кадра 1
+click 602 287              # туда и обратно
+click 205 369              # создать
+sleep 0.3
+move 700 300
+sleep 0.2
+shot 03_tag
+key Return                 # проигрывание метки
+sleep 0.25
+key Return                 # стоп
+move 700 300
+sleep 0.2
+shot 04_played
+click 163 465              # кадр 1 по номеру
+key period                 # кадр 2
+click 163 504              # нижний слой, кадр 1
+move 700 300
+sleep 0.2
+shot 05_cell
+click 485 425              # экран «Слои, кадры и экспорт»
+sleep 0.3
+shot 06_screen
+click 636 240              # анимация GIF…
+sleep 0.2
+key Return                 # всё по умолчанию
+sleep 0.3
+click 485 425
+sleep 0.3
+click 636 209              # лист спрайтов…
+sleep 0.2
+key Return
+sleep 0.3
+click 485 425
+sleep 0.3
+click 636 333              # проект .tjt…
+sleep 0.3
+key l                      # открыть выгруженный GIF
+sleep 0.3
+move 700 300
+sleep 0.2
+shot 07_gif

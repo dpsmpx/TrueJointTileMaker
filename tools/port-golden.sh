@@ -20,7 +20,14 @@ rm -rf "$WORK"
 mkdir -p "$WORK/base" "$WORK/shots"
 cp "$ROOT/Config.txt" "$WORK/base"/
 cp -r "$ROOT/Resources" "$ROOT/Картинки" "$WORK/base"/
-SDL_VIDEODRIVER=offscreen "$BIN" --base "$WORK/base" --script "$ROOT/tests/screens/$SC.txt" --shots "$WORK/shots"
+# Ответы диалогам файлов, как в тесте: @BASE@ — каталог прогона.
+DIALOGS=""
+if [ -f "$ROOT/tests/screens/$SC.dialogs" ]; then
+    DIALOGS="$WORK/dialogs.txt"
+    sed "s|@BASE@|$WORK/base|g" "$ROOT/tests/screens/$SC.dialogs" > "$DIALOGS"
+fi
+SDL_VIDEODRIVER=offscreen TJTM_TEST_DIALOGS="$DIALOGS" "$BIN" --base "$WORK/base" \
+    --script "$ROOT/tests/screens/$SC.txt" --shots "$WORK/shots"
 
 OUT="$ROOT/tests/screens/golden/$SC"
 rm -rf "$OUT"

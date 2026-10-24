@@ -21,6 +21,7 @@
 #include "core/color.h"
 #include "core/grid.h"
 #include "core/mapdoc.h"
+#include "core/png.h"
 #include "core/sprite.h"
 #include "core/theme.h"
 
@@ -29,7 +30,7 @@ namespace tjtm {
 inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — когда пройдены все четыре.
-inline constexpr const char* kAppVersion = "0.10.0";
+inline constexpr const char* kAppVersion = "1.0.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -522,8 +523,18 @@ public:
     bool deleteFrame();
     bool moveFrame(int dir);
     void setFrameDuration(int f, int ms);
+    /// Длительность кадров from..to разом, одним шагом истории.
+    void setFramesDuration(int from, int to, int ms);
     int addTag(const std::string& name, int from, int to, int direction);
     bool deleteTag(int i);
+    bool setTag(int i, const AnimTag& t);
+    /// Первая метка, в которую входит кадр f, или -1.
+    int tagOfFrame(int f) const;
+    /// Сведённые кадры from..to с их длительностями — для экспорта.
+    std::vector<AnimFrame> animationFrames(int from, int to) const;
+    /// Документ из кадров анимации (APNG, GIF): один слой, кадры с их
+    /// длительностями. Размер — по первому кадру.
+    void setAnimation(const std::vector<AnimFrame>& frames, const std::string& fileName);
     /// Следующий кадр проигрывания внутри метки tag (-1 — все кадры).
     /// pingDir — направление для «туда-обратно», меняется на краях.
     int nextPlayFrame(int f, int tag, int& pingDir) const;

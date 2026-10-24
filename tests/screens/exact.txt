@@ -68,3 +68,13 @@ pal2       02_transparent 624 116 132 132
 pal2       03_ramp    624  116  132  132
 pal2       04_snapped  0    0  600  560
 pal2       04_snapped 602  248   34   64
+# Этап 4 RoadToProLevel — эталон со снимков переноса: холст над лентой и
+# клетки ленты без подписей.
+anim4      01_layers   0    0  600  410
+anim4      01_layers 150  474  450   80
+anim4      02_onion    0    0  600  410
+anim4      04_played   0    0  600  410
+anim4      04_played 150  474  450   80
+anim4      05_cell   150  474  450   80
+anim4      07_gif      0    0  600  410
+anim4      07_gif    150  474  450   80

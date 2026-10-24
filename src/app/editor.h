@@ -249,6 +249,8 @@ private:
         std::string label;
         int* v;
         int lo, hi;
+        /// Шаг кнопок: ±step и ±8·step (длительности кадров — десятками мс).
+        int step = 1;
     };
     bool askNumbers(const std::string& title, const std::string& hint,
                     const std::vector<NumField>& fields, const std::string& okCaption, int* anchor);
@@ -265,6 +267,54 @@ private:
     /// Последняя разобранная клавиша с модификаторами в миг нажатия.
     KeyPress lastKey_;
     bool outlineEight_ = false;
+
+    // --- этап 4: лента слоёв и кадров (timeline.cpp) ---
+    /// Лента под холстом. Видна только в режиме тайла; включается J или
+    /// сама, когда открыт документ со слоями или кадрами.
+    bool timelineOn_ = false;
+    /// Первый видимый кадр и первая видимая строка слоёв (сверху — верхний).
+    int tlFirstFrame_ = 0;
+    int tlFirstRow_ = 0;
+    /// Активные кадр и слой, которые лента уже показала: прокрутка к ним
+    /// только при смене, чтобы ролик мог отлистать ленту.
+    int tlSeenFrame_ = -1;
+    int tlSeenLayer_ = -1;
+    bool playing_ = false;
+    /// Метка, которую проигрывают, или -1 — все кадры.
+    int playTag_ = -1;
+    int playPing_ = 0;
+    int playNextMs_ = 0;
+    /// Двойной щелчок по имени слоя — переименование.
+    int tlLastClickMs_ = -100000;
+    int tlLastClickLayer_ = -1;
+    [[nodiscard]] bool timelineShown() const { return timelineOn_ && m.docMode == DOC_TILE; }
+    /// Высота холста по ленте: m.H — холст, окно — WIN_H.
+    void applyLayout();
+    void drawTimeline();
+    void handleTimelineClick();
+    bool handleTimelineKey(int key);
+    void timelineWheel(int wheel);
+    void togglePlayback();
+    void stopPlayback();
+    void stepPlayback();
+    void renameLayerAsk(int l);
+    void editFrameDuration(int f);
+    /// Метка: i < 0 — новая на активном кадре.
+    void editTag(int i);
+    void showAnimationScreen();
+    // --- экспорт и импорт анимации ---
+    /// 1 — открыта анимация, 0 — файл не анимация, -1 — ошибка (сказано).
+    int tryLoadAnimation(const std::string& path, bool quiet);
+    bool saveAnimationTo(const std::string& path, bool gif, int from, int to, int scale, int plays,
+                         bool asDocument);
+    /// Диалог сохранения выгрузки с заданным расширением.
+    std::string askExportFile(const std::string& title, const std::string& suggested,
+                              const std::string& ext, const std::string& filterName);
+    void exportSheetAsk();
+    void exportAnimationAsk(bool gif);
+    void exportFramesAsk();
+    /// Кадры для выгрузки: метка проигрывания или все.
+    void exportRange(int& from, int& to) const;
 
     // --- запуск ---
     void initColorBars();

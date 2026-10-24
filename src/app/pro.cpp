@@ -396,7 +396,7 @@ void Editor::showToolOptions() {
             axisRow(368, m.symY, m.symAxisY2, m.tile.h, "Ось Y  (D)");
         }
 
-        if (uiButton(WIN_W / 2 - 90, m.H - 52, 180, 36, "Закрыть", true)) done = true;
+        if (uiButton(WIN_W / 2 - 90, WIN_H - 52, 180, 36, "Закрыть", true)) done = true;
         redraw();
         const int key = takeKey();
         if (key == KEY_ESC || key == KEY_ENTER || key == KEY_O) done = true;
@@ -433,12 +433,16 @@ bool Editor::askNumbers(const std::string& title, const std::string& hint,
     auto stepRow = [&](int y, const NumField& f) {
         int& v = *f.v;
         uiLabel(40, y, 180, 34, f.label, cText);
-        if (uiButton(230, y, 46, 34, "−8", v > f.lo)) v = clampI(v - 8, f.lo, f.hi);
-        if (uiButton(282, y, 46, 34, "−1", v > f.lo)) v = clampI(v - 1, f.lo, f.hi);
+        const int s1 = std::max(1, f.step);
+        const int s8 = s1 * 8;
+        const std::string n1 = std::to_string(s1);
+        const std::string n8 = std::to_string(s8);
+        if (uiButton(230, y, 46, 34, "−" + n8, v > f.lo)) v = clampI(v - s8, f.lo, f.hi);
+        if (uiButton(282, y, 46, 34, "−" + n1, v > f.lo)) v = clampI(v - s1, f.lo, f.hi);
         fb_.fillRoundRect(334, y, 434, y + 34, 6, 6, cFace);
         uiLabel(334, y, 100, 34, std::to_string(v), cText);
-        if (uiButton(440, y, 46, 34, "+1", v < f.hi)) v = clampI(v + 1, f.lo, f.hi);
-        if (uiButton(492, y, 46, 34, "+8", v < f.hi)) v = clampI(v + 8, f.lo, f.hi);
+        if (uiButton(440, y, 46, 34, "+" + n1, v < f.hi)) v = clampI(v + s1, f.lo, f.hi);
+        if (uiButton(492, y, 46, 34, "+" + n8, v < f.hi)) v = clampI(v + s8, f.lo, f.hi);
         // Ноль — частая точка отсчёта у сдвигов: возврат к нему одним щелчком.
         if (f.lo < 0 && f.hi > 0 && uiButton(548, y, 46, 34, "0", v != 0)) v = 0;
     };
@@ -645,11 +649,11 @@ void Editor::showImageScreen() {
         // --- низ ---
         if (uiToggle(c2, 444, CW, BH, "Контур по восьми соседям", outlineEight_))
             outlineEight_ = !outlineEight_;
-        if (uiButton(c1, m.H - 50, CW / 2 - 3, 34, "Цвет…", tile)) showColorOpsScreen();
-        if (uiButton(c1 + CW / 2 + 3, m.H - 50, CW / 2 - 3, 34, "Палитра…", tile))
+        if (uiButton(c1, WIN_H - 50, CW / 2 - 3, 34, "Цвет…", tile)) showColorOpsScreen();
+        if (uiButton(c1 + CW / 2 + 3, WIN_H - 50, CW / 2 - 3, 34, "Палитра…", tile))
             showPaletteScreen();
-        if (uiButton(c2, m.H - 50, CW, 34, "Параметры инструментов…", true)) showToolOptions();
-        if (uiButton(c3, m.H - 50, CW, 34, "Закрыть", true)) done = true;
+        if (uiButton(c2, WIN_H - 50, CW, 34, "Параметры инструментов…", true)) showToolOptions();
+        if (uiButton(c3, WIN_H - 50, CW, 34, "Закрыть", true)) done = true;
         redraw();
         const int key = takeKey();
         if (key == KEY_ESC || key == KEY_K) done = true;

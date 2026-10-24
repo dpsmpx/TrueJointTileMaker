@@ -291,7 +291,7 @@ void Editor::drawInfoSection() {
 }
 
 void Editor::drawMenuButtonSection() {
-    fb_.fillRect(PANEL_X, MENU_Y0 - 2, PANEL_X + PANEL_W, m.H, cPanel);
+    fb_.fillRect(PANEL_X, MENU_Y0 - 2, PANEL_X + PANEL_W, WIN_H, cPanel);
     std::string caption = m.docMode == DOC_MAP ? "Меню — карта" : "Меню — тайл";
     if (m.isModified()) caption += " *";
     uiButton(PANEL_X + 4, MENU_Y0, PANEL_W - 8, MENU_Y1 - MENU_Y0, caption, true);
@@ -304,9 +304,9 @@ void Editor::panelDivider(int y) {
 }
 
 void Editor::drawPanel() {
-    fb_.fillRect(PANEL_X, 0, PANEL_X + PANEL_W, m.H, cPanel);
+    fb_.fillRect(PANEL_X, 0, PANEL_X + PANEL_W, WIN_H, cPanel);
     // Граница панели: на светлой теме разница тонов мала, и край терялся.
-    fb_.fillRect(PANEL_X, 0, PANEL_X + 1, m.H, cBorder);
+    fb_.fillRect(PANEL_X, 0, PANEL_X + 1, WIN_H, cBorder);
     drawToolsSection();
     panelDivider(TOOLS_Y1 + 2);
     if (m.docMode == DOC_MAP) {
@@ -329,6 +329,7 @@ void Editor::repaint() {
     // он сводится к ячейке до того, как его увидят.
     m.enforceIndexed();
     drawCanvas();
+    drawTimeline();
     drawPanel();
     redraw();
     m.needRepaint = false;

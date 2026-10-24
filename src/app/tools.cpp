@@ -345,6 +345,16 @@ void Editor::handleCanvasClick() {
         m.pickColorFromTile(mx, my);
         return;
     }
+    // По скрытому или запертому слою кисть ничего не меняет: лучше сказать
+    // об этом, чем молча не рисовать.
+    if (m.toolTile != T_SELECT && !m.activeLayerEditable()) {
+        const Layer& l = m.doc.layers[static_cast<std::size_t>(m.activeLayer)];
+        showMessage(l.locked ? "Слой заперт" : "Слой скрыт",
+                    "Слой «" + l.name + "» " + (l.locked ? "заперт" : "скрыт") +
+                        ": рисунок на нём не меняется. Щёлкните по " +
+                        (l.locked ? "замку" : "глазу") + " слоя на ленте кадров (клавиша J).");
+        return;
+    }
     switch (m.toolTile) {
         case T_PEN:
         case T_ERASER:
@@ -514,6 +524,7 @@ void Editor::handlePanelClick() {
 
 void Editor::handleEditorKey(int key) {
     if (handleProKey(key)) return;
+    if (handleTimelineKey(key)) return;
     const int step = std::max(1, m.pixelSize * 4);
     const bool tile = m.docMode == DOC_TILE;
     switch (key) {
