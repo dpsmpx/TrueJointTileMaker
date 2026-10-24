@@ -612,9 +612,23 @@ void Editor::handleEditorKey(int key) {
             m.needRepaint = true;
             break;
         case KEY_B:
-            m.seamlessOn = !m.seamlessOn;
-            cfg.showSeamless = m.seamlessOn;
-            saveConfig();
+            // Shift+B — картинки набора: на карте — карта тайлами, у тайла
+            // местности — его окружение на настоящей карте; Ctrl+B — к
+            // следующему месту этой местности (этап 7).
+            if (lastKey_.shift) {
+                if (tile) {
+                    toggleMapContext();
+                } else {
+                    m.mapTiles = !m.mapTiles;
+                    gameTilesDirty_ = true;
+                }
+            } else if (lastKey_.ctrl) {
+                ++mapCtxIndex_;
+            } else {
+                m.seamlessOn = !m.seamlessOn;
+                cfg.showSeamless = m.seamlessOn;
+                saveConfig();
+            }
             m.needRepaint = true;
             break;
         case KEY_W:

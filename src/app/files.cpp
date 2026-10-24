@@ -208,6 +208,8 @@ bool Editor::saveProjectTo(const std::string& path) {
 
 bool Editor::saveTileTo(const std::string& path) {
     if (path.empty()) return false;
+    // Записанное могло лечь в набор игры: картинки карты перечитаются.
+    gameTilesDirty_ = true;
     const int nf = m.doc.frameCount();
     if (pathExtLower(path) == ".tjt") return saveProjectTo(path);
     const int fmt = imageFormatOf(path);

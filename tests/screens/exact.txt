@@ -93,3 +93,10 @@ layers6    03_group  150  474  450   80
 layers6    04_tilemap  0    0  600  410
 layers6    05_propagated 0  0  600  410
 layers6    06_reloaded 0    0  600  410
+# Этап 7 — эталон со снимков переноса. На экране «Набор для игры» строка
+# с путём к папке набора не сверяется: каталог прогона каждый раз свой.
+game7      01_gameset  0   64  780  496
+game7      02_template 0    0  600  560
+game7      03_maptiles 0    0  600  560
+game7      04_context  0    0  600  560
+game7      05_inner    0    0  600  560

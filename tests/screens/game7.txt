@@ -1,0 +1,69 @@
+# Этап 7 RoadToProLevel: связь с игрой. Набор тайлов и карта — свои
+# заготовки из game7.files; ответы диалогам — game7.dialogs.
+key Escape
+sleep 0.4
+key t
+sleep 0.3
+click 390 472              # папка набора: любой тайл в ней
+sleep 0.3
+click 160 472              # «Для игры…»
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 01_gameset
+click 205 111              # лист 8×8 для игры
+sleep 0.3
+click 205 175              # атлас набора и JSON
+sleep 0.3
+click 659 111              # заготовка стыков стены
+sleep 0.3
+key Return                 # подсказка о масках
+sleep 0.3
+# Заготовка 64x64 по 8 точек — с (44, 24); клетка 5 (соседи сверху и
+# снизу) — точки 16..31 по обеим осям. Красная полоса — сверху вниз.
+click 682 125 3            # красный из палитры
+key 1
+drag 224 156 224 276
+drag 232 156 232 276
+drag 240 156 240 276
+drag 248 156 248 276
+move 770 550
+sleep 0.2
+shot 02_template
+key t
+sleep 0.3
+click 160 472              # «Для игры…»
+sleep 0.3
+click 575 261              # разрезать на варианты
+sleep 0.3
+key Return
+sleep 0.2
+key Escape
+sleep 0.3
+key Escape
+sleep 0.3
+key Tab                    # карта
+sleep 0.3
+key l
+sleep 0.3
+key shift+b                # карта картинками тайлов
+move 770 550
+sleep 0.2
+shot 03_maptiles
+key Tab                    # снова тайл
+sleep 0.3
+key t
+sleep 0.3
+click 150 160 3            # открыть стену из набора
+sleep 0.3
+click 390 327              # заготовку не сохранять
+sleep 0.3
+key shift+b                # стена среди соседей с карты
+move 770 550
+sleep 0.2
+shot 04_context
+# Места стены по строкам карты: 21-е — внутренняя стена (2, 3).
+key ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b ctrl+b 
+move 770 550
+sleep 0.2
+shot 05_inner

@@ -31,7 +31,7 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.2.0";
+inline constexpr const char* kAppVersion = "1.3.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -334,6 +334,11 @@ public:
     /// тайла. Иначе кисть кладёт тайл tileBrush целиком.
     bool tilemapPixels = false;
     int tileBrush = 1;
+    /// Этап 7: карта картинками тайлов из набора игры, со стыками по
+    /// соседям, и тайл местности среди соседей настоящей карты.
+    bool mapTiles = false;
+    bool mapAutotile = false;
+    bool mapContext = false;
     /// Вид линии: прямая (как в оригинале), ломаная, многоугольник, кривая
     /// через точки, замкнутая кривая, звезда (этап 6).
     int lineKind = 0;

@@ -23,6 +23,7 @@ add_executable(tjtm_core_tests
     test_config.cpp
     test_doc.cpp
     test_formats.cpp
+    test_gameset.cpp
     test_imageops.cpp
     test_layers.cpp
     test_map.cpp

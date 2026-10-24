@@ -114,6 +114,8 @@ bool Editor::appInit(int argc, char** argv) {
     m.clipToSelection = true;
     // Этап 2: индексный режим — настоящий: точка хранит номер ячейки.
     m.strictIndexed = true;
+    // Этап 7: карта картинками набора подбирает варианты стыков.
+    m.mapAutotile = true;
     m.syncHSVFromColor();
     m.setDefaultPalette();
     m.buffer.clear();

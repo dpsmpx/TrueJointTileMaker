@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -16,6 +17,7 @@
 #include <vector>
 
 #include "core/anim.h"
+#include "core/gameset.h"
 #include "core/gif.h"
 #include "core/model.h"
 #include "core/png.h"
@@ -47,7 +49,7 @@ std::vector<Region> readRegions() {
 
 /// Свежий каталог программы: настройки, ресурсы и картинки из репозитория.
 /// Программа пишет в Config.txt, и прогоны не должны влиять друг на друга.
-fs::path makeBase(const std::string& name) {
+fs::path makeBase(const std::string& name, const std::string& scenario = {}) {
     const fs::path src(TJTM_SOURCE_DIR);
     const fs::path base = fs::temp_directory_path() / ("tjtm_app_test_" + name);
     fs::remove_all(base);
@@ -56,6 +58,10 @@ fs::path makeBase(const std::string& name) {
     fs::copy(src / "Resources", base / "Resources", fs::copy_options::recursive);
     fs::copy(src / fs::path(u8"Картинки"), base / fs::path(u8"Картинки"),
              fs::copy_options::recursive);
+    // Свои файлы сценария (набор тайлов, карта) — tests/screens/ИМЯ.files.
+    const fs::path extra =
+        src / "tests" / "screens" / ((scenario.empty() ? name : scenario) + ".files");
+    if (fs::exists(extra)) fs::copy(extra, base, fs::copy_options::recursive);
     return base;
 }
 
@@ -161,7 +167,7 @@ TEST_P(AppScreens, MatchOriginal) {
 
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
-                                           "anim4", "prec5", "layers6"));
+                                           "anim4", "prec5", "layers6", "game7"));
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.
@@ -301,6 +307,63 @@ TEST(AppScreens, LayersProjectSaved) {
     ASSERT_TRUE(m.doc.cel(3, 0));
     for (const int v : m.doc.cel(3, 0)->tiles.d)
         EXPECT_EQ(v, 2);
+    fs::remove_all(base);
+}
+
+/// Этап 7: лист 8x8 и атлас выгружены из набора, варианты стыков
+/// разрезаны из заготовки, уже нарисованный вариант сохранился.
+TEST(AppScreens, GameSetExported) {
+    const fs::path base = makeBase("game7x", "game7");
+    ASSERT_TRUE(runScenario("game7", base));
+    const fs::path fixture =
+        fs::path(TJTM_SOURCE_DIR) / "tests" / "screens" / "game7.files" / "tiles";
+    std::string err;
+    auto load = [&](const fs::path& p) {
+        tjtm::Grid<tjtm::Color> g;
+        EXPECT_TRUE(tjtm::pngLoad(p.string(), g, err)) << p.string() << ": " << err;
+        return g;
+    };
+
+    std::vector<tjtm::Grid<tjtm::Color>> slots;
+    ASSERT_TRUE(tjtm::game::sliceSheet(load(base / "sheet.png"), slots, err)) << err;
+    for (int i = 0; i < tjtm::TSET_BASE_COUNT; ++i) {
+        const fs::path src = fixture / (tjtm::tsetBaseFile(i) + ".png");
+        const auto& got = slots[static_cast<std::size_t>(i)];
+        if (fs::exists(src)) {
+            EXPECT_EQ(got.d, load(src).d) << tjtm::tsetBaseFile(i);
+        } else {
+            EXPECT_TRUE(got.empty()) << tjtm::tsetBaseFile(i);
+        }
+    }
+
+    const tjtm::Grid<tjtm::Color> atlas = load(base / "atlas.png");
+    std::ifstream jin(base / "atlas.json", std::ios::binary);
+    const std::string json((std::istreambuf_iterator<char>(jin)), std::istreambuf_iterator<char>());
+    int frames = 0;
+    for (const auto& e : fs::directory_iterator(fixture)) {
+        const std::string name = e.path().filename().string();
+        const std::size_t at = json.find("\"" + name + "\": {");
+        ASSERT_NE(at, std::string::npos) << name;
+        int x = 0;
+        int y = 0;
+        ASSERT_EQ(std::sscanf(json.c_str() + json.find("\"frame\"", at),
+                              "\"frame\": { \"x\": %d, \"y\": %d", &x, &y),
+                  2);
+        const auto img = load(e.path());
+        for (int yy = 0; yy < img.h; ++yy) {
+            for (int xx = 0; xx < img.w; ++xx)
+                ASSERT_EQ(atlas.at(x + xx, y + yy).argb(), img.at(xx, yy).argb()) << name;
+        }
+        ++frames;
+    }
+    EXPECT_EQ(frames, 12);
+
+    const auto wall = load(fixture / "wall.png");
+    for (int k = 0; k < 16; ++k)
+        EXPECT_TRUE(fs::exists(base / "tiles" / ("wall_" + std::to_string(k) + ".png"))) << k;
+    EXPECT_EQ(load(base / "tiles" / "wall_0.png").d, wall.d);
+    EXPECT_EQ(load(base / "tiles" / "wall_10.png").d, load(fixture / "wall_10.png").d);
+    EXPECT_NE(load(base / "tiles" / "wall_5.png").d, wall.d);
     fs::remove_all(base);
 }
 

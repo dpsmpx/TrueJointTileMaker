@@ -85,10 +85,21 @@ void Editor::drawTileCells() {
         cr = std::min(W, ox + sw);
         cb = std::min(H, oy + sh);
     }
+    // Тайл местности в окружении настоящей карты (этап 7): соседи — на весь
+    // холст, как копии в бесшовном виде.
+    const bool context = m.mapContext && !m.seamlessOn && editedTerrain() >= 0;
+    if (context) {
+        cl = X0;
+        ct = Y0;
+        cr = W;
+        cb = H;
+    }
     if (cr <= cl || cb <= ct) return;
 
-    // Холст — левая часть окна; панель справа его не касается.
-    fb_.setClip(gfx::Rect{0, 0, W, H});
+    // Холст — левая часть окна; панель справа его не касается, линейки
+    // слева и сверху — тоже.
+    fb_.setClip(canvasRect());
+    if (context) drawMapContext(ox, oy, sw, sh);
     int kx0 = 0;
     int kx1 = 0;
     int ky0 = 0;
@@ -106,7 +117,7 @@ void Editor::drawTileCells() {
     }
 
     // Соседние копии притушены, чтобы было видно, где сам тайл.
-    if (m.seamlessOn) {
+    if (m.seamlessOn || context) {
         const Color dim = argb(56, 0, 0, 0);
         if (oy > Y0) fb_.fillRect(X0, Y0, W, std::min(oy, H), dim);
         if (oy + sh < H) fb_.fillRect(X0, std::max(Y0, oy + sh), W, H, dim);
@@ -115,6 +126,7 @@ void Editor::drawTileCells() {
             fb_.fillRect(std::max(X0, ox + sw), std::max(Y0, oy), W, std::min(H, oy + sh), dim);
         fb_.frameRect(ox - 1, oy - 1, ox + sw + 1, oy + sh + 1, cAccent);
     }
+    if (context) drawMapContextLabel();
 
     // Выделение подкрашивается одним прямоугольником поверх; выделение
     // произвольной формы подкрашивается по точкам (drawSelectionMask).
@@ -147,13 +159,23 @@ void Editor::drawMapCells() {
     const int i0 = std::max(0, m.screenToTileY(m.Y0));
     const int i1 = std::min(m.map.h - 1, m.screenToTileY(m.H - 1));
     fb_.setClip(canvasRect());
+    const int ps = m.pixelSize;
     for (int i = i0; i <= i1; ++i) {
         for (int j = j0; j <= j1; ++j) {
-            Color c = mapTileColor(m.map.at(j, i));
-            if (m.hasSelection && j >= m.selX && j < m.selX + m.selW && i >= m.selY &&
-                i < m.selY + m.selH) {
-                c = blendOver(argb(80, cAccent.r, cAccent.g, cAccent.b), c);
+            const bool sel = m.hasSelection && j >= m.selX && j < m.selX + m.selW && i >= m.selY &&
+                             i < m.selY + m.selH;
+            // Карта картинками набора игры (этап 7): клетка — её тайл или
+            // вариант стыка; нет картинки — цвет оригинала.
+            if (const Grid<Color>* img = m.mapTiles ? mapCellImage(j, i) : nullptr) {
+                fb_.drawImage(*img, m.tileToScreenX(j), m.tileToScreenY(i), ps - g, ps - g);
+                if (sel)
+                    fb_.fillRect(m.tileToScreenX(j), m.tileToScreenY(i), m.tileToScreenX(j + 1) - g,
+                                 m.tileToScreenY(i + 1) - g,
+                                 argb(80, cAccent.r, cAccent.g, cAccent.b));
+                continue;
             }
+            Color c = mapTileColor(m.map.at(j, i));
+            if (sel) c = blendOver(argb(80, cAccent.r, cAccent.g, cAccent.b), c);
             fb_.fillRect(m.tileToScreenX(j), m.tileToScreenY(i), m.tileToScreenX(j + 1) - g,
                          m.tileToScreenY(i + 1) - g, c);
         }
@@ -164,6 +186,16 @@ void Editor::drawMapCells() {
         if (o.x < j0 || o.x > j1 || o.y < i0 || o.y > i1) continue;
         const int sx = m.tileToScreenX(o.x);
         const int sy = m.tileToScreenY(o.y);
+        if (m.mapTiles) {
+            // Объект — своей картинкой: житель и враг — по id, если нарисован,
+            // иначе общим тайлом вида.
+            const Grid<Color>* img = gameTile(m.mapCellTileFile(o.x, o.y));
+            if (img == nullptr) img = gameTile(o.kind == "spawn" ? "mob" : o.kind);
+            if (img != nullptr) {
+                fb_.drawImage(*img, sx, sy, ps - g, ps - g);
+                continue;
+            }
+        }
         fb_.fillRect(sx + 1, sy + 1, sx + m.pixelSize - 1, sy + m.pixelSize - 1,
                      argb(210, 250, 250, 210));
         if (m.pixelSize >= 10)

@@ -8,6 +8,7 @@
 // исходником.
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -284,6 +285,32 @@ private:
     int rotateDeg_ = 15;
     int rotateMethod_ = 1;
     bool rotateExpand_ = true;
+
+    // --- этап 7: связь с игрой (gameset_ui.cpp) ---
+    /// Картинки тайлов набора игры по имени файла без расширения; пустая —
+    /// файла нет. Сбрасывается, когда в набор что-то записали.
+    std::map<std::string, Grid<Color>> gameTiles_;
+    bool gameTilesDirty_ = true;
+    /// Какое по счёту место местности на карте показывает окружение тайла.
+    int mapCtxIndex_ = 0;
+    const Grid<Color>* gameTile(const std::string& name);
+    /// Картинка клетки карты: вариант стыка, если он нарисован, иначе тайл.
+    const Grid<Color>* mapCellImage(int x, int y);
+    /// Местность, которую рисует открытый тайл (слот 0..6), или -1.
+    int editedTerrain() const;
+    /// Клетка карты, вокруг которой показывать тайл; false — такой нет.
+    bool mapContextCell(int& cx, int& cy, int& count);
+    void drawMapContext(int ox, int oy, int sw, int sh);
+    void drawMapContextLabel();
+    void toggleMapContext();
+    /// true — открыт новый документ (заготовка стыков): экран наборов
+    /// тоже закрывается.
+    bool showGameSetScreen();
+    void exportGameSheet();
+    void exportGameAtlas();
+    void sliceGameSheetAsk();
+    bool autotileTemplate(int terrain);
+    void autotileSlice();
 
     // --- этап 6: векторные инструменты и тайлы (vector_ui.cpp) ---
     /// Последняя тронутая фигура векторного слоя: её удаляет Delete.
