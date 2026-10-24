@@ -25,3 +25,32 @@ tile       04_select  99  170   91  390
 tile       04_select 638  248  104  130
 map        01_map      0    0  600  560
 map        01_map    640  382  100  100
+draw       01_drawn    0    0  600  560   # карандаш, линия, фигуры, заливка, ластик
+draw       01_drawn  640  382  100  100
+draw       02_undo     0    0  600  560   # две отмены
+draw       03_zoom     0    0  600  560   # ролик и сдвиг средней кнопкой
+draw       03_zoom   640  382  100  100
+draw       04_palette  0    0  600  560   # цвет из палитры
+draw       04_palette 602 248   34   64
+# Карта: всё, кроме букв на метках объектов (x 300..455, y 245..304).
+mapedit    01_painted   0    0  300  560
+mapedit    01_painted  456    0  144  560
+mapedit    01_painted  300    0  156  245
+mapedit    01_painted  300  305  156  255
+mapedit    01_painted  640  382  100  100
+mapedit    02_paste     0    0   83  560   # вокруг рамки выделения и меток
+mapedit    02_paste   456    0  144  560
+mapedit    02_paste    83    0  373  183
+mapedit    02_paste    83  307  373  253
+mapedit    02_paste    85  185  179  119   # внутри выделения
+mapedit    02_paste    640  382  100  100
+mapedit    03_undo      0    0  300  560
+mapedit    03_undo     456    0  144  560
+mapedit    03_undo     300    0  156  245
+mapedit    03_undo     300  305  156  255
+mapedit    03_undo     640  382  100  100
+mapedit    04_redo_fit  0    0  300  560
+mapedit    04_redo_fit 456    0  144  560
+mapedit    04_redo_fit 300    0  156  245
+mapedit    04_redo_fit 300  305  156  255
+mapedit    04_redo_fit 640  382  100  100
