@@ -59,7 +59,10 @@ elseif(TJTM_FETCH_SDL)
     FetchContent_Declare(SDL3_image
         GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
         GIT_TAG ${TJTM_SDL_IMAGE_TAG}
-        GIT_SHALLOW TRUE)
+        GIT_SHALLOW TRUE
+        # Подмодули — библиотеки выключенных форматов: stb лежит в самих
+        # исходниках, а качать AVIF и JPEG XL ради ничего незачем.
+        GIT_SUBMODULES "")
     FetchContent_MakeAvailable(SDL3_image)
 else()
     message(FATAL_ERROR "SDL3 не найдена, а скачивание выключено (TJTM_FETCH_SDL=OFF)")

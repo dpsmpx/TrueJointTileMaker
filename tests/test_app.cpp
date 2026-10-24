@@ -70,7 +70,13 @@ bool runScenario(const std::string& scenario, const fs::path& base) {
 #endif
     const std::string cmd = "\"" + std::string(TJTM_APP_EXE) + "\" --base \"" + base.string() +
                             "\" --script \"" + script + "\" --shots \"" + shots.string() + "\"";
+#ifdef _WIN32
+    // cmd /c срезает первую и последнюю кавычку строки: без внешней пары
+    // от пути к программе осталась бы половина.
+    return std::system(("\"" + cmd + "\"").c_str()) == 0;
+#else
     return std::system(cmd.c_str()) == 0;
+#endif
 }
 
 class AppScreens : public ::testing::TestWithParam<std::string> {};

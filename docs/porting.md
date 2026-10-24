@@ -47,6 +47,7 @@ tools/setup-env.sh
 - **Эталон:** Mono 6.8 с WinForms, .NET SDK 10 и компилятор PascalABC.NET,
   собранный из исходников (закреплён на коммите `643514c`).
 - **Окна без экрана:** Xvfb, xdotool, ImageMagick.
+- **Windows:** MinGW-w64 для кросс-сборки и Wine для её тестов.
 - **Корпус игры:** клон [Andors-Love](https://github.com/dpsmpx/Andors-Love)
   с 50 картами и 107 тайлами.
 
@@ -66,8 +67,19 @@ cmake --preset debug && cmake --build --preset debug && ctest --preset debug
 | `asan` | AddressSanitizer и UndefinedBehaviorSanitizer, утечки ловятся |
 | `clang` | Clang, предупреждения считаются ошибками |
 | `tidy` | Clang с clang-tidy на каждом файле при сборке |
+| `mingw` | Windows: кросс-сборка MinGW-w64, тесты — под Wine |
 
-Каталоги сборки — `build/<пресет>`. Программа без экрана:
+Каталоги сборки — `build/<пресет>`.
+
+Windows собирается здесь же, кросс-компиляцией: SDL3 и GoogleTest
+скачиваются и собираются под Windows заново, `tjtm.exe` выходит одним
+файлом без DLL. `ctest --preset mingw` гоняет все тесты, включая сценарии со
+сверкой экранов, под Wine. Wine нужна локаль UTF-8 (`LC_ALL=C.UTF-8` стоит в
+пресете): без неё он не сопоставляет кириллические имена файлов с файлами
+Linux, и `Картинки/` не находится. Сборку в самой Windows (MSVC или MinGW)
+даёт тот же `CMakeLists.txt`.
+
+Программа без экрана:
 
 ```bash
 SDL_VIDEODRIVER=offscreen SDL_FRAMEBUFFER_ACCELERATION=0 \

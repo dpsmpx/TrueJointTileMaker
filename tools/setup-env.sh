@@ -67,6 +67,8 @@ APT_PACKAGES=(
     mono-complete libgdiplus dotnet-sdk-10.0
     # Запуск окон без экрана, управление ими и сравнение снимков
     xvfb xdotool imagemagick
+    # Windows-сборка из Linux (пресет mingw) и её тесты под Wine
+    mingw-w64 wine64
     git python3
 )
 

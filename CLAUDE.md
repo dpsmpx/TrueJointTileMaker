@@ -22,6 +22,7 @@ PascalABC.NET на C++ (SDL3). Подробности — `docs/porting.md`,
 tools/setup-env.sh                                   # инструменты (в облаке — хук)
 cmake --preset debug && cmake --build --preset debug # сборка
 ctest --preset debug                                 # тесты; asan, clang — тоже пресеты
+cmake --preset mingw && cmake --build --preset mingw && ctest --preset mingw  # Windows под Wine
 tools/lint.sh                                        # clang-format, clang-tidy, cppcheck, shellcheck
 tools/gui.sh ref|port start|key|click|drag|shot|stop # окна оригинала и переноса
 tools/gui.sh compare a.png b.png diff.png            # попиксельное сравнение
