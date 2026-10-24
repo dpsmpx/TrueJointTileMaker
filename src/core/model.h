@@ -21,6 +21,7 @@
 #include "core/color.h"
 #include "core/grid.h"
 #include "core/mapdoc.h"
+#include "core/sprite.h"
 #include "core/theme.h"
 
 namespace tjtm {
@@ -28,7 +29,7 @@ namespace tjtm {
 inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — когда пройдены все четыре.
-inline constexpr const char* kAppVersion = "0.9.0";
+inline constexpr const char* kAppVersion = "0.10.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -46,12 +47,6 @@ inline constexpr int MAX_TILE = 512;
 inline constexpr int PAL_COLS = 8;
 inline constexpr int PAL_ROWS = 8;
 inline constexpr int PAL_SIZE = PAL_COLS * PAL_ROWS;
-
-/// Номер ячейки палитры. Шире байта оригинала: палитра этапа 2 может быть
-/// длиннее 255 цветов.
-using PalIndex = std::uint16_t;
-/// Пиксель не связан ни с одной ячейкой палитры (IDX_NONE оригинала).
-inline constexpr PalIndex IDX_NONE = 0xFFFF;
 
 /// Вертикальная разметка панели. Отрисовка и попадание мыши считают
 /// границы по одним и тем же константам.
@@ -155,6 +150,12 @@ struct TileSnapshot {
     Grid<PalIndex> idx;
     std::vector<Color> palette;
     PalIndex transparentIdx = IDX_NONE;
+    /// Слои и кадры: таблица общих картинок, копируется дёшево. Отмена
+    /// возвращает и их, и активную ячейку — правку кадра 3 отменяют,
+    /// стоя на кадре 5.
+    SpriteDoc doc;
+    int layer = 0;
+    int frame = 0;
 };
 
 class Model {
@@ -244,6 +245,17 @@ public:
     bool strictIndexed = false;
     /// Прокрутка палитры на панели, в рядах по PAL_COLS.
     int palScroll = 0;
+
+    // --- этапы 3 и 4: слои и кадры ---
+
+    /// Слои, кадры, метки. Картинка активной ячейки — tile.
+    SpriteDoc doc;
+    int activeLayer = 0;
+    int activeFrame = 0;
+    /// «Луковая кожа»: соседние кадры полупрозрачно под текущим.
+    bool onionSkin = false;
+    int onionPrev = 1;
+    int onionNext = 1;
 
     Color firstColor = argb(255, 0, 0, 0);
     Color secondColor = argb(255, 255, 255, 255);
@@ -467,10 +479,54 @@ public:
     /// Точки без номера в строгом режиме — к ближайшей ячейке. Зовётся
     /// после команд, которые кладут произвольные цвета.
     void enforceIndexed();
+    /// То же для одной картинки; возвращает число точек, сменивших цвет.
+    int enforceGrid(Grid<Color>& img, Grid<PalIndex>& idx) const;
     /// Сколько непрозрачных точек не совпадает ни с одной ячейкой.
     int unmatchedPixelCount() const;
     /// Тон, насыщенность, яркость точек выделения или всей картинки.
     void adjustImageHSV(int dh, int ds, int dv);
+
+    // --- слои и кадры (этапы 3 и 4) ---
+    /// Один слой, один кадр — документ из одной картинки, как в 0.6.0.
+    void resetDoc();
+    /// Записать tile в таблицу ячеек; пустая картинка — пустая ячейка.
+    void commitActiveCel();
+    /// Взять картинку активной ячейки в tile.
+    void loadActiveCel();
+    void setActiveCel(int layer, int frame);
+    /// Больше одного слоя или кадра: показ идёт сведением.
+    bool multiCel() const { return doc.layerCount() > 1 || doc.frameCount() > 1; }
+    /// Активный слой виден и не заперт: на нём можно рисовать.
+    bool activeLayerEditable() const;
+    /// Применить правку ко всем ячейкам документа, включая активную. Так
+    /// работают команды над всей картинкой: размер холста, поворот, палитра.
+    void forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>& fn);
+    /// Пройти по картинкам всех ячеек, ничего не меняя.
+    void forEachCelConst(const std::function<void(const Grid<Color>&)>& fn) const;
+    /// Видимые слои кадра f, сведённые с учётом непрозрачности слоя.
+    Grid<Color> compositeFrame(int f) const;
+    Color compositeAt(int f, int x, int y) const;
+    /// То, что видно на холсте в точке: сведение и «луковая кожа», без шахматки.
+    Color viewColorAt(int x, int y) const;
+    int addLayer();
+    bool deleteLayer();
+    int duplicateLayer();
+    bool moveLayer(int dir);
+    bool mergeLayerDown();
+    void setLayerVisible(int l, bool v);
+    void setLayerLocked(int l, bool v);
+    void renameLayer(int l, const std::string& name);
+    void setLayerOpacity(int l, int opacity);
+    /// Новый кадр после активного: пустой или копия (ячейки общие).
+    int addFrame(bool copy);
+    bool deleteFrame();
+    bool moveFrame(int dir);
+    void setFrameDuration(int f, int ms);
+    int addTag(const std::string& name, int from, int to, int direction);
+    bool deleteTag(int i);
+    /// Следующий кадр проигрывания внутри метки tag (-1 — все кадры).
+    /// pingDir — направление для «туда-обратно», меняется на краях.
+    int nextPlayFrame(int f, int tag, int& pingDir) const;
 
     // --- симметрия ---
     int mirrorX(int x) const;

@@ -8,6 +8,7 @@
 #include "app/editor.h"
 #include "core/fsutil.h"
 #include "core/png.h"
+#include "core/project.h"
 #include "core/text.h"
 #include "core/theme.h"
 
@@ -15,7 +16,10 @@ namespace tjtm {
 
 namespace {
 
-const std::vector<FileFilter> kPngFilter = {{"Изображения PNG", "png"}, {"Все файлы", "*"}};
+// Проект .tjt открывается тем же «Загрузить»: это тоже PNG, только с
+// куском проекта внутри.
+const std::vector<FileFilter> kPngFilter = {
+    {"Картинки и проекты (PNG, TJT)", "png;tjt"}, {"Проекты редактора", "tjt"}, {"Все файлы", "*"}};
 const std::vector<FileFilter> kMapFilter = {{"Карты локаций", "map"}, {"Все файлы", "*"}};
 
 /// Расширение по умолчанию, если в диалоге сохранения его не написали —
@@ -23,6 +27,19 @@ const std::vector<FileFilter> kMapFilter = {{"Карты локаций", "map"}
 std::string withExtension(const std::string& path, const std::string& ext) {
     if (path.empty() || !pathExtLower(path).empty()) return path;
     return path + "." + ext;
+}
+
+std::string replaceExtension(const std::string& path, const std::string& ext) {
+    const std::string old = pathExtLower(path);
+    return path.substr(0, path.size() - old.size()) + ext;
+}
+
+/// Проект ли это: по расширению или, у переименованного, по содержимому.
+bool looksLikeProject(const std::string& path) {
+    if (pathExtLower(path) == ".tjt") return true;
+    const auto data = readFile(path);
+    if (!data) return false;
+    return isProjectFile(std::vector<std::uint8_t>(data->begin(), data->end()));
 }
 
 }  // namespace
@@ -39,7 +56,8 @@ std::string Editor::askSaveFile(const std::string& title, const std::string& sug
         pf_.saveFileDialog(title, kPngFilter, resolvePath(cfg.lastFolder), suggested);
     waitMouseRelease();
     m.needRepaint = true;
-    return withExtension(r, "png");
+    // Без расширения: документ со слоями — проектом, картинка — PNG.
+    return withExtension(r, m.multiCel() ? "tjt" : "png");
 }
 
 /// Папка карт для диалогов: сначала настройка, потом папка последней карты.
@@ -125,6 +143,18 @@ bool Editor::readImageGrid(const std::string& path, Grid<Color>& g, bool quiet) 
 /// remember = false — для автозагрузки при старте: стартовая картинка не
 /// должна подменять собой последний файл пользователя.
 bool Editor::loadTileFrom(const std::string& path, bool quiet, bool remember) {
+    if (looksLikeProject(path)) {
+        std::string err;
+        // Модель меняется, только если проект прочитан целиком.
+        if (!projectLoad(path, m, err)) {
+            if (!quiet) showMessage("Проект не открыт", path + ": " + err);
+            return false;
+        }
+        m.currentFile = path;
+        m.tileModified = false;
+        if (remember) rememberFile(path, false);
+        return true;
+    }
     Grid<Color> g;
     if (!readImageGrid(path, g, quiet)) return false;
     m.setTile(std::move(g), path);
@@ -132,9 +162,37 @@ bool Editor::loadTileFrom(const std::string& path, bool quiet, bool remember) {
     return true;
 }
 
+bool Editor::saveProjectTo(const std::string& path) {
+    std::string err;
+    if (!projectSave(path, m, err)) {
+        showMessage("Не удалось сохранить проект", path + ": " + err);
+        return false;
+    }
+    m.currentFile = path;
+    m.tileModified = false;
+    rememberFile(path, false);
+    return true;
+}
+
 bool Editor::saveTileTo(const std::string& path) {
     if (path.empty()) return false;
+    if (pathExtLower(path) == ".tjt") return saveProjectTo(path);
     std::string err;
+    if (m.multiCel()) {
+        // В PNG слои и кадры не помещаются: либо проект, либо сведённая
+        // картинка текущего кадра — тогда документ остаётся несохранённым.
+        const int a = ask3("Слои и кадры",
+                           "PNG хранит одну картинку: слои сведутся, сохранится только текущий "
+                           "кадр. Слои, кадры и метки сохраняет проект .tjt.",
+                           "Сохранить проект", "Сохранить картинку", "Отмена");
+        if (a < 0) return false;
+        if (a == 1) return saveProjectTo(replaceExtension(path, ".tjt"));
+        if (!pngSave(path, m.compositeFrame(m.activeFrame), err)) {
+            showMessage("Не удалось сохранить файл", path + ": " + err);
+            return false;
+        }
+        return true;
+    }
     if (!pngSave(path, m.tile, err)) {
         showMessage("Не удалось сохранить файл", path + ": " + err);
         return false;
@@ -229,7 +287,7 @@ bool Editor::commandSaveAs() {
         return !path.empty() && saveMapTo(path);
     }
     std::string suggest = fileNameOnly(m.currentFile);
-    if (suggest.empty()) suggest = "tile.png";
+    if (suggest.empty()) suggest = m.multiCel() ? "sprite.tjt" : "tile.png";
     const std::string path = askSaveFile("Сохранить тайл", suggest);
     return !path.empty() && saveTileTo(path);
 }

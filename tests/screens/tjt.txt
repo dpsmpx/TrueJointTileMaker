@@ -1,0 +1,24 @@
+# Этап 3 RoadToProLevel: проект .tjt. Рисунок сохраняется проектом, затем
+# портится и открывается из файла — холст обязан вернуться. Пути диалогам
+# выбора файла даёт тест через TJTM_TEST_DIALOGS.
+key Escape
+sleep 0.4
+key 1
+drag 60 60 300 200
+move 700 300
+sleep 0.2
+shot 01_drawn
+key Escape
+sleep 0.3
+click 390 296              # Сохранить как — путь с .tjt
+sleep 0.3
+drag 60 300 300 300        # линия, которой нет в файле
+key Escape
+sleep 0.3
+click 390 224              # Загрузить файл
+sleep 0.3
+click 390 327              # Не сохранять
+sleep 0.3
+move 700 300
+sleep 0.2
+shot 02_reopened

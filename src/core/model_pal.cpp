@@ -89,20 +89,23 @@ void Model::remapPalette(std::vector<Color> newPal, const std::vector<int>& oldT
     const int nt = newIndex(transparentIdx);
     transparentIdx = nt < 0 ? IDX_NONE : static_cast<PalIndex>(nt);
     palette = std::move(newPal);
-    for (std::size_t k = 0; k < tile.d.size(); ++k) {
-        const PalIndex v = tileIdx.d[k];
-        if (v == IDX_NONE) continue;
-        const int nv = newIndex(v);
-        if (nv >= 0) {
-            tileIdx.d[k] = static_cast<PalIndex>(nv);
-        } else if (strict) {
-            // Ячейки больше нет: в строгом режиме точка берёт ближайшую.
-            tileIdx.d[k] = resolveIndex(tile.d[k], IDX_NONE);
-        } else {
-            tileIdx.d[k] = IDX_NONE;
+    // Номера одни на весь документ: переставляются во всех слоях и кадрах.
+    forEachCel([&](Grid<Color>& img, Grid<PalIndex>& idx) {
+        for (std::size_t k = 0; k < img.d.size(); ++k) {
+            const PalIndex v = idx.d[k];
+            if (v == IDX_NONE) continue;
+            const int nv = newIndex(v);
+            if (nv >= 0) {
+                idx.d[k] = static_cast<PalIndex>(nv);
+            } else if (strict) {
+                // Ячейки больше нет: в строгом режиме точка берёт ближайшую.
+                idx.d[k] = resolveIndex(img.d[k], IDX_NONE);
+            } else {
+                idx.d[k] = IDX_NONE;
+            }
+            if (strict) img.d[k] = effectiveColor(idx.d[k]);
         }
-        if (strict) tile.d[k] = effectiveColor(tileIdx.d[k]);
-    }
+    });
     auto remapWorking = [&](PalIndex& idx, Color& c) {
         const int n = newIndex(idx);
         if (n >= 0) {
@@ -238,8 +241,14 @@ void Model::adjustPaletteEntries(int from, int to, int dh, int ds, int dv) {
         const Color now = pal::adjustHSV(old, dh, ds, dv);
         palette[static_cast<std::size_t>(k)] = now;
         // Точки ячейки перекрашиваются вместе с ней — так меняют тон целого
-        // набора тайлов одной правкой палитры.
-        recolorPaletteEntry(static_cast<PalIndex>(k), old, now);
+        // набора тайлов одной правкой палитры, во всех слоях и кадрах.
+        const auto pk = static_cast<PalIndex>(k);
+        forEachCel([&](Grid<Color>& img, const Grid<PalIndex>& idx) {
+            for (std::size_t q = 0; q < img.d.size(); ++q) {
+                if (idx.d[q] == pk && sameRGB(img.d[q], old))
+                    img.d[q] = argb(img.d[q].a, now.r, now.g, now.b);
+            }
+        });
         if (firstIdx == k) firstColor = argb(firstColor.a, now.r, now.g, now.b);
         if (secondIdx == k) secondColor = argb(secondColor.a, now.r, now.g, now.b);
     }
@@ -293,10 +302,12 @@ void Model::setTransparentIndex(PalIndex idx) {
     pushUndo();
     transparentIdx = idx;
     // Точки прежнего прозрачного номера снова видны, нового — пропадают.
-    if (indexedOn && tileIdx.sameSize(tile.w, tile.h)) {
-        for (std::size_t k = 0; k < tile.d.size(); ++k) {
-            if (tileIdx.d[k] != IDX_NONE) tile.d[k] = effectiveColor(tileIdx.d[k]);
-        }
+    if (indexedOn) {
+        forEachCel([this](Grid<Color>& img, const Grid<PalIndex>& cel) {
+            for (std::size_t k = 0; k < img.d.size(); ++k) {
+                if (cel.d[k] != IDX_NONE) img.d[k] = effectiveColor(cel.d[k]);
+            }
+        });
     }
     tileBmpDirty = true;
     overDirty = true;
@@ -305,9 +316,11 @@ void Model::setTransparentIndex(PalIndex idx) {
 
 int Model::unmatchedPixelCount() const {
     int n = 0;
-    for (const Color c : tile.d) {
-        if (c.a != 0 && indexOfColor(c) == IDX_NONE) ++n;
-    }
+    forEachCelConst([&](const Grid<Color>& g) {
+        for (const Color c : g.d) {
+            if (c.a != 0 && indexOfColor(c) == IDX_NONE) ++n;
+        }
+    });
     return n;
 }
 
@@ -316,21 +329,24 @@ int Model::enableIndexed(bool addMissing) {
     pushUndo();
     if (addMissing) {
         std::vector<Color> np = palette;
-        for (const Color c : tile.d) {
-            if (c.a == 0 || static_cast<int>(np.size()) >= pal::MAX_PALETTE) continue;
-            const bool have =
-                std::any_of(np.begin(), np.end(), [&](Color p) { return sameRGB(p, c); });
-            if (!have) np.push_back(argb(255, c.r, c.g, c.b));
-        }
+        forEachCelConst([&](const Grid<Color>& g) {
+            for (const Color c : g.d) {
+                if (c.a == 0 || static_cast<int>(np.size()) >= pal::MAX_PALETTE) continue;
+                const bool have =
+                    std::any_of(np.begin(), np.end(), [&](Color p) { return sameRGB(p, c); });
+                if (!have) np.push_back(argb(255, c.r, c.g, c.b));
+            }
+        });
         palette = std::move(np);
     }
     indexedOn = true;
-    rebindTileToPalette();
-    const Grid<Color> before = tile;
-    enforceIndexed();
+    // Привязка и сведение к палитре — во всех слоях и кадрах.
     int changed = 0;
-    for (std::size_t k = 0; k < tile.d.size(); ++k)
-        changed += tile.d[k] == before.d[k] ? 0 : 1;
+    forEachCel([&](Grid<Color>& img, Grid<PalIndex>& idx) {
+        for (std::size_t k = 0; k < img.d.size(); ++k)
+            idx.d[k] = indexOfColor(img.d[k]);
+        changed += enforceGrid(img, idx);
+    });
     firstIdx = resolveIndex(firstColor, indexOfColor(firstColor));
     secondIdx = resolveIndex(secondColor, indexOfColor(secondColor));
     tileBmpDirty = true;
@@ -339,26 +355,32 @@ int Model::enableIndexed(bool addMissing) {
     return changed;
 }
 
-void Model::enforceIndexed() {
-    if (!strictIndexedOn() || tile.empty() || palette.empty()) return;
-    ensureTileIdx();
-    bool changed = false;
-    for (std::size_t k = 0; k < tile.d.size(); ++k) {
-        PalIndex v = tileIdx.d[k];
+int Model::enforceGrid(Grid<Color>& img, Grid<PalIndex>& idx) const {
+    if (palette.empty()) return 0;
+    if (!idx.sameSize(img.w, img.h)) idx.resize(img.w, img.h, IDX_NONE);
+    int changed = 0;
+    for (std::size_t k = 0; k < img.d.size(); ++k) {
+        PalIndex v = idx.d[k];
         if (v == IDX_NONE || v >= palette.size()) {
             // Прозрачная точка без прозрачного номера остаётся свободной:
             // она ничего не рисует, и номер ей не нужен.
-            if (tile.d[k].a == 0 && transparentIdx == IDX_NONE) continue;
-            v = resolveIndex(tile.d[k], IDX_NONE);
-            tileIdx.d[k] = v;
+            if (img.d[k].a == 0 && transparentIdx == IDX_NONE) continue;
+            v = resolveIndex(img.d[k], IDX_NONE);
+            idx.d[k] = v;
         }
         const Color e = effectiveColor(v);
-        if (tile.d[k] != e) {
-            tile.d[k] = e;
-            changed = true;
+        if (img.d[k] != e) {
+            img.d[k] = e;
+            ++changed;
         }
     }
-    if (changed) {
+    return changed;
+}
+
+void Model::enforceIndexed() {
+    if (!strictIndexedOn() || tile.empty() || palette.empty()) return;
+    ensureTileIdx();
+    if (enforceGrid(tile, tileIdx) > 0) {
         tileBmpDirty = true;
         overDirty = true;
     }

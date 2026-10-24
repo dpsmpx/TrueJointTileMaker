@@ -11,7 +11,7 @@
 | --- | --- |
 | `pascal/` | оригинал на PascalABC.NET, эталон |
 | `CMakeLists.txt`, `CMakePresets.json` | сборка переноса |
-| `src/core/` | ядро без SDL: цвет, настройки, карты, логика редактора (`Model`), PNG и deflate; `imageops`, `palette`, `model_pro.cpp`, `model_pal.cpp` — этапы RoadToProLevel ([roadmap.md](roadmap.md)) |
+| `src/core/` | ядро без SDL: цвет, настройки, карты, логика редактора (`Model`), PNG и deflate; `imageops`, `palette`, `sprite.h`, `project`, `model_pro.cpp`, `model_pal.cpp`, `model_doc.cpp` — этапы RoadToProLevel ([roadmap.md](roadmap.md)) |
 | `src/gfx/` | программный кадр с примитивами GraphABC и шрифт |
 | `src/platform/` | окно, ввод, диалоги файлов, буфер обмена — всё, что знает об SDL3 |
 | `src/app/` | редактор: холст, панель, инструменты, экраны; имена процедур — как в `TJTM.pas` |

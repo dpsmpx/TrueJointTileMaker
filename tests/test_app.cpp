@@ -15,7 +15,9 @@
 #include <string>
 #include <vector>
 
+#include "core/model.h"
 #include "core/png.h"
+#include "core/project.h"
 
 namespace fs = std::filesystem;
 
@@ -142,6 +144,56 @@ TEST(AppScreens, MenuScenarioRuns) {
          {"01_menu", "03_settings", "04_help", "05_colorops", "06_tileset", "07_new"}) {
         EXPECT_TRUE(fs::exists(base / "shots" / (std::string(shot) + ".png"))) << shot;
     }
+    fs::remove_all(base);
+}
+
+/// Этап 3: «Сохранить как» с расширением .tjt пишет проект, «Загрузить
+/// файл» открывает его обратно поверх испорченного рисунка.
+TEST(AppScreens, ProjectSaveAndReopen) {
+    const fs::path base = makeBase("tjt");
+    const fs::path project = base / "sprite.tjt";
+    const fs::path answers = base / "dialogs.txt";
+    {
+        std::ofstream f(answers, std::ios::binary);
+        f << project.string() << "\n" << project.string() << "\n";
+    }
+#ifdef _WIN32
+    _putenv_s("TJTM_TEST_DIALOGS", answers.string().c_str());
+#else
+    setenv("TJTM_TEST_DIALOGS", answers.string().c_str(), 1);
+#endif
+    const bool ran = runScenario("tjt", base);
+#ifdef _WIN32
+    _putenv_s("TJTM_TEST_DIALOGS", "");
+#else
+    unsetenv("TJTM_TEST_DIALOGS");
+#endif
+    ASSERT_TRUE(ran);
+
+    std::ifstream in(project, std::ios::binary);
+    ASSERT_TRUE(in.good()) << "проект не записан";
+    const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(in)),
+                                          std::istreambuf_iterator<char>());
+    EXPECT_TRUE(tjtm::isProjectFile(bytes));
+    tjtm::Model m;
+    std::string err;
+    ASSERT_TRUE(tjtm::projectDecode(bytes, m, err)) << err;
+
+    std::map<std::string, tjtm::Grid<tjtm::Color>> shots;
+    for (const char* name : {"01_drawn", "02_reopened"}) {
+        tjtm::Grid<tjtm::Color> g;
+        ASSERT_TRUE(tjtm::pngLoad((base / "shots" / (std::string(name) + ".png")).string(), g, err))
+            << name << ": " << err;
+        shots.emplace(name, std::move(g));
+    }
+    // Холст до сохранения и после открытия: панель справа пишет имя файла
+    // и в сравнение не входит.
+    int bad = 0;
+    for (int y = 0; y < tjtm::CANVAS_H; ++y)
+        for (int x = 0; x < tjtm::CANVAS_W; ++x)
+            if (shots.at("01_drawn").at(x, y).argb() != shots.at("02_reopened").at(x, y).argb())
+                ++bad;
+    EXPECT_EQ(bad, 0);
     fs::remove_all(base);
 }
 

@@ -320,8 +320,11 @@ void Model::transformImage(int op) {
         needRepaint = true;
         return;
     }
-    tile = applyTf(tile, op);
-    tileIdx = applyTf(tileIdx, op);
+    // Вся картинка — это все слои и кадры: поворачивается спрайт целиком.
+    forEachCel([op](Grid<Color>& img, Grid<PalIndex>& idx) {
+        img = applyTf(img, op);
+        idx = applyTf(idx, op);
+    });
     afterResize(*this);
 }
 
@@ -329,9 +332,10 @@ bool Model::scaleImageTo(int nw, int nh) {
     if (docMode != DOC_TILE || tile.empty()) return false;
     if (nw < 1 || nh < 1 || nw > MAX_TILE || nh > MAX_TILE) return false;
     pushUndo();
-    ensureTileIdx();
-    tile = img::scaleNearest(tile, nw, nh);
-    tileIdx = img::scaleNearest(tileIdx, nw, nh);
+    forEachCel([nw, nh](Grid<Color>& img, Grid<PalIndex>& idx) {
+        img = img::scaleNearest(img, nw, nh);
+        idx = img::scaleNearest(idx, nw, nh);
+    });
     afterResize(*this);
     return true;
 }
@@ -358,25 +362,38 @@ bool Model::cropToSelection() {
     if (docMode != DOC_TILE || !hasSelection || selW < 1 || selH < 1) return false;
     if (selW == tile.w && selH == tile.h) return false;
     pushUndo();
-    ensureTileIdx();
-    tile = img::crop(tile, selX, selY, selW, selH, kClear);
-    tileIdx = img::crop(tileIdx, selX, selY, selW, selH, IDX_NONE);
+    const int x = selX;
+    const int y = selY;
+    const int w = selW;
+    const int h = selH;
+    forEachCel([=](Grid<Color>& img, Grid<PalIndex>& idx) {
+        img = img::crop(img, x, y, w, h, kClear);
+        idx = img::crop(idx, x, y, w, h, IDX_NONE);
+    });
     afterResize(*this);
     return true;
 }
 
 bool Model::cropToContent() {
     if (docMode != DOC_TILE) return false;
+    // Содержимое — всех слоёв и кадров: обрезка не должна срезать то, что
+    // нарисовано в другом кадре.
+    Grid<std::uint8_t> any(tile.w, tile.h, 0);
+    forEachCelConst([&](const Grid<Color>& g) {
+        for (std::size_t k = 0; k < g.d.size() && k < any.d.size(); ++k)
+            if (g.d[k].a != 0) any.d[k] = 1;
+    });
     int x = 0;
     int y = 0;
     int w = 0;
     int h = 0;
-    if (!img::contentBounds(tile, x, y, w, h)) return false;
+    if (!img::maskBounds(any, x, y, w, h)) return false;
     if (x == 0 && y == 0 && w == tile.w && h == tile.h) return false;
     pushUndo();
-    ensureTileIdx();
-    tile = img::crop(tile, x, y, w, h, kClear);
-    tileIdx = img::crop(tileIdx, x, y, w, h, IDX_NONE);
+    forEachCel([=](Grid<Color>& img, Grid<PalIndex>& idx) {
+        img = img::crop(img, x, y, w, h, kClear);
+        idx = img::crop(idx, x, y, w, h, IDX_NONE);
+    });
     afterResize(*this);
     return true;
 }
@@ -386,11 +403,17 @@ bool Model::resizeCanvas(int nw, int nh, int anchorX, int anchorY) {
     if (nw < MIN_TILE || nh < MIN_TILE || nw > MAX_TILE || nh > MAX_TILE) return false;
     if (nw == tile.w && nh == tile.h) return false;
     pushUndo();
-    ensureTileIdx();
     const Color blank = blankColor();
     const PalIndex bi = blank.a == 0 ? IDX_NONE : indexOfColor(blank);
-    tile = img::resizeCanvas(tile, nw, nh, anchorX, anchorY, blank);
-    tileIdx = img::resizeCanvas(tileIdx, nw, nh, anchorX, anchorY, bi);
+    // У слоёв новое место пустое: белый холст верхнего слоя закрыл бы всё
+    // под ним. Фон документа — только у картинки из одного слоя.
+    const bool single = doc.layerCount() <= 1;
+    const Color fill = single ? blank : kClear;
+    const PalIndex fillIdx = single ? bi : IDX_NONE;
+    forEachCel([&](Grid<Color>& img, Grid<PalIndex>& idx) {
+        img = img::resizeCanvas(img, nw, nh, anchorX, anchorY, fill);
+        idx = img::resizeCanvas(idx, nw, nh, anchorX, anchorY, fillIdx);
+    });
     afterResize(*this);
     return true;
 }
@@ -398,9 +421,10 @@ bool Model::resizeCanvas(int nw, int nh, int anchorX, int anchorY) {
 void Model::offsetImage(int dx, int dy) {
     if (docMode != DOC_TILE || tile.empty() || (dx == 0 && dy == 0)) return;
     pushUndo();
-    ensureTileIdx();
-    tile = img::offsetWrap(tile, dx, dy);
-    tileIdx = img::offsetWrap(tileIdx, dx, dy);
+    forEachCel([dx, dy](Grid<Color>& img, Grid<PalIndex>& idx) {
+        img = img::offsetWrap(img, dx, dy);
+        idx = img::offsetWrap(idx, dx, dy);
+    });
     resetSelection();
     tileBmpDirty = true;
     needRepaint = true;

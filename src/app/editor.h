@@ -169,6 +169,7 @@ private:
     std::string mapsDir() const;
     bool readImageGrid(const std::string& path, Grid<Color>& g, bool quiet);
     bool loadTileFrom(const std::string& path, bool quiet, bool remember);
+    bool saveProjectTo(const std::string& path);
     bool saveTileTo(const std::string& path);
     bool saveGridTo(const Grid<Color>& g, const std::string& path);
     bool loadPaletteFrom(const std::string& path, bool quiet);

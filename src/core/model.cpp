@@ -392,7 +392,8 @@ void Model::pushUndo() {
         // Снимок берётся перед изменением, поэтому пометка здесь накрывает
         // любую отменяемую правку тайла разом.
         tileBmpDirty = true;
-        undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx});
+        undoStack.push_back(
+            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
         while (undoStack.size() > limit)
             undoStack.erase(undoStack.begin());
         redoStack.clear();
@@ -409,13 +410,17 @@ void Model::doUndo() {
     } else {
         if (undoStack.empty()) return;
         ensureTileIdx();
-        redoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx});
+        redoStack.push_back(
+            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
         TileSnapshot s = std::move(undoStack.back());
         undoStack.pop_back();
         tile = std::move(s.tile);
         tileIdx = std::move(s.idx);
         palette = std::move(s.palette);
         transparentIdx = s.transparentIdx;
+        doc = std::move(s.doc);
+        activeLayer = s.layer;
+        activeFrame = s.frame;
         ensureTileIdx();
     }
     resetSelection();
@@ -434,13 +439,17 @@ void Model::doRedo() {
     } else {
         if (redoStack.empty()) return;
         ensureTileIdx();
-        undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx});
+        undoStack.push_back(
+            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
         TileSnapshot s = std::move(redoStack.back());
         redoStack.pop_back();
         tile = std::move(s.tile);
         tileIdx = std::move(s.idx);
         palette = std::move(s.palette);
         transparentIdx = s.transparentIdx;
+        doc = std::move(s.doc);
+        activeLayer = s.layer;
+        activeFrame = s.frame;
         ensureTileIdx();
     }
     resetSelection();
@@ -454,6 +463,7 @@ void Model::doRedo() {
 
 void Model::setTile(Grid<Color> newTile, const std::string& fileName) {
     tile = std::move(newTile);
+    resetDoc();
     tileBmpDirty = true;
     // Открытый файл ничего не знает о палитре, поэтому привязки выводятся
     // из его же цветов: совпал с ячейкой — значит, ею и управляется.
@@ -500,7 +510,9 @@ Color Model::checkerColor(int x, int y) const {
 }
 
 Color Model::displayColor(int x, int y) const {
-    Color c = tile.at(x, y);
+    // Слои и кадры показываются сведением; документ из одной картинки —
+    // как в оригинале, прямо из tile.
+    Color c = (multiCel() || onionSkin) ? viewColorAt(x, y) : tile.at(x, y);
     if (checkerOn && c.a < 255) c = blendOver(c, checkerColor(x, y));
     return c;
 }
@@ -547,6 +559,9 @@ void Model::paintOne(int x, int y) {
     }
     if (!tile.inside(x, y)) return;
     if (clipToSelection && hasSelection && !isSelected(x, y)) return;
+    // Скрытый или запертый слой не правится: рисунок на невидимом слое —
+    // всегда ошибка.
+    if (!activeLayerEditable()) return;
     if (strokeMask.sameSize(tile.w, tile.h)) {
         if (strokeMask.at(x, y) != 0) return;
         strokeMask.at(x, y) = 1;
@@ -701,6 +716,7 @@ void Model::floodFillTile(int sx, int sy, Color newColor) {
     if (!tile.inside(sx, sy)) return;
     const bool clip = clipToSelection && hasSelection;
     if (clip && !isSelected(sx, sy)) return;
+    if (!activeLayerEditable()) return;
     const Color target = tile.at(sx, sy);
     if (sameColor(target, newColor)) return;
     // Привязка одна на всю заливку: палитра просматривается раз.
@@ -1139,8 +1155,11 @@ std::vector<std::uint8_t> Model::buildOverviewRaw() const {
         for (int x = 0; x < pw; ++x) {
             const int sx = clampI(x * docW() / pw, 0, docW() - 1);
             const int sy = clampI(y * docH() / ph, 0, docH() - 1);
-            const Color c = docMode == DOC_MAP ? mapTileColor(map.at(sx, sy))
-                                               : blendOver(tile.at(sx, sy), checkerColor(sx, sy));
+            const Color c =
+                docMode == DOC_MAP
+                    ? mapTileColor(map.at(sx, sy))
+                    : blendOver(multiCel() ? compositeAt(activeFrame, sx, sy) : tile.at(sx, sy),
+                                checkerColor(sx, sy));
             putBgra(raw,
                     (static_cast<std::size_t>(y) * static_cast<std::size_t>(pw) +
                      static_cast<std::size_t>(x)) *

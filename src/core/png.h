@@ -39,6 +39,19 @@ bool pngDecode(const std::vector<std::uint8_t>& file, Grid<Color>& out, std::str
 /// Пишет 8-битный RGBA PNG.
 std::vector<std::uint8_t> pngEncode(const Grid<Color>& img, int level = 9);
 
+/// Свой кусок PNG: тип из четырёх латинских букв и данные.
+struct PngChunk {
+    std::string type;
+    std::vector<std::uint8_t> data;
+};
+/// PNG с дополнительными кусками после картинки (перед IEND). Просмотрщики
+/// пропускают незнакомые служебные куски, поэтому файл остаётся картинкой.
+std::vector<std::uint8_t> pngEncodeWith(const Grid<Color>& img, const std::vector<PngChunk>& extra,
+                                        int level = 9);
+/// Данные первого куска такого типа с верной контрольной суммой.
+bool pngFindChunk(const std::vector<std::uint8_t>& file, const std::string& type,
+                  std::vector<std::uint8_t>& data);
+
 bool pngLoad(const std::string& path, Grid<Color>& out, std::string& error);
 bool pngSave(const std::string& path, const Grid<Color>& img, std::string& error);
 

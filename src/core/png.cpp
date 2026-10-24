@@ -492,11 +492,38 @@ bool pngDecode(const std::vector<std::uint8_t>& file, Grid<Color>& out, std::str
 }
 
 std::vector<std::uint8_t> pngEncode(const Grid<Color>& img, int level) {
+    return pngEncodeWith(img, {}, level);
+}
+
+std::vector<std::uint8_t> pngEncodeWith(const Grid<Color>& img, const std::vector<PngChunk>& extra,
+                                        int level) {
     std::vector<std::uint8_t> out(kSig.begin(), kSig.end());
     writeChunk(out, "IHDR", ihdr(img.w, img.h));
     writeChunk(out, "IDAT", zlibCompress(filteredRows(img), level));
+    for (const PngChunk& c : extra) {
+        if (c.type.size() == 4) writeChunk(out, c.type.c_str(), c.data);
+    }
     writeChunk(out, "IEND", {});
     return out;
+}
+
+bool pngFindChunk(const std::vector<std::uint8_t>& file, const std::string& type,
+                  std::vector<std::uint8_t>& data) {
+    if (file.size() < 8 || std::memcmp(file.data(), kSig.data(), 8) != 0) return false;
+    std::size_t pos = 8;
+    while (pos + 12 <= file.size()) {
+        const std::uint32_t len = be32(file.data() + pos);
+        if (len > file.size() - pos - 12) return false;
+        const bool match = std::memcmp(file.data() + pos + 4, type.data(), 4) == 0;
+        const std::uint32_t crc = be32(file.data() + pos + 8 + len);
+        if (match && crc32(file.data() + pos + 4, len + 4) == crc) {
+            data.assign(file.begin() + static_cast<std::ptrdiff_t>(pos + 8),
+                        file.begin() + static_cast<std::ptrdiff_t>(pos + 8 + len));
+            return true;
+        }
+        pos += 12 + len;
+    }
+    return false;
 }
 
 bool pngLoad(const std::string& path, Grid<Color>& out, std::string& error) {
