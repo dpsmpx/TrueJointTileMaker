@@ -28,7 +28,7 @@ namespace tjtm {
 inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — когда пройдены все четыре.
-inline constexpr const char* kAppVersion = "0.7.0";
+inline constexpr const char* kAppVersion = "0.8.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -96,6 +96,12 @@ inline constexpr int T_PEN = 0, T_ERASER = 1, T_FILL = 2, T_PICK = 3, T_LINE = 4
                      T_ELLIPSE = 6, T_DITHER = 7, T_SELECT = 8, T_TILE_COUNT = 9;
 inline constexpr int M_PAINT = 0, M_FILL = 1, M_RECT = 2, M_OBJ = 3, M_SELECT = 4, T_MAP_COUNT = 5;
 inline constexpr int DOC_TILE = 0, DOC_MAP = 1;
+
+/// Преобразования картинки или содержимого выделения (этап 1).
+inline constexpr int TF_FLIP_H = 0, TF_FLIP_V = 1, TF_ROT90 = 2, TF_ROT180 = 3, TF_ROT270 = 4;
+/// Вид выделения: рамка, овал, лассо, волшебная палочка, по цвету.
+inline constexpr int SS_RECT = 0, SS_ELLIPSE = 1, SS_LASSO = 2, SS_WAND = 3, SS_COLOR = 4,
+                     SS_COUNT = 5;
 
 inline constexpr int MIN_ZOOM = 1;
 inline constexpr int MAX_ZOOM = 64;
@@ -194,6 +200,39 @@ public:
     /// Кисть пишет цвет поверх, не смешивая. Ластик всегда работает так.
     bool brushReplace = false;
 
+    // --- этап 1 RoadToProLevel ---
+    //
+    // Значения по умолчанию — поведение оригинала: на них стоят эталонные
+    // тесты 0.6.0. Окно включает новое при запуске (Editor::appInit).
+
+    /// Маска выделения размером с документ. Пустая — выделение
+    /// прямоугольное (selX, selY, selW, selH) или его нет: рамка остаётся
+    /// рамкой, и путь оригинала для неё не меняется.
+    Grid<std::uint8_t> selMask;
+    /// Последнее снятое выделение — для «Вернуть выделение».
+    Grid<std::uint8_t> lastSelMask;
+    /// Кисть, фигуры и заливка не выходят за выделение. В оригинале
+    /// выделение рисование не ограничивало.
+    bool clipToSelection = false;
+    /// «Новый» и «Очистить» дают прозрачный холст, а не белый.
+    bool transparentBlank = false;
+    /// Мазок без углов «Г»: карандаш, ластик и узор.
+    bool pixelPerfect = false;
+    /// Узор инструмента «Узор»; 0 — шахматка оригинала.
+    int ditherPattern = 0;
+    /// Оси симметрии в половинах точки: зеркало x — это axis - 1 - x.
+    /// -1 — середина документа, как в оригинале.
+    int symAxisX2 = -1, symAxisY2 = -1;
+    /// Вид выделения и действие по умолчанию (img::SelOp).
+    int selShape = SS_RECT;
+    int selOp = 0;
+    /// Вставленное «плавает»: пока картинку и выделение после вставки
+    /// никто не трогал, повторное вынимание возвращает то, что было под
+    /// вставкой, а не прозрачность. Проверка — сравнением с результатом.
+    Grid<Color> floatUnder, floatResult;
+    Grid<PalIndex> floatUnderIdx;
+    Grid<std::uint8_t> floatSel;
+
     Color firstColor = argb(255, 0, 0, 0);
     Color secondColor = argb(255, 255, 255, 255);
     /// Ячейки палитры, из которых взяты рабочие цвета: IDX_NONE или
@@ -219,6 +258,12 @@ public:
     /// Маска текущего штриха: пиксель закрашивается не больше раза,
     /// иначе полупрозрачная кисть накладывалась бы сама на себя.
     Grid<std::uint8_t> strokeMask;
+    /// Мазок «пиксель-перфект»: его точки по порядку и картинка до него —
+    /// из неё возвращается точка, оказавшаяся углом «Г».
+    std::vector<std::pair<int, int>> strokePts;
+    Grid<Color> strokeBase;
+    Grid<PalIndex> strokeBaseIdx;
+    bool strokeActive = false;
 
     // Признаки для отрисовки: что пересобрать в следующем кадре.
     bool tileBmpDirty = true;
@@ -296,6 +341,9 @@ public:
     void putMapOne(int x, int y);
     void putMapCell(int x, int y);
     void emitPixel(int x, int y);
+    /// Точка мазка «пиксель-перфект»: ставится, и если с двумя прежними
+    /// она образует угол «Г», средняя возвращается к тому, что было до мазка.
+    void emitPixelPerfect(int x, int y);
     /// Начало и конец штриха: маска размером с документ.
     void beginStroke();
     void endStroke();
@@ -367,6 +415,65 @@ public:
     bool overviewViewport(int& vx0, int& vy0, int& vx1, int& vy1) const;
     /// Картинка тайла с шахматкой под прозрачным, BGRA с прямой альфой.
     std::vector<std::uint8_t> tileBmpRaw() const;
+
+    // --- симметрия ---
+    int mirrorX(int x) const;
+    int mirrorY(int y) const;
+    /// Ось там, где её рисовать на холсте, в половинах точки.
+    int axisX2() const { return symAxisX2 < 0 ? docW() : symAxisX2; }
+    int axisY2() const { return symAxisY2 < 0 ? docH() : symAxisY2; }
+
+    // --- выделение произвольной формы (этап 1) ---
+    bool isSelected(int x, int y) const;
+    /// Маска выделения размером с документ, из рамки или из selMask.
+    Grid<std::uint8_t> selectionMask() const;
+    /// Принять маску как выделение: рамка пересчитывается, прямоугольная
+    /// маска хранится рамкой. Пустая маска снимает выделение.
+    void setSelectionMask(const Grid<std::uint8_t>& mask);
+    /// Сочетать новую область с выделением (img::SelOp).
+    void applySelection(const Grid<std::uint8_t>& mask, int op);
+    void selectAll();
+    /// Снять выделение, запомнив его для reselect.
+    void deselect();
+    void invertSelection();
+    bool reselect();
+    void growSelection(int n);
+    void selectByColorAt(int x, int y, bool contiguous, int op);
+    void selectOpaque(int op);
+    /// Содержимое выделения в его рамке; невыделенное — прозрачное.
+    Grid<Color> selectionContent() const;
+    /// Скопировать содержимое выделения в буфер.
+    bool copySelection();
+    /// Выделенное — прозрачным (с отменой).
+    bool eraseSelection();
+    bool cutSelection();
+    /// Вставка, после которой вставленное выделено и его можно двигать.
+    void pasteAsSelection(int px, int py);
+    /// Вынуть содержимое выделения: картинка и маска в его рамке; при erase
+    /// исходное место становится прозрачным. Шаг истории — на вызывающем.
+    void liftSelection(bool erase, Grid<Color>& content, Grid<std::uint8_t>& mask);
+    /// Положить вынутое в (px, py) и выделить его. Прозрачное не затирает
+    /// того, что под ним, — как вставка оригинала.
+    void placeFloating(const Grid<Color>& content, const Grid<std::uint8_t>& mask, int px, int py);
+    /// Залить выделение или, без выделения, всю картинку (с отменой).
+    void fillSelectionOrAll(Color c);
+    /// Цвет пустого холста: прозрачный или белый оригинала.
+    Color blankColor() const;
+
+    // --- преобразования (этап 1) ---
+    /// Отражение или поворот: содержимого выделения, а без него — всей
+    /// картинки. Поворот всей картинки меняет её стороны местами.
+    void transformImage(int op);
+    /// Масштаб ближайшим соседом в num/den: содержимого выделения от его
+    /// левого верхнего угла или всей картинки. false — размер вне пределов.
+    bool scaleBy(int num, int den);
+    bool scaleImageTo(int nw, int nh);
+    bool cropToSelection();
+    bool cropToContent();
+    bool resizeCanvas(int nw, int nh, int anchorX, int anchorY);
+    void offsetImage(int dx, int dy);
+    int outlineImage(Color c, bool eightWay, bool outside);
+    int removeIsolatedPixels();
 
     // --- карта и набор тайлов ---
     /// Файл тайла, которым нарисована клетка карты, без расширения.

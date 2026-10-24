@@ -45,8 +45,15 @@ SOURCES=()
 for f in "${FILES[@]}"; do
     case "$f" in *.cpp) SOURCES+=("$f") ;; esac
 done
+# Файлы проверяются параллельно (run-clang-tidy): по одному проверка всего
+# проекта шла десяток минут.
 if [ "${#SOURCES[@]}" -gt 0 ]; then
-    clang-tidy -p build/debug --quiet "${SOURCES[@]}" 2>/dev/null | grep -E "warning:|error:" && status=1
+    if command -v run-clang-tidy >/dev/null 2>&1; then
+        run-clang-tidy -p build/debug -quiet -j "$(nproc)" "${SOURCES[@]}" 2>/dev/null |
+            grep -E "^/.*(warning|error):" | sort -u && status=1
+    else
+        clang-tidy -p build/debug --quiet "${SOURCES[@]}" 2>/dev/null | grep -E "warning:|error:" && status=1
+    fi
 fi
 
 echo "== cppcheck"

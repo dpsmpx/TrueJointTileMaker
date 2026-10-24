@@ -50,6 +50,7 @@ private:
     void pause(double seconds);
     void push(ScriptEvent e);
     bool key(const std::string& name, std::string& error);
+    bool hold(const std::string& name, bool down, std::string& error);
 };
 
 /// Код клавиши SDL по имени xdotool (Escape, Return, g, ctrl+z) и

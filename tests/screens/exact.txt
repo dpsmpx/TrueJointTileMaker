@@ -54,3 +54,9 @@ mapedit    04_redo_fit 456    0  144  560
 mapedit    04_redo_fit 300    0  156  245
 mapedit    04_redo_fit 300  305  156  255
 mapedit    04_redo_fit 640  382  100  100
+# Этап 1 RoadToProLevel — эталон со снимков переноса (tools/port-golden.sh).
+pro1       01_mask     0    0  600  560
+pro1       02_moved    0    0  600  560
+pro1       03_rotated  0    0  600  560
+pro1       04_strokes  0    0  600  560
+pro1       05_cropped  0    0  600  560

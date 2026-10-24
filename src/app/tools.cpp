@@ -158,6 +158,12 @@ void Editor::dragSelection(int mx, int my) {
 }
 
 void Editor::doSelectTool(int mx, int my) {
+    // В режиме тайла — выделение этапа 1: формы, сочетания, перенос.
+    // Карта выделяет рамкой, как оригинал.
+    if (m.docMode == DOC_TILE) {
+        selectToolPro(mx, my);
+        return;
+    }
     if (m.hasSelection && m.selW > 0 && m.selH > 0 && mx >= m.selX && mx < m.selX + m.selW &&
         my >= m.selY && my < m.selY + m.selH) {
         dragSelection(mx, my);
@@ -325,17 +331,17 @@ void Editor::handleCanvasClick() {
         return;
     }
     if (!m.inDoc(mx, my)) {
-        if (m.hasSelection) {
-            m.resetSelection();
-            m.needRepaint = true;
-        }
+        // Снятое щелчком мимо выделение можно вернуть: Ctrl+Shift+D.
+        if (m.hasSelection) m.deselect();
         return;
     }
     if (m.docMode == DOC_MAP) {
         handleMapCanvas(mx, my);
         return;
     }
-    if (frameClickButton_ == MB_RIGHT || isKeyPressed(KEY_ALT) || m.toolTile == T_PICK) {
+    // Alt у выделения вычитает из него, а не берёт цвет.
+    if (frameClickButton_ == MB_RIGHT || (isKeyPressed(KEY_ALT) && m.toolTile != T_SELECT) ||
+        m.toolTile == T_PICK) {
         m.pickColorFromTile(mx, my);
         return;
     }
@@ -441,7 +447,14 @@ void Editor::handlePanelClick() {
     const int py = frameClickY_;
     int idx = 0;
     if (py >= TOOLS_Y0 && py < TOOLS_Y1) {
-        if (m.toolHit(frameClickX_, frameClickY_, idx)) m.setTool(idx);
+        if (m.toolHit(frameClickX_, frameClickY_, idx)) {
+            m.setTool(idx);
+            // Правая кнопка по инструменту тайла — его параметры.
+            if (m.docMode == DOC_TILE && frameClickButton_ == MB_RIGHT) showToolOptions();
+        } else if (m.docMode == DOC_TILE) {
+            const int chip = chipHit(frameClickX_, frameClickY_);
+            if (chip >= 0) handleChipClick(chip);
+        }
     } else if (py >= OVER_Y0 && py < OVER_Y1) {
         if (isMiddle(frameClickButton_)) {
             doOverviewDrag();
@@ -489,6 +502,7 @@ void Editor::handlePanelClick() {
 // ---------------------------------------------------------------------------
 
 void Editor::handleEditorKey(int key) {
+    if (handleProKey(key)) return;
     const int step = std::max(1, m.pixelSize * 4);
     const bool tile = m.docMode == DOC_TILE;
     switch (key) {

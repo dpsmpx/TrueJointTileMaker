@@ -72,6 +72,10 @@ bool scriptKey(const std::string& name, int& scancode, int& mod) {
         rest = rest.substr(p + 1);
     }
     if (rest == "plus") m |= SDL_KMOD_LSHIFT;
+    // Сам модификатор по имени xdotool — для keydown shift.
+    if (rest == "shift") rest = "Left Shift";
+    if (rest == "ctrl") rest = "Left Ctrl";
+    if (rest == "alt") rest = "Left Alt";
     const char* alias = sdlKeyName(rest);
     const SDL_Scancode sc = SDL_GetScancodeFromName(alias != nullptr ? alias : rest.c_str());
     if (sc == SDL_SCANCODE_UNKNOWN) return false;
@@ -115,11 +119,44 @@ bool Script::key(const std::string& name, std::string& error) {
         error = "неизвестная клавиша «" + name + "»";
         return false;
     }
+    // Модификаторы — отдельными нажатиями вокруг клавиши, как их шлёт
+    // xdotool: программа узнаёт о Ctrl по удерживаемой клавише, а не по
+    // флагам самого нажатия.
+    static const struct {
+        int mod;
+        SDL_Scancode sc;
+    } kMods[] = {{SDL_KMOD_LCTRL, SDL_SCANCODE_LCTRL},
+                 {SDL_KMOD_LSHIFT, SDL_SCANCODE_LSHIFT},
+                 {SDL_KMOD_LALT, SDL_SCANCODE_LALT}};
+    auto modKeys = [&](ScriptEvent::Kind kind) {
+        for (const auto& km : kMods) {
+            if ((e.mod & km.mod) == 0) continue;
+            ScriptEvent me;
+            me.kind = kind;
+            me.scancode = static_cast<int>(km.sc);
+            me.mod = e.mod;
+            push(me);
+        }
+    };
+    modKeys(ScriptEvent::KEY_DOWN);
     e.kind = ScriptEvent::KEY_DOWN;
     push(e);
     e.kind = ScriptEvent::KEY_UP;
     push(e);
+    modKeys(ScriptEvent::KEY_UP);
     pause(kAfterInput);
+    return true;
+}
+
+bool Script::hold(const std::string& name, bool down, std::string& error) {
+    ScriptEvent e;
+    if (!scriptKey(name, e.scancode, e.mod)) {
+        error = "неизвестная клавиша «" + name + "»";
+        return false;
+    }
+    e.kind = down ? ScriptEvent::KEY_DOWN : ScriptEvent::KEY_UP;
+    push(e);
+    pause(0.05);
     return true;
 }
 
@@ -156,6 +193,12 @@ bool Script::parse(const std::string& text, std::string& error) {
         } else if (cmd == "key") {
             for (const std::string& k : a) {
                 if (!key(k, error)) return fail(error);
+            }
+        } else if (cmd == "keydown" || cmd == "keyup") {
+            // Удержание для протяжки с модификатором: keydown shift, drag,
+            // keyup shift.
+            for (const std::string& k : a) {
+                if (!hold(k, cmd == "keydown", error)) return fail(error);
             }
         } else if (cmd == "move") {
             if (a.size() < 2) return fail("move X Y");

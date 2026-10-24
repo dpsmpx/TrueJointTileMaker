@@ -11,7 +11,7 @@
 #   tjtm_gfx  — программный кадр и примитивы GraphABC, текст через SDL3_ttf.
 #   tjtm      — сам редактор: окно, ввод, экраны.
 cmake_minimum_required(VERSION 3.24)
-project(TrueJointTileMaker VERSION 0.7.0 LANGUAGES C CXX)
+project(TrueJointTileMaker VERSION 0.8.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,8 +56,10 @@ add_library(tjtm_core STATIC
     src/core/color.cpp
     src/core/config.cpp
     src/core/fsutil.cpp
+    src/core/imageops.cpp
     src/core/mapdoc.cpp
     src/core/model.cpp
+    src/core/model_pro.cpp
     src/core/png.cpp
     src/core/text.cpp
     src/core/zlib.cpp
@@ -85,6 +87,7 @@ if(TJTM_BUILD_APP)
         src/app/main.cpp
         src/app/menu.cpp
         src/app/panel.cpp
+        src/app/pro.cpp
         src/app/screens.cpp
         src/app/tools.cpp
         src/app/ui.cpp

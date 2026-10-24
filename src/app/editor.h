@@ -100,6 +100,9 @@ private:
 
     // --- примитивы интерфейса ---
     bool uiButton(int x, int y, int bw, int bh, const std::string& caption, bool enabled);
+    bool uiToggle(int x, int y, int bw, int bh, const std::string& caption, bool on);
+    bool uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
+                    bool on);
     void uiLabel(int x, int y, int bw, int bh, const std::string& caption, Color c);
     void uiLabelLeft(int x, int y, int bh, const std::string& caption, Color c);
     void textCentered(int x0, int y0, int x1, int y1, const std::string& s, Color c);
@@ -222,6 +225,28 @@ private:
     void doOverviewDrag();
     void handlePanelClick();
     void handleEditorKey(int key);
+
+    // --- этап 1 RoadToProLevel (pro.cpp) ---
+    /// Три ячейки третьего ряда инструментов тайла: режим кисти,
+    /// «пиксель-перфект», параметры. Номер 0..2 или -1.
+    static int chipHit(int px, int py);
+    void drawToolChips();
+    void handleChipClick(int chip);
+    void selectToolPro(int mx, int my);
+    void defineSelectionPro(int ax, int ay, int op);
+    void moveSelectionPro(int mx, int my, bool copy);
+    void drawSelectionMask();
+    bool handleProKey(int key);
+    void showToolOptions();
+    void showImageScreen();
+    /// Два числа со ступенями ±1 и ±8; anchor — сетка якоря 3x3 (номер
+    /// ay * 3 + ax) или nullptr.
+    bool askTwoNumbers(const std::string& title, const std::string& hint, const std::string& label1,
+                       int& v1, int lo1, int hi1, const std::string& label2, int& v2, int lo2,
+                       int hi2, const std::string& okCaption, int* anchor);
+    /// Последняя разобранная клавиша с модификаторами в миг нажатия.
+    KeyPress lastKey_;
+    bool outlineEight_ = false;
 
     // --- запуск ---
     void initColorBars();

@@ -2,6 +2,7 @@
 // ползунка перерисовываются только полосы цвета, а не всё окно.
 
 #include <algorithm>
+#include <cstdio>
 
 #include "app/editor.h"
 #include "core/pmath.h"
@@ -91,6 +92,7 @@ void Editor::drawToolsSection() {
                          m.curTool() == i ? rgb(255, 255, 255) : cText);
         }
     }
+    drawToolChips();
 }
 
 void Editor::drawPaletteSection() {
@@ -233,14 +235,25 @@ void Editor::drawInfoSection() {
     const int tx = m.screenToTileX(mouseX());
     const int ty = m.screenToTileY(mouseY());
     std::string s;
+    std::string alpha;
     if (mouseX() < m.W && m.inDoc(tx, ty)) {
         s = std::to_string(tx) + " : " + std::to_string(ty);
-        if (m.docMode == DOC_MAP) s += "  " + mapTileName(m.map.at(tx, ty));
+        if (m.docMode == DOC_MAP) {
+            s += "  " + mapTileName(m.map.at(tx, ty));
+        } else {
+            // Цвет под курсором: пипеткой его не узнать, не потеряв
+            // рабочий, а знать его нужно часто.
+            const Color c = m.tile.at(tx, ty);
+            char hex[16];
+            std::snprintf(hex, sizeof hex, "  #%02X%02X%02X", c.r, c.g, c.b);
+            s += hex;
+            if (c.a < 255) alpha = "  α" + std::to_string(c.a);
+        }
     } else {
         s = "—";
     }
     s += "\n" + std::to_string(m.docW()) + "x" + std::to_string(m.docH()) + "  " +
-         std::to_string(m.pixelSize) + "x";
+         std::to_string(m.pixelSize) + "x" + alpha;
     if (m.docMode == DOC_MAP) s += "  объектов " + std::to_string(m.map.objects.size());
     uiLabel(PANEL_X + 46, INFO_Y0, PANEL_W - 48, INFO_Y1 - INFO_Y0, s, cText);
 }

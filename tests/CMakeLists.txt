@@ -20,6 +20,7 @@ endif()
 add_executable(tjtm_core_tests
     test_color.cpp
     test_config.cpp
+    test_imageops.cpp
     test_map.cpp
     test_model.cpp
     test_png.cpp

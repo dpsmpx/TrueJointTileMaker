@@ -106,6 +106,12 @@ bool Editor::appInit(int argc, char** argv) {
     m.seamlessOn = cfg.showSeamless;
     m.firstColor = argb(255, 0, 0, 0);
     m.secondColor = argb(255, 255, 255, 255);
+    // Этап 1 RoadToProLevel: карандаш пиксель-арта заменяет цвет, а не
+    // смешивает; новый и очищенный тайл прозрачен; кисть и заливка не
+    // выходят за выделение. Смешивание осталось — клавиша E.
+    m.brushReplace = true;
+    m.transparentBlank = true;
+    m.clipToSelection = true;
     m.syncHSVFromColor();
     m.setDefaultPalette();
     m.buffer.clear();

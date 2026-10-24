@@ -1,0 +1,43 @@
+# Этап 1 RoadToProLevel: выделение с Shift и Alt, перенос, поворот
+# выделенного, «пиксель-перфект», узор, обрезка и размер холста.
+# Эталон — снимки самого переноса (tools/port-golden.sh): у оригинала
+# этого не было.
+key Escape
+sleep 0.4
+key 9
+drag 100 100 260 220
+keydown shift
+drag 200 180 380 320
+keyup shift
+keydown alt
+drag 150 150 220 200
+keyup alt
+move 700 300
+sleep 0.2
+shot 01_mask
+drag 120 120 300 400       # перенос: исходное место пустеет
+move 700 300
+sleep 0.2
+shot 02_moved
+key k
+sleep 0.3
+click 390 154              # «Повернуть на 90° по часовой»
+sleep 0.3
+move 700 300
+shot 03_rotated
+key ctrl+d
+key q 1                    # «пиксель-перфект» и карандаш
+drag 60 470 260 520
+key 8 bracketright         # узор «Точки 25%»
+drag 300 470 500 470
+move 700 300
+sleep 0.2
+shot 04_strokes
+key 9
+drag 60 60 300 300
+key k
+sleep 0.3
+click 635 92               # «Обрезать по выделению»
+sleep 0.3
+move 700 300
+shot 05_cropped

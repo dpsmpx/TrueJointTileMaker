@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "core/fsutil.h"
+#include "core/imageops.h"
 #include "core/pmath.h"
 #include "core/text.h"
 
@@ -266,6 +267,7 @@ void Model::resetSelection() {
     selX = selY = selW = selH = 0;
     hasSelection = false;
     draggingSelection = false;
+    selMask.clear();
 }
 
 // --- палитра и привязка -----------------------------------------------------
@@ -467,7 +469,7 @@ void Model::setTile(Grid<Color> newTile, const std::string& fileName) {
 void Model::newTileOfSize(int nw, int nh) {
     nw = clampI(nw, MIN_TILE, MAX_TILE);
     nh = clampI(nh, MIN_TILE, MAX_TILE);
-    setTile(Grid<Color>(nw, nh, argb(255, 255, 255, 255)), "");
+    setTile(Grid<Color>(nw, nh, blankColor()), "");
 }
 
 void Model::newMapOfSize(int w, int h) {
@@ -505,7 +507,8 @@ Color Model::displayColor(int x, int y) const {
 
 Color Model::brushColorAt(int x, int y) const {
     if (toolTile == T_ERASER) return argb(0, 0, 0, 0);
-    if (toolTile == T_DITHER) return ((x + y) % 2) == 0 ? firstColor : secondColor;
+    if (toolTile == T_DITHER)
+        return img::ditherFirst(ditherPattern, x, y) ? firstColor : secondColor;
     return firstColor;
 }
 
@@ -517,7 +520,7 @@ bool Model::brushReplaces() const {
 
 PalIndex Model::brushIndexAt(int x, int y) const {
     if (toolTile == T_ERASER) return IDX_NONE;
-    if (toolTile == T_DITHER) return ((x + y) % 2) == 0 ? firstIdx : secondIdx;
+    if (toolTile == T_DITHER) return img::ditherFirst(ditherPattern, x, y) ? firstIdx : secondIdx;
     return firstIdx;
 }
 
@@ -527,6 +530,7 @@ void Model::paintOne(int x, int y) {
         y = ((y % tile.h) + tile.h) % tile.h;
     }
     if (!tile.inside(x, y)) return;
+    if (clipToSelection && hasSelection && !isSelected(x, y)) return;
     if (strokeMask.sameSize(tile.w, tile.h)) {
         if (strokeMask.at(x, y) != 0) return;
         strokeMask.at(x, y) = 1;
@@ -547,9 +551,9 @@ void Model::paintOne(int x, int y) {
 
 void Model::paintPixel(int x, int y) {
     paintOne(x, y);
-    if (symX) paintOne(tile.w - 1 - x, y);
-    if (symY) paintOne(x, tile.h - 1 - y);
-    if (symX && symY) paintOne(tile.w - 1 - x, tile.h - 1 - y);
+    if (symX) paintOne(mirrorX(x), y);
+    if (symY) paintOne(x, mirrorY(y));
+    if (symX && symY) paintOne(mirrorX(x), mirrorY(y));
 }
 
 void Model::putMapOne(int x, int y) {
@@ -563,9 +567,9 @@ void Model::putMapOne(int x, int y) {
 
 void Model::putMapCell(int x, int y) {
     putMapOne(x, y);
-    if (symX) putMapOne(map.w - 1 - x, y);
-    if (symY) putMapOne(x, map.h - 1 - y);
-    if (symX && symY) putMapOne(map.w - 1 - x, map.h - 1 - y);
+    if (symX) putMapOne(mirrorX(x), y);
+    if (symY) putMapOne(x, mirrorY(y));
+    if (symX && symY) putMapOne(mirrorX(x), mirrorY(y));
 }
 
 void Model::emitPixel(int x, int y) {
@@ -574,11 +578,14 @@ void Model::emitPixel(int x, int y) {
     if (shapePreview) {
         if (!drawPreviewPixel) return;
         drawPreviewPixel(x, y);
-        if (symX) drawPreviewPixel(docW() - 1 - x, y);
-        if (symY) drawPreviewPixel(x, docH() - 1 - y);
-        if (symX && symY) drawPreviewPixel(docW() - 1 - x, docH() - 1 - y);
+        if (symX) drawPreviewPixel(mirrorX(x), y);
+        if (symY) drawPreviewPixel(x, mirrorY(y));
+        if (symX && symY) drawPreviewPixel(mirrorX(x), mirrorY(y));
     } else if (docMode == DOC_MAP) {
         putMapCell(x, y);
+    } else if (strokeActive && pixelPerfect &&
+               (toolTile == T_PEN || toolTile == T_ERASER || toolTile == T_DITHER)) {
+        emitPixelPerfect(x, y);
     } else {
         paintPixel(x, y);
     }
@@ -586,10 +593,21 @@ void Model::emitPixel(int x, int y) {
 
 void Model::beginStroke() {
     strokeMask.resize(docW(), docH(), 0);
+    strokePts.clear();
+    strokeActive = docMode == DOC_TILE;
+    if (strokeActive && pixelPerfect) {
+        ensureTileIdx();
+        strokeBase = tile;
+        strokeBaseIdx = tileIdx;
+    }
 }
 
 void Model::endStroke() {
     strokeMask.clear();
+    strokePts.clear();
+    strokeBase.clear();
+    strokeBaseIdx.clear();
+    strokeActive = false;
 }
 
 // --- фигуры -----------------------------------------------------------------
@@ -665,6 +683,8 @@ void Model::squarifyTo(int ax, int ay, int& bx, int& by) {
 
 void Model::floodFillTile(int sx, int sy, Color newColor) {
     if (!tile.inside(sx, sy)) return;
+    const bool clip = clipToSelection && hasSelection;
+    if (clip && !isSelected(sx, sy)) return;
     const Color target = tile.at(sx, sy);
     if (sameColor(target, newColor)) return;
     // Привязка одна на всю заливку: палитра просматривается раз.
@@ -678,6 +698,8 @@ void Model::floodFillTile(int sx, int sy, Color newColor) {
     std::size_t tail = 0;
     auto push = [&](int x, int y) {
         if (!tile.inside(x, y) || visited.at(x, y) != 0) return;
+        // Граница выделения для заливки — такая же стена, как чужой цвет.
+        if (clip && !isSelected(x, y)) return;
         if (!sameColor(tile.at(x, y), target)) return;
         visited.at(x, y) = 1;
         qx[tail] = x;
@@ -826,9 +848,10 @@ bool Model::applyBufferToSelection() {
 void Model::clearTile() {
     pushUndo();
     ensureTileIdx();
-    const Color white = argb(255, 255, 255, 255);
-    const PalIndex ni = indexOfColor(white);
-    std::fill(tile.d.begin(), tile.d.end(), white);
+    const Color blank = blankColor();
+    // Прозрачное ни к какой ячейке не привязано — как после ластика.
+    const PalIndex ni = blank.a == 0 ? IDX_NONE : indexOfColor(blank);
+    std::fill(tile.d.begin(), tile.d.end(), blank);
     std::fill(tileIdx.d.begin(), tileIdx.d.end(), ni);
     needRepaint = true;
 }

@@ -8,6 +8,7 @@
 #   tools/gui.sh TARGET shot F.png   снимок окна 780x560
 #   tools/gui.sh TARGET key KEY...   клавиши: Escape, g, ctrl+z, Tab
 #   tools/gui.sh TARGET move X Y     навести курсор (подсветка кнопок)
+#   tools/gui.sh TARGET keydown|keyup KEY...   держать клавишу (shift, ctrl, alt)
 #   tools/gui.sh TARGET click X Y [BTN]          щелчок; BTN 1/2/3, ролик 4/5
 #   tools/gui.sh TARGET drag X0 Y0 X1 Y1 [BTN]   протяжка с нажатой кнопкой
 #   tools/gui.sh TARGET type TEXT    набрать текст
@@ -39,7 +40,7 @@ TITLE="True Joint Tile Maker"
 
 die() { echo "gui.sh: $*" >&2; exit 1; }
 
-usage() { sed -n '2,18p' "$0"; exit 2; }
+usage() { sed -n '2,19p' "$0"; exit 2; }
 
 # --- цели -------------------------------------------------------------------
 
@@ -164,6 +165,18 @@ cmd_key() {
     done
 }
 
+cmd_hold() {
+    local action="$1"
+    shift
+    use_display
+    local wid
+    wid="$(window_id)"
+    for k in "$@"; do
+        xdotool "$action" --window "$wid" "$k" 2>/dev/null
+        sleep 0.05
+    done
+}
+
 cmd_move() {
     [ $# -eq 2 ] || die "move X Y"
     use_display
@@ -244,6 +257,7 @@ case "${1:-}" in
     shot) shift; cmd_shot "$@" ;;
     key) shift; cmd_key "$@" ;;
     move) shift; cmd_move "$@" ;;
+    keydown|keyup) cmd_hold "$@" ;;
     click) shift; cmd_click "$@" ;;
     drag) shift; cmd_drag "$@" ;;
     type) shift; cmd_type "$@" ;;

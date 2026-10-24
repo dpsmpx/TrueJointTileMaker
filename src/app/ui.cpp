@@ -47,8 +47,10 @@ void Editor::dropInput() {
 int Editor::takeKey() {
     Input& in = pf_.input();
     if (in.keys.empty()) return 0;
-    const int k = in.keys.front();
+    const KeyPress kp = in.keys.front();
     in.keys.pop_front();
+    lastKey_ = kp;
+    const int k = kp.vk;
     return k;
 }
 
@@ -116,6 +118,17 @@ void Editor::saveConfig() {
 
 /// Рисует кнопку и сообщает, был ли по ней щелчок в этом кадре.
 bool Editor::uiButton(int x, int y, int bw, int bh, const std::string& caption, bool enabled) {
+    return uiButtonEx(x, y, bw, bh, caption, enabled, false);
+}
+
+/// Кнопка-переключатель: включённая обведена цветом выделения и подсвечена,
+/// как выбранный инструмент, — чтобы состояние читалось без подписи «вкл».
+bool Editor::uiToggle(int x, int y, int bw, int bh, const std::string& caption, bool on) {
+    return uiButtonEx(x, y, bw, bh, caption, true, on);
+}
+
+bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
+                        bool on) {
     const bool over =
         enabled && mouseX() >= x && mouseX() < x + bw && mouseY() >= y && mouseY() < y + bh;
     const bool down = over && mousePressed();
@@ -126,8 +139,8 @@ bool Editor::uiButton(int x, int y, int bw, int bh, const std::string& caption, 
     if (enabled && !down)
         fb_.fillRoundRect(x + 1, y + 2, x + bw - 1, y + bh + 1, BTN_R, BTN_R, cShadow);
 
-    fb_.fillRoundRect(x, y, x + bw, y + bh, BTN_R, BTN_R, cBorder);
-    Color face = cBack;
+    fb_.fillRoundRect(x, y, x + bw, y + bh, BTN_R, BTN_R, on ? cAccent : cBorder);
+    Color face = on ? cHover : cBack;
     if (!enabled || down) {
         face = cFace;
     } else if (over) {

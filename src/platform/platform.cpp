@@ -167,10 +167,11 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
             const int vk = vkFromScancode(e.key.scancode);
             if (vk == 0) break;
             in_.keyHeld[static_cast<std::size_t>(vk)] = true;
-            in_.keys.push_back(vk);
             const SDL_Keymod mod = e.key.mod;
-            in_.presses.push_back(KeyPress{vk, (mod & SDL_KMOD_SHIFT) != 0,
-                                           (mod & SDL_KMOD_CTRL) != 0, (mod & SDL_KMOD_ALT) != 0});
+            const KeyPress kp{vk, (mod & SDL_KMOD_SHIFT) != 0, (mod & SDL_KMOD_CTRL) != 0,
+                              (mod & SDL_KMOD_ALT) != 0};
+            in_.keys.push_back(kp);
+            in_.presses.push_back(kp);
             // Очередь ограничена: если программа долго не разбирала ввод,
             // старые нажатия ей уже не нужны.
             while (in_.keys.size() > 64)

@@ -109,8 +109,9 @@ void Editor::drawTileCells() {
         fb_.frameRect(ox - 1, oy - 1, ox + sw + 1, oy + sh + 1, cAccent);
     }
 
-    // Выделение подкрашивается одним прямоугольником поверх.
-    if (m.hasSelection && m.selW > 0 && m.selH > 0) {
+    // Выделение подкрашивается одним прямоугольником поверх; выделение
+    // произвольной формы подкрашивается по точкам (drawSelectionMask).
+    if (m.hasSelection && m.selW > 0 && m.selH > 0 && m.selMask.empty()) {
         fb_.fillRect(m.tileToScreenX(m.selX), m.tileToScreenY(m.selY),
                      m.tileToScreenX(m.selX + m.selW), m.tileToScreenY(m.selY + m.selH),
                      argb(64, cAccent.r, cAccent.g, cAccent.b));
@@ -201,19 +202,24 @@ void Editor::drawCanvas() {
     }
 
     if (m.hasSelection && m.selW > 0 && m.selH > 0) {
-        drawAnts(m.tileToScreenX(m.selX) - 1, m.tileToScreenY(m.selY) - 1,
-                 m.tileToScreenX(m.selX + m.selW) + 1, m.tileToScreenY(m.selY + m.selH) + 1);
+        if (m.selMask.empty()) {
+            drawAnts(m.tileToScreenX(m.selX) - 1, m.tileToScreenY(m.selY) - 1,
+                     m.tileToScreenX(m.selX + m.selW) + 1, m.tileToScreenY(m.selY + m.selH) + 1);
+        } else {
+            drawSelectionMask();
+        }
     }
 
     // Оси симметрии видно на холсте, иначе легко забыть, что они включены.
     fb_.setClip(gfx::Rect{0, 0, m.W, m.H});
     const Color axis = argb(90, 220, 60, 60);
     if (m.symX) {
-        const int cx = m.tileToScreenX(0) + m.docW() * m.pixelSize / 2;
+        // Ось может стоять не посередине: её место — в половинах точки.
+        const int cx = m.tileToScreenX(0) + m.axisX2() * m.pixelSize / 2;
         fb_.fillRect(cx - 1, m.tileToScreenY(0), cx + 1, m.tileToScreenY(m.docH()), axis);
     }
     if (m.symY) {
-        const int cy = m.tileToScreenY(0) + m.docH() * m.pixelSize / 2;
+        const int cy = m.tileToScreenY(0) + m.axisY2() * m.pixelSize / 2;
         fb_.fillRect(m.tileToScreenX(0), cy - 1, m.tileToScreenX(m.docW()), cy + 1, axis);
     }
     fb_.resetClip();

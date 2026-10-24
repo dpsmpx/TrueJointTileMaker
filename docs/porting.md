@@ -11,7 +11,7 @@
 | --- | --- |
 | `pascal/` | оригинал на PascalABC.NET, эталон |
 | `CMakeLists.txt`, `CMakePresets.json` | сборка переноса |
-| `src/core/` | ядро без SDL: цвет, настройки, карты, логика редактора (`Model`), PNG и deflate |
+| `src/core/` | ядро без SDL: цвет, настройки, карты, логика редактора (`Model`), PNG и deflate; `imageops` и `model_pro.cpp` — этапы RoadToProLevel ([roadmap.md](roadmap.md)) |
 | `src/gfx/` | программный кадр с примитивами GraphABC и шрифт |
 | `src/platform/` | окно, ввод, диалоги файлов, буфер обмена — всё, что знает об SDL3 |
 | `src/app/` | редактор: холст, панель, инструменты, экраны; имена процедур — как в `TJTM.pas` |
@@ -21,6 +21,7 @@
 | `tools/setup-env.sh` | установка всех инструментов |
 | `tools/gui.sh` | запуск, управление и снимки окон оригинала и переноса |
 | `tools/screens.sh` | один сценарий на обеих программах, снимки рядом и разница |
+| `tools/port-golden.sh` | эталонные вырезки со снимков переноса — для сценариев новых возможностей |
 | `tools/golden.sh`, `tools/golden/` | харнессы на Pascal, снимающие эталонные данные |
 | `tools/lint.sh` | clang-format, clang-tidy, cppcheck |
 | `tools/pabcnet/` | заплатка компилятора PascalABC.NET для Mono |
