@@ -392,7 +392,7 @@ void Model::pushUndo() {
         // Снимок берётся перед изменением, поэтому пометка здесь накрывает
         // любую отменяемую правку тайла разом.
         tileBmpDirty = true;
-        undoStack.push_back(TileSnapshot{tile, tileIdx, palette});
+        undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx});
         while (undoStack.size() > limit)
             undoStack.erase(undoStack.begin());
         redoStack.clear();
@@ -409,12 +409,13 @@ void Model::doUndo() {
     } else {
         if (undoStack.empty()) return;
         ensureTileIdx();
-        redoStack.push_back(TileSnapshot{tile, tileIdx, palette});
+        redoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx});
         TileSnapshot s = std::move(undoStack.back());
         undoStack.pop_back();
         tile = std::move(s.tile);
         tileIdx = std::move(s.idx);
         palette = std::move(s.palette);
+        transparentIdx = s.transparentIdx;
         ensureTileIdx();
     }
     resetSelection();
@@ -433,12 +434,13 @@ void Model::doRedo() {
     } else {
         if (redoStack.empty()) return;
         ensureTileIdx();
-        undoStack.push_back(TileSnapshot{tile, tileIdx, palette});
+        undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx});
         TileSnapshot s = std::move(redoStack.back());
         redoStack.pop_back();
         tile = std::move(s.tile);
         tileIdx = std::move(s.idx);
         palette = std::move(s.palette);
+        transparentIdx = s.transparentIdx;
         ensureTileIdx();
     }
     resetSelection();
@@ -506,6 +508,11 @@ Color Model::displayColor(int x, int y) const {
 // --- кисть ------------------------------------------------------------------
 
 Color Model::brushColorAt(int x, int y) const {
+    // Строгий индексный режим: цвет — всегда цвет ячейки, которой кисть пишет.
+    if (strictIndexedOn()) {
+        const PalIndex i = brushIndexAt(x, y);
+        return i == IDX_NONE ? argb(0, 0, 0, 0) : effectiveColor(i);
+    }
     if (toolTile == T_ERASER) return argb(0, 0, 0, 0);
     if (toolTile == T_DITHER)
         return img::ditherFirst(ditherPattern, x, y) ? firstColor : secondColor;
@@ -514,11 +521,20 @@ Color Model::brushColorAt(int x, int y) const {
 
 bool Model::brushReplaces() const {
     // Ластик иначе не смог бы стирать: прозрачный цвет поверх по правилу
-    // source-over ничего не меняет.
-    return brushReplace || toolTile == T_ERASER;
+    // source-over ничего не меняет. В строгом индексном режиме смешивать
+    // нельзя: смесь — не цвет палитры.
+    return brushReplace || toolTile == T_ERASER || strictIndexedOn();
 }
 
 PalIndex Model::brushIndexAt(int x, int y) const {
+    if (strictIndexedOn()) {
+        if (toolTile == T_ERASER) return transparentIdx;
+        if (toolTile == T_DITHER) {
+            return img::ditherFirst(ditherPattern, x, y) ? resolveIndex(firstColor, firstIdx)
+                                                         : resolveIndex(secondColor, secondIdx);
+        }
+        return resolveIndex(firstColor, firstIdx);
+    }
     if (toolTile == T_ERASER) return IDX_NONE;
     if (toolTile == T_DITHER) return img::ditherFirst(ditherPattern, x, y) ? firstIdx : secondIdx;
     return firstIdx;

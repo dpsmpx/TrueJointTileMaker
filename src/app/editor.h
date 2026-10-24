@@ -244,6 +244,23 @@ private:
     bool askTwoNumbers(const std::string& title, const std::string& hint, const std::string& label1,
                        int& v1, int lo1, int hi1, const std::string& label2, int& v2, int lo2,
                        int hi2, const std::string& okCaption, int* anchor);
+    struct NumField {
+        std::string label;
+        int* v;
+        int lo, hi;
+    };
+    bool askNumbers(const std::string& title, const std::string& hint,
+                    const std::vector<NumField>& fields, const std::string& okCaption, int* anchor);
+
+    // --- этап 2: палитра (palette_ui.cpp) ---
+    void toggleIndexed();
+    void showPaletteScreen();
+    /// Палитра из файла: PNG (точка — ячейка), GPL, HEX, PAL. merge —
+    /// добавить к текущей, а не заменить.
+    bool loadPaletteFile(const std::string& path, bool quiet, bool merge);
+    bool savePaletteFile(const std::string& path);
+    int palSelA_ = 0;
+    int palSelB_ = 0;
     /// Последняя разобранная клавиша с модификаторами в миг нажатия.
     KeyPress lastKey_;
     bool outlineEight_ = false;

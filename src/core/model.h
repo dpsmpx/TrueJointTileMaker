@@ -28,7 +28,7 @@ namespace tjtm {
 inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — когда пройдены все четыре.
-inline constexpr const char* kAppVersion = "0.8.0";
+inline constexpr const char* kAppVersion = "0.9.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -154,6 +154,7 @@ struct TileSnapshot {
     Grid<Color> tile;
     Grid<PalIndex> idx;
     std::vector<Color> palette;
+    PalIndex transparentIdx = IDX_NONE;
 };
 
 class Model {
@@ -232,6 +233,17 @@ public:
     Grid<Color> floatUnder, floatResult;
     Grid<PalIndex> floatUnderIdx;
     Grid<std::uint8_t> floatSel;
+
+    // --- этап 2: палитра произвольного размера ---
+
+    /// Прозрачный номер палитры: точки с ним прозрачны, ластик в индексном
+    /// режиме пишет его. IDX_NONE — такого номера нет.
+    PalIndex transparentIdx = IDX_NONE;
+    /// Строгий индексный режим: при indexedOn каждая точка хранит номер, а
+    /// цвет — из палитры. Оригинал лишь привязывал совпавшие точки.
+    bool strictIndexed = false;
+    /// Прокрутка палитры на панели, в рядах по PAL_COLS.
+    int palScroll = 0;
 
     Color firstColor = argb(255, 0, 0, 0);
     Color secondColor = argb(255, 255, 255, 255);
@@ -415,6 +427,50 @@ public:
     bool overviewViewport(int& vx0, int& vy0, int& vx1, int& vy1) const;
     /// Картинка тайла с шахматкой под прозрачным, BGRA с прямой альфой.
     std::vector<std::uint8_t> tileBmpRaw() const;
+
+    // --- палитра произвольного размера (этап 2) ---
+    int palCount() const { return static_cast<int>(palette.size()); }
+    /// Номер ячейки под клеткой (j, i) панели с учётом прокрутки; -1 — пусто.
+    int palCellIndex(int j, int i) const;
+    int palMaxScroll() const;
+    void scrollPalette(int rows);
+    /// Как номер выглядит на картинке: прозрачный — с нулевой альфой.
+    Color effectiveColor(PalIndex idx) const;
+    bool strictIndexedOn() const { return strictIndexed && indexedOn && docMode == DOC_TILE; }
+    /// Номер для цвета c, взятого из ячейки bound: сама ячейка, если она
+    /// есть, иначе ближайшая; прозрачный цвет — прозрачный номер.
+    PalIndex resolveIndex(Color c, PalIndex bound) const;
+    /// Цвет заливки: первый цвет, в строгом индексном режиме — его ячейки.
+    Color fillColor() const;
+    /// Новая палитра на место прежней; oldToNew[k] — новый номер прежней
+    /// ячейки k или -1, если её больше нет. Привязки и цвета точек едут
+    /// следом; без строгого режима точки удалённой ячейки отвязываются.
+    void remapPalette(std::vector<Color> newPal, const std::vector<int>& oldToNew);
+    /// Заменить палитру целиком: точки привязываются заново по цвету.
+    void setPalette(std::vector<Color> p);
+    int addPaletteColor(Color c, int at);
+    bool deletePaletteEntry(int idx);
+    bool duplicatePaletteEntry(int idx);
+    bool movePaletteEntry(int idx, int to);
+    void sortPalette(int key, int from, int to);
+    /// Ряд из steps цветов от ячейки a до b: промежуточные встают после a.
+    /// Возвращает число новых ячеек.
+    int insertRamp(int a, int b, int steps, int hueShift);
+    void adjustPaletteEntries(int from, int to, int dh, int ds, int dv);
+    int extractPaletteFromTile(int maxColors);
+    int removeDuplicateEntries();
+    void setTransparentIndex(PalIndex idx);
+    /// Включить строгий индексный режим. addMissing — цвета, которых нет в
+    /// палитре, добавить в неё; иначе свести к ближайшим. Возвращает число
+    /// точек, сменивших цвет.
+    int enableIndexed(bool addMissing);
+    /// Точки без номера в строгом режиме — к ближайшей ячейке. Зовётся
+    /// после команд, которые кладут произвольные цвета.
+    void enforceIndexed();
+    /// Сколько непрозрачных точек не совпадает ни с одной ячейкой.
+    int unmatchedPixelCount() const;
+    /// Тон, насыщенность, яркость точек выделения или всей картинки.
+    void adjustImageHSV(int dh, int ds, int dv);
 
     // --- симметрия ---
     int mirrorX(int x) const;

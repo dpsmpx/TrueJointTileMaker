@@ -351,7 +351,8 @@ void Editor::handleCanvasClick() {
         case T_DITHER: doPaintStroke(mx, my); break;
         case T_FILL:
             m.pushUndo();
-            m.floodFillTile(mx, my, m.firstColor);
+            // В строгом индексном режиме заливка — цветом ячейки.
+            m.floodFillTile(mx, my, m.fillColor());
             m.needRepaint = true;
             break;
         case T_LINE:
@@ -399,34 +400,44 @@ void Editor::dragAlphaBar() {
 
 void Editor::handlePaletteClick() {
     if (isMiddle(frameClickButton_)) {
-        paletteIO();
+        // Средняя кнопка открывала загрузку и сохранение палитры; теперь —
+        // экран палитры, где есть и они.
+        showPaletteScreen();
         return;
     }
     int cj = 0;
     int ci = 0;
     if (!Model::palHit(frameClickX_, frameClickY_, cj, ci)) return;
-    const PalIndex idx = Model::palIndexAt(cj, ci);
+    const int cell = m.palCellIndex(cj, ci);
+    if (cell < 0) {
+        // Пустая клетка за концом палитры: левая кнопка добавляет первый цвет.
+        if (frameClickButton_ == MB_LEFT) m.addPaletteColor(m.firstColor, -1);
+        return;
+    }
+    const auto idx = static_cast<PalIndex>(cell);
+    const Color palCell = m.palette[idx];
     if (frameClickButton_ == MB_RIGHT) {
-        m.pickColor(m.palAt(cj, ci));
+        m.pickColor(m.effectiveColor(idx));
         // Цвет взят из конкретной ячейки: привязка точная, а не выведенная
         // по цвету, — когда цвет стоит в палитре дважды, важно, из какой.
         m.firstIdx = idx;
         return;
     }
-    const Color oldC = m.palAt(cj, ci);
+    const Color oldC = palCell;
     if (sameColor(oldC, m.firstColor)) return;
     if (m.indexedOn && m.docMode == DOC_TILE) {
         // Пиксели и сама ячейка меняются одной операцией и одной же отменяются.
         m.pushUndo();
-        m.palAt(cj, ci) = m.firstColor;
+        m.palette[idx] = m.firstColor;
         m.recolorPaletteEntry(idx, oldC, m.firstColor);
+        m.enforceIndexed();
         // Второй рабочий цвет, взятый из этой ячейки, едет за ней следом.
         if (m.secondIdx == idx)
             m.secondColor = argb(m.secondColor.a, m.firstColor.r, m.firstColor.g, m.firstColor.b);
         m.overDirty = true;
         m.tileBmpDirty = true;
     } else {
-        m.palAt(cj, ci) = m.firstColor;
+        m.palette[idx] = m.firstColor;
     }
     m.needRepaint = true;
 }
@@ -571,13 +582,7 @@ void Editor::handleEditorKey(int key) {
             if (tile) showTilesetScreen();
             break;
         case KEY_I:
-            if (tile) {
-                m.indexedOn = !m.indexedOn;
-                // Включая режим, привязываем уже нарисованное: иначе он
-                // подействовал бы только на пиксели, положенные после.
-                if (m.indexedOn) m.rebindTileToPalette();
-                m.needRepaint = true;
-            }
+            if (tile) toggleIndexed();
             break;
         case KEY_PLUS:
         case KEY_NUMPLUS: m.zoomAt(1, m.W / 2, m.H / 2); break;

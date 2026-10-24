@@ -112,6 +112,8 @@ bool Editor::appInit(int argc, char** argv) {
     m.brushReplace = true;
     m.transparentBlank = true;
     m.clipToSelection = true;
+    // Этап 2: индексный режим — настоящий: точка хранит номер ячейки.
+    m.strictIndexed = true;
     m.syncHSVFromColor();
     m.setDefaultPalette();
     m.buffer.clear();
@@ -179,8 +181,14 @@ void Editor::appStep() {
         repaintCanvasOnly();
     }
 
-    // Колесо могло провернуться на несколько щелчков между кадрами.
+    // Колесо могло провернуться на несколько щелчков между кадрами. Над
+    // длинной палитрой оно её листает, а не меняет масштаб.
     int wheel = takeWheel();
+    if (wheel != 0 && m.docMode == DOC_TILE && m.palMaxScroll() > 0 && mouseX() >= PANEL_X &&
+        mouseY() >= PAL_Y0 && mouseY() < PAL_Y1) {
+        m.scrollPalette(-wheel);
+        wheel = 0;
+    }
     for (; wheel > 0; --wheel)
         m.zoomAt(1, std::min(mouseX(), m.W - 1), mouseY());
     for (; wheel < 0; ++wheel)

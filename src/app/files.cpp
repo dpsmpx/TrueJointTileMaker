@@ -156,30 +156,15 @@ bool Editor::saveGridTo(const Grid<Color>& g, const std::string& path) {
 }
 
 /// Палитра из картинки, растянутой до 8x8.
+/// Палитра из файла настроек. Оригинал растягивал любую картинку до 8x8;
+/// этап 2 берёт каждую точку небольшой картинки ячейкой, а у большой —
+/// её цвета (loadPaletteFile). Для Palitra.png 8x8 это одно и то же.
 bool Editor::loadPaletteFrom(const std::string& path, bool quiet) {
-    Grid<Color> g;
-    if (!readImageGrid(path, g, quiet)) return false;
-    m.paletteFromGrid(g);
-    return true;
+    return loadPaletteFile(path, quiet, false);
 }
 
 void Editor::paletteIO() {
-    const int answer = ask3("Палитра", "Загрузить палитру из файла или сохранить текущую?",
-                            "Загрузить", "Сохранить", "Отмена");
-    if (answer == 1) {
-        const std::string path = askOpenFile("Загрузить палитру");
-        if (!path.empty()) loadPaletteFrom(path, false);
-    } else if (answer == 0) {
-        const std::string path = askSaveFile("Сохранить палитру", "palette.png");
-        if (!path.empty()) {
-            Grid<Color> g(PAL_COLS, PAL_ROWS);
-            for (int i = 0; i < PAL_ROWS; ++i) {
-                for (int j = 0; j < PAL_COLS; ++j)
-                    g.at(j, i) = m.palAt(j, i);
-            }
-            saveGridTo(g, path);
-        }
-    }
+    showPaletteScreen();
 }
 
 bool Editor::loadMapFrom(const std::string& path, bool quiet, bool remember) {

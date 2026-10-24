@@ -97,11 +97,41 @@ void Editor::drawToolsSection() {
 
 void Editor::drawPaletteSection() {
     fb_.fillRect(PANEL_X, SLOT1_Y0 - 2, PANEL_X + PANEL_W, SLOT1_Y1 + 2, cPanel);
+    // Палитра любой длины: на панели окно 8x8 с прокруткой колесом.
+    // Пустые клетки за концом палитры — фон панели: щелчок по ним добавляет
+    // первый цвет.
     for (int i = 0; i < PAL_ROWS; ++i) {
         for (int j = 0; j < PAL_COLS; ++j) {
-            fb_.fillRect(Model::palCellX(j), Model::palCellY(i), Model::palCellX(j + 1),
-                         Model::palCellY(i + 1), blendOver(m.palAt(j, i), m.checkerColor(j, i)));
+            const int k = m.palCellIndex(j, i);
+            const int x0 = Model::palCellX(j);
+            const int y0 = Model::palCellY(i);
+            if (k < 0) {
+                fb_.fillRect(x0, y0, x0 + PAL_CELL, y0 + PAL_CELL, cFace);
+                continue;
+            }
+            const Color c = m.palette[static_cast<std::size_t>(k)];
+            fb_.fillRect(x0, y0, x0 + PAL_CELL, y0 + PAL_CELL, blendOver(c, m.checkerColor(j, i)));
+            // Прозрачный номер: шахматка с уголком его цвета — видно и что
+            // он прозрачен, и какой цвет за ним записан.
+            if (k == m.transparentIdx) {
+                for (int q = 0; q < PAL_CELL; q += 4) {
+                    for (int r = 0; r < PAL_CELL; r += 4)
+                        fb_.fillRect(x0 + q, y0 + r, x0 + q + 4, y0 + r + 4,
+                                     ((q + r) / 4) % 2 == 0 ? cCheckA : cCheckB);
+                }
+                fb_.fillRect(x0, y0, x0 + 6, y0 + 6, argb(255, c.r, c.g, c.b));
+            }
         }
+    }
+    if (m.palMaxScroll() > 0) {
+        // Полоса прокрутки справа от палитры: где окно и сколько всего.
+        const int total = (m.palCount() + PAL_COLS - 1) / PAL_COLS;
+        const int x0 = PAL_X0 + PAL_COLS * PAL_CELL + 3;
+        const int h = PAL_ROWS * PAL_CELL;
+        fb_.fillRect(x0, PAL_Y0, x0 + 3, PAL_Y0 + h, cLine);
+        const int t0 = PAL_Y0 + h * m.palScroll / total;
+        const int t1 = PAL_Y0 + h * (m.palScroll + PAL_ROWS) / total;
+        fb_.fillRect(x0, t0, x0 + 3, t1, cTextDim);
     }
     // Рамка цветом выделения: индексный режим включён, и правка ячейки
     // перекрасит тайл — об этом надо знать заранее.
@@ -109,9 +139,11 @@ void Editor::drawPaletteSection() {
     fb_.frameRect(PAL_X0 - 1, PAL_Y0 - 1, PAL_X0 + PAL_COLS * PAL_CELL + 1,
                   PAL_Y0 + PAL_ROWS * PAL_CELL + 1, edge);
     // Ячейка, из которой взят первый цвет: она поедет за кистью при правке.
-    if (m.firstIdx != IDX_NONE && m.firstIdx < PAL_SIZE && m.docMode == DOC_TILE) {
+    const int fRow = m.firstIdx / PAL_COLS - m.palScroll;
+    if (m.firstIdx != IDX_NONE && m.firstIdx < m.palCount() && fRow >= 0 && fRow < PAL_ROWS &&
+        m.docMode == DOC_TILE) {
         const int fj = m.firstIdx % PAL_COLS;
-        const int fi = m.firstIdx / PAL_COLS;
+        const int fi = fRow;
         fb_.frameRect(Model::palCellX(fj), Model::palCellY(fi), Model::palCellX(fj + 1),
                       Model::palCellY(fi + 1), cAccent);
     }
@@ -293,6 +325,9 @@ void Editor::drawPanel() {
 }
 
 void Editor::repaint() {
+    // Команда могла положить цвет не из палитры: в строгом индексном режиме
+    // он сводится к ячейке до того, как его увидят.
+    m.enforceIndexed();
     drawCanvas();
     drawPanel();
     redraw();

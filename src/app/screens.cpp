@@ -569,9 +569,7 @@ void Editor::showColorOpsScreen() {
         if (uiButton(bx, y, bw, bh,
                      m.indexedOn ? "Индексный режим: включён" : "Индексный режим: выключен",
                      true)) {
-            m.indexedOn = !m.indexedOn;
-            if (m.indexedOn) m.rebindTileToPalette();
-            m.needRepaint = true;
+            toggleIndexed();
         }
         y += stp;
         if (uiButton(bx, y, bw, bh, "Привязать тайл к палитре", true)) {

@@ -60,3 +60,11 @@ pro1       02_moved    0    0  600  560
 pro1       03_rotated  0    0  600  560
 pro1       04_strokes  0    0  600  560
 pro1       05_cropped  0    0  600  560
+# Этап 2 RoadToProLevel — эталон со снимков переноса.
+pal2       01_indexed  0    0  600  560
+pal2       01_indexed 624  116  132  132
+pal2       02_transparent 0 0  600  560
+pal2       02_transparent 624 116 132 132
+pal2       03_ramp    624  116  132  132
+pal2       04_snapped  0    0  600  560
+pal2       04_snapped 602  248   34   64

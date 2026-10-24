@@ -23,6 +23,7 @@ add_executable(tjtm_core_tests
     test_imageops.cpp
     test_map.cpp
     test_model.cpp
+    test_palette.cpp
     test_png.cpp
 )
 target_link_libraries(tjtm_core_tests PRIVATE tjtm_core GTest::gtest_main)

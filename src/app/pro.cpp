@@ -312,6 +312,7 @@ bool Editor::handleProKey(int key) {
             return true;
         case KEY_O: showToolOptions(); return true;
         case KEY_K: showImageScreen(); return true;
+        case KEY_U: showPaletteScreen(); return true;
         case KEY_LBRACKET:
         case KEY_RBRACKET: {
             const int n = img::ditherPatternCount();
@@ -416,39 +417,53 @@ bool Editor::askTwoNumbers(const std::string& title, const std::string& hint,
                            const std::string& label1, int& v1, int lo1, int hi1,
                            const std::string& label2, int& v2, int lo2, int hi2,
                            const std::string& okCaption, int* anchor) {
-    v1 = clampI(v1, lo1, hi1);
-    v2 = clampI(v2, lo2, hi2);
+    std::vector<NumField> f = {{label1, &v1, lo1, hi1}, {label2, &v2, lo2, hi2}};
+    return askNumbers(title, hint, f, okCaption, anchor);
+}
+
+bool Editor::askNumbers(const std::string& title, const std::string& hint,
+                        const std::vector<NumField>& fields, const std::string& okCaption,
+                        int* anchor) {
+    for (const NumField& f : fields)
+        *f.v = clampI(*f.v, f.lo, f.hi);
     bool done = false;
     bool ok = false;
     dropInput();
     pf_.input().keys.clear();
-    auto stepRow = [&](int y, const std::string& caption, int& v, int lo, int hi) {
-        uiLabel(60, y, 160, 34, caption, cText);
-        if (uiButton(230, y, 46, 34, "−8", v > lo)) v = clampI(v - 8, lo, hi);
-        if (uiButton(282, y, 46, 34, "−1", v > lo)) v = clampI(v - 1, lo, hi);
+    auto stepRow = [&](int y, const NumField& f) {
+        int& v = *f.v;
+        uiLabel(40, y, 180, 34, f.label, cText);
+        if (uiButton(230, y, 46, 34, "−8", v > f.lo)) v = clampI(v - 8, f.lo, f.hi);
+        if (uiButton(282, y, 46, 34, "−1", v > f.lo)) v = clampI(v - 1, f.lo, f.hi);
         fb_.fillRoundRect(334, y, 434, y + 34, 6, 6, cFace);
         uiLabel(334, y, 100, 34, std::to_string(v), cText);
-        if (uiButton(440, y, 46, 34, "+1", v < hi)) v = clampI(v + 1, lo, hi);
-        if (uiButton(492, y, 46, 34, "+8", v < hi)) v = clampI(v + 8, lo, hi);
+        if (uiButton(440, y, 46, 34, "+1", v < f.hi)) v = clampI(v + 1, f.lo, f.hi);
+        if (uiButton(492, y, 46, 34, "+8", v < f.hi)) v = clampI(v + 8, f.lo, f.hi);
+        // Ноль — частая точка отсчёта у сдвигов: возврат к нему одним щелчком.
+        if (f.lo < 0 && f.hi > 0 && uiButton(548, y, 46, 34, "0", v != 0)) v = 0;
     };
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
         textCentered(0, 30, WIN_W, 66, title, cText);
         uiLabel(0, 70, WIN_W, 26, hint, cTextDim);
-        stepRow(120, label1, v1, lo1, hi1);
-        stepRow(170, label2, v2, lo2, hi2);
+        int y = 120;
+        for (const NumField& f : fields) {
+            stepRow(y, f);
+            y += 50;
+        }
         if (anchor != nullptr) {
             // Якорь: куда прижать старую картинку на новом холсте.
-            uiLabel(60, 230, 160, 30, "Картинка к", cText);
+            uiLabel(40, y + 10, 180, 30, "Картинка к", cText);
             static const char* kArrows[9] = {"↖", "↑", "↗", "←", "·", "→", "↙", "↓", "↘"};
             for (int k = 0; k < 9; ++k) {
-                if (uiToggle(230 + (k % 3) * 40, 226 + (k / 3) * 38, 36, 34, kArrows[k],
+                if (uiToggle(230 + (k % 3) * 40, y + 6 + (k / 3) * 38, 36, 34, kArrows[k],
                              *anchor == k))
                     *anchor = k;
             }
+            y += 130;
         }
-        const int by = anchor != nullptr ? 370 : 250;
+        const int by = y + 30;
         if (uiButton(WIN_W / 2 - 180, by, 170, 38, okCaption, true)) {
             ok = true;
             done = true;
@@ -612,11 +627,27 @@ void Editor::showImageScreen() {
         if (act(c3, y, "Прозрачным", tile)) m.fillSelectionOrAll(argb(0, 0, 0, 0));
         y += ST;
         if (act(c3, y, "Убрать одиночные точки", tile)) m.removeIsolatedPixels();
+        y += ST;
+        if (act(c3, y, "Тон, насыщенность, яркость…", tile)) {
+            int dh = 0;
+            int ds = 0;
+            int dv = 0;
+            if (askNumbers("Тон, насыщенность, яркость",
+                           std::string("Для точек ") + (sel ? "выделения" : "всего тайла") +
+                               (m.strictIndexedOn() ? "; итог сведётся к палитре" : ""),
+                           {{"Тон, градусы", &dh, -180, 180},
+                            {"Насыщенность, %", &ds, -100, 100},
+                            {"Яркость, %", &dv, -100, 100}},
+                           "Применить", nullptr))
+                m.adjustImageHSV(dh, ds, dv);
+        }
 
         // --- низ ---
         if (uiToggle(c2, 444, CW, BH, "Контур по восьми соседям", outlineEight_))
             outlineEight_ = !outlineEight_;
-        if (uiButton(c1, m.H - 50, CW, 34, "Операции с цветом…", tile)) showColorOpsScreen();
+        if (uiButton(c1, m.H - 50, CW / 2 - 3, 34, "Цвет…", tile)) showColorOpsScreen();
+        if (uiButton(c1 + CW / 2 + 3, m.H - 50, CW / 2 - 3, 34, "Палитра…", tile))
+            showPaletteScreen();
         if (uiButton(c2, m.H - 50, CW, 34, "Параметры инструментов…", true)) showToolOptions();
         if (uiButton(c3, m.H - 50, CW, 34, "Закрыть", true)) done = true;
         redraw();
