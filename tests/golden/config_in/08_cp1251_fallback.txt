@@ -1,0 +1,2 @@
+ ShowGrid = да
+ StartupImage = Картинки/x.png

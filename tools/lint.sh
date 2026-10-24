@@ -50,10 +50,11 @@ if [ "${#SOURCES[@]}" -gt 0 ]; then
 fi
 
 echo "== cppcheck"
-# useStlAlgorithm — совет заменить цикл алгоритмом; это вкус, а не ошибка.
-cppcheck --enable=warning,style,performance,portability --std=c++17 --quiet \
+# useStlAlgorithm — совет заменить цикл алгоритмом, это вкус; unusedStructMember
+# ложно срабатывает на полях, которыми пользуются другие файлы.
+cppcheck --enable=warning,style,performance,portability --std=c++20 --language=c++ --quiet \
     --inline-suppr --error-exitcode=1 \
-    --suppress=missingIncludeSystem --suppress=useStlAlgorithm \
+    --suppress=missingIncludeSystem --suppress=useStlAlgorithm --suppress=unusedStructMember \
     -I src "${FILES[@]}" || status=1
 
 echo "== shellcheck"

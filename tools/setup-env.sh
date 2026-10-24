@@ -1,16 +1,19 @@
 #!/bin/bash
 # Установка всего, что нужно для переноса True Joint Tile Maker на C++.
 #
-#   tools/setup-env.sh [--skip-apt] [--skip-pabcnet] [--skip-corpus]
+#   tools/setup-env.sh [--skip-apt] [--skip-sdl] [--skip-pabcnet] [--skip-corpus]
 #
 # Ставит три вещи:
 #
-#   1. Системные пакеты: компиляторы и отладчики C++, SDL2 с ttf и image,
-#      GoogleTest, анализаторы кода, Xvfb и xdotool для снимков экрана.
-#   2. Эталон — компилятор PascalABC.NET, собранный из исходников под Mono.
+#   1. Системные пакеты: компиляторы и отладчики C++, GoogleTest,
+#      анализаторы кода, Xvfb и xdotool для снимков экрана.
+#   2. SDL3 с SDL3_ttf и SDL3_image, собранные из исходников: в Ubuntu 24.04
+#      SDL3 ещё нет. Ставятся в $TJTM_TOOLS_DIR/sdl3, CMake находит их
+#      через CMAKE_PREFIX_PATH из env.sh.
+#   3. Эталон — компилятор PascalABC.NET, собранный из исходников под Mono.
 #      Им собирается старая реализация из pascal/, чтобы сравнивать перенос
 #      с оригиналом не по памяти, а по живой программе.
-#   3. Корпус карт и тайлов игры Andors-Love: на нём проверяется, что разбор
+#   4. Корпус карт и тайлов игры Andors-Love: на нём проверяется, что разбор
 #      и запись карт дают файл байт в байт.
 #
 # Рассчитан на Ubuntu 24.04. Повторный запуск ничего не пересобирает, если
@@ -35,12 +38,26 @@ PABCNET_PATCH="$ROOT/tools/pabcnet/mono68-generic-array-ctors.patch"
 ANDORS_URL="https://github.com/dpsmpx/Andors-Love"
 ANDORS_DIR="$TOOLS_DIR/andors-love"
 
+# SDL3 закреплена на выпусках: поведение окна, ввода и шрифтов между ними
+# меняется, а снимки экрана сверяются попиксельно.
+SDL_PREFIX="$TOOLS_DIR/sdl3"
+SDL_SRC="$TOOLS_DIR/sdl3-src"
+SDL_TAG=release-3.4.18
+SDL_TTF_TAG=release-3.2.2
+SDL_IMAGE_TAG=release-3.4.8
+
 APT_PACKAGES=(
     # Сборка и отладка C++
     build-essential cmake ninja-build pkg-config ccache
     clang clang-tidy clang-format cppcheck shellcheck gdb lldb valgrind
-    # Окно, текст, картинки; диалоги файлов (GTK3 или zenity)
-    libsdl2-dev libsdl2-ttf-dev libsdl2-image-dev libgtk-3-dev zenity
+    # Зависимости сборки SDL3: X11, Wayland, ввод, D-Bus для диалогов
+    # через портал; FreeType и HarfBuzz для SDL3_ttf; PNG и JPEG для SDL3_image
+    libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev
+    libxfixes-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols
+    libegl-dev libgl-dev libdbus-1-dev libudev-dev
+    libfreetype-dev libharfbuzz-dev libpng-dev libjpeg-dev zlib1g-dev
+    # Диалоги открытия и сохранения SDL3 в Linux без портала идут через zenity
+    zenity
     # Тесты
     libgtest-dev libgmock-dev
     # Шрифты: Liberation Sans метрически совпадает с Arial,
@@ -54,11 +71,13 @@ APT_PACKAGES=(
 )
 
 SKIP_APT=0
+SKIP_SDL=0
 SKIP_PABCNET=0
 SKIP_CORPUS=0
 for arg in "$@"; do
     case "$arg" in
         --skip-apt) SKIP_APT=1 ;;
+        --skip-sdl) SKIP_SDL=1 ;;
         --skip-pabcnet) SKIP_PABCNET=1 ;;
         --skip-corpus) SKIP_CORPUS=1 ;;
         -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
@@ -85,6 +104,44 @@ install_packages() {
     as_root apt-get update -q
     as_root env DEBIAN_FRONTEND=noninteractive \
         apt-get install -y -q --no-install-recommends "${missing[@]}"
+}
+
+# Собирает одну библиотеку SDL3 из исходников и ставит её в SDL_PREFIX.
+build_sdl_one() {
+    local name="$1" tag="$2"
+    shift 2
+    local src="$SDL_SRC/$name" bld="$SDL_SRC/$name-build"
+    if [ ! -d "$src/.git" ]; then
+        git clone -q --depth 1 --branch "$tag" "https://github.com/libsdl-org/$name" "$src"
+    else
+        git -C "$src" fetch -q --depth 1 origin tag "$tag"
+        git -C "$src" checkout -q --force "$tag"
+    fi
+    cmake -S "$src" -B "$bld" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="$SDL_PREFIX" -DCMAKE_PREFIX_PATH="$SDL_PREFIX" \
+        -DCMAKE_INSTALL_LIBDIR=lib "$@" > /dev/null
+    cmake --build "$bld" > /dev/null
+    cmake --install "$bld" > /dev/null
+}
+
+build_sdl() {
+    local stamp_file="$SDL_PREFIX/.tjtm-stamp"
+    local want="$SDL_TAG $SDL_TTF_TAG $SDL_IMAGE_TAG"
+    if [ "$(cat "$stamp_file" 2>/dev/null)" = "$want" ]; then
+        log "SDL3 уже собрана: $SDL_PREFIX"
+        return
+    fi
+    mkdir -p "$SDL_SRC"
+    log "собираю SDL3 ($want)"
+    build_sdl_one SDL "$SDL_TAG" -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+    # FreeType и HarfBuzz берутся системные: так быстрее, а на Windows
+    # CMakeLists переноса собирает их встроенными (SDLTTF_VENDORED).
+    build_sdl_one SDL_ttf "$SDL_TTF_TAG" -DSDLTTF_SAMPLES=OFF -DSDLTTF_VENDORED=OFF
+    build_sdl_one SDL_image "$SDL_IMAGE_TAG" -DSDLIMAGE_SAMPLES=OFF -DSDLIMAGE_TESTS=OFF \
+        -DSDLIMAGE_VENDORED=OFF -DSDLIMAGE_AVIF=OFF -DSDLIMAGE_JXL=OFF \
+        -DSDLIMAGE_TIF=OFF -DSDLIMAGE_WEBP=OFF
+    echo "$want" > "$stamp_file"
+    log "SDL3 готова"
 }
 
 # Отпечаток сборки: коммит и заплатка. Совпал — собирать незачем.
@@ -152,6 +209,7 @@ write_env() {
 export TJTM_TOOLS_DIR="$TOOLS_DIR"
 export PABCNET_DIR="$PABCNET_DIR"
 export ANDORS_LOVE_DIR="$ANDORS_DIR"
+export CMAKE_PREFIX_PATH="$SDL_PREFIX\${CMAKE_PREFIX_PATH:+:\$CMAKE_PREFIX_PATH}"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
 EOF
@@ -160,6 +218,7 @@ EOF
 
 mkdir -p "$TOOLS_DIR"
 [ "$SKIP_APT" -eq 1 ] || install_packages
+[ "$SKIP_SDL" -eq 1 ] || build_sdl
 [ "$SKIP_PABCNET" -eq 1 ] || build_pabcnet
 [ "$SKIP_CORPUS" -eq 1 ] || fetch_corpus
 write_env
