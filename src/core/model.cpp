@@ -395,8 +395,8 @@ void Model::pushUndo() {
         // Снимок берётся перед изменением, поэтому пометка здесь накрывает
         // любую отменяемую правку тайла разом.
         tileBmpDirty = true;
-        undoStack.push_back(
-            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
+        undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
+                                         activeFrame, tileShapes, tileMap});
         while (undoStack.size() > limit)
             undoStack.erase(undoStack.begin());
         redoStack.clear();
@@ -413,8 +413,8 @@ void Model::doUndo() {
     } else {
         if (undoStack.empty()) return;
         ensureTileIdx();
-        redoStack.push_back(
-            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
+        redoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
+                                         activeFrame, tileShapes, tileMap});
         TileSnapshot s = std::move(undoStack.back());
         undoStack.pop_back();
         tile = std::move(s.tile);
@@ -424,6 +424,8 @@ void Model::doUndo() {
         doc = std::move(s.doc);
         activeLayer = s.layer;
         activeFrame = s.frame;
+        tileShapes = std::move(s.shapes);
+        tileMap = std::move(s.tileMap);
         ensureTileIdx();
     }
     resetSelection();
@@ -442,8 +444,8 @@ void Model::doRedo() {
     } else {
         if (redoStack.empty()) return;
         ensureTileIdx();
-        undoStack.push_back(
-            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
+        undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
+                                         activeFrame, tileShapes, tileMap});
         TileSnapshot s = std::move(redoStack.back());
         redoStack.pop_back();
         tile = std::move(s.tile);
@@ -453,6 +455,8 @@ void Model::doRedo() {
         doc = std::move(s.doc);
         activeLayer = s.layer;
         activeFrame = s.frame;
+        tileShapes = std::move(s.shapes);
+        tileMap = std::move(s.tileMap);
         ensureTileIdx();
     }
     resetSelection();
@@ -589,6 +593,12 @@ void Model::paintOne(int x, int y) {
     // Скрытый или запертый слой не правится: рисунок на невидимом слое —
     // всегда ошибка.
     if (!activeLayerEditable()) return;
+    // Тайлкарта, которую правят тайлами: кисть кладёт тайл в клетку под
+    // точкой, ластик опустошает клетку (этап 6).
+    if (activeKind() == LK_TILEMAP && !tilemapPixels) {
+        stampTileAt(x, y);
+        return;
+    }
     if (strokeMask.sameSize(tile.w, tile.h)) {
         if (strokeMask.at(x, y) != 0) return;
         strokeMask.at(x, y) = 1;

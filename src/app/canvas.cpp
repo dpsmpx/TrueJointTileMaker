@@ -230,6 +230,7 @@ void Editor::drawCanvas() {
         fb_.fillRect(m.tileToScreenX(0), cy - 1, m.tileToScreenX(m.docW()), cy + 1, axis);
     }
     fb_.resetClip();
+    drawVectorHandles();
     drawRadialAxes();
     drawGuides();
     drawRulers();

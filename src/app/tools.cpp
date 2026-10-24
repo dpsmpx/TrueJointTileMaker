@@ -340,19 +340,43 @@ void Editor::handleCanvasClick() {
         return;
     }
     // Alt у выделения вычитает из него, а не берёт цвет.
+    const int kind = m.activeKind();
+    const bool tileStamp = kind == LK_TILEMAP && !m.tilemapPixels;
     if (frameClickButton_ == MB_RIGHT || (isKeyPressed(KEY_ALT) && m.toolTile != T_SELECT) ||
         m.toolTile == T_PICK) {
+        // У тайлкарты, которую правят тайлами, пипетка берёт тайл клетки.
+        if (tileStamp) {
+            m.tileBrush = m.tileIndexAt(mx, my);
+            m.needRepaint = true;
+            return;
+        }
         m.pickColorFromTile(mx, my);
+        return;
+    }
+    if (kind == LK_GROUP) {
+        showMessage("Это группа",
+                    "Группа сама не рисуется: выберите слой внутри неё на ленте кадров (J).");
+        return;
+    }
+    const bool shapeTool = m.toolTile == T_LINE || m.toolTile == T_RECT || m.toolTile == T_ELLIPSE;
+    if (kind == LK_VECTOR && !shapeTool) {
+        showMessage("Векторный слой",
+                    "На векторном слое рисуют линией, прямоугольником и овалом — фигуры "
+                    "остаются правимыми. Чтобы рисовать точками, растрируйте слой на экране "
+                    "слоёв и кадров.");
         return;
     }
     // По скрытому или запертому слою кисть ничего не меняет: лучше сказать
     // об этом, чем молча не рисовать.
     if (m.toolTile != T_SELECT && !m.activeLayerEditable()) {
         const Layer& l = m.doc.layers[static_cast<std::size_t>(m.activeLayer)];
-        showMessage(l.locked ? "Слой заперт" : "Слой скрыт",
-                    "Слой «" + l.name + "» " + (l.locked ? "заперт" : "скрыт") +
-                        ": рисунок на нём не меняется. Щёлкните по " +
-                        (l.locked ? "замку" : "глазу") + " слоя на ленте кадров (клавиша J).");
+        const bool own = l.locked || !l.visible;
+        showMessage(m.layerLockedDeep(m.activeLayer) ? "Слой заперт" : "Слой скрыт",
+                    "Слой «" + l.name + "» " +
+                        (m.layerLockedDeep(m.activeLayer) ? "заперт" : "скрыт") +
+                        (own ? "" : " вместе со своей группой") +
+                        ": рисунок на нём не меняется. Щёлкните по замку или глазу на ленте "
+                        "кадров (клавиша J).");
         return;
     }
     switch (m.toolTile) {
@@ -360,6 +384,10 @@ void Editor::handleCanvasClick() {
         case T_ERASER:
         case T_DITHER: doPaintStroke(mx, my); break;
         case T_FILL:
+            if (tileStamp) {
+                m.fillTilesAt(mx, my);
+                break;
+            }
             m.pushUndo();
             // В строгом индексном режиме заливка — цветом ячейки.
             m.floodFillTile(mx, my, m.fillColor());
@@ -367,7 +395,15 @@ void Editor::handleCanvasClick() {
             break;
         case T_LINE:
         case T_RECT:
-        case T_ELLIPSE: doShapeTool(mx, my); break;
+        case T_ELLIPSE:
+            // Фигуры векторного слоя и линии особых видов — векторным
+            // инструментом; прямая и фигуры растра — как в оригинале.
+            if (kind == LK_VECTOR || (m.toolTile == T_LINE && m.lineKind != LINE_STRAIGHT)) {
+                doVectorTool(mx, my);
+            } else {
+                doShapeTool(mx, my);
+            }
+            break;
         case T_SELECT: doSelectTool(mx, my); break;
         default: break;
     }
@@ -470,8 +506,15 @@ void Editor::handlePanelClick() {
     if (py >= TOOLS_Y0 && py < TOOLS_Y1) {
         if (m.toolHit(frameClickX_, frameClickY_, idx)) {
             m.setTool(idx);
-            // Правая кнопка по инструменту тайла — его параметры.
-            if (m.docMode == DOC_TILE && frameClickButton_ == MB_RIGHT) showToolOptions();
+            // Правая кнопка по инструменту тайла — его параметры; у линии и
+            // фигур — параметры фигур (этап 6).
+            if (m.docMode == DOC_TILE && frameClickButton_ == MB_RIGHT) {
+                if (idx == T_LINE || idx == T_RECT || idx == T_ELLIPSE) {
+                    showShapeOptions();
+                } else {
+                    showToolOptions();
+                }
+            }
         } else if (m.docMode == DOC_TILE) {
             const int chip = chipHit(frameClickX_, frameClickY_);
             if (chip >= 0) handleChipClick(chip);

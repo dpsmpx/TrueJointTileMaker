@@ -31,7 +31,7 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.1.0";
+inline constexpr const char* kAppVersion = "1.2.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -99,6 +99,9 @@ inline constexpr int DOC_TILE = 0, DOC_MAP = 1;
 
 /// Преобразования картинки или содержимого выделения (этап 1).
 inline constexpr int TF_FLIP_H = 0, TF_FLIP_V = 1, TF_ROT90 = 2, TF_ROT180 = 3, TF_ROT270 = 4;
+/// Вид линии инструмента «Линия» (этап 6).
+inline constexpr int LINE_STRAIGHT = 0, LINE_POLY = 1, LINE_POLYGON = 2, LINE_CURVE = 3,
+                     LINE_CLOSED_CURVE = 4, LINE_STAR = 5, LINE_KINDS = 6;
 /// Вид выделения: рамка, овал, лассо, волшебная палочка, по цвету,
 /// многоугольник по вершинам (этап 5).
 inline constexpr int SS_RECT = 0, SS_ELLIPSE = 1, SS_LASSO = 2, SS_WAND = 3, SS_COLOR = 4,
@@ -162,7 +165,14 @@ struct TileSnapshot {
     SpriteDoc doc;
     int layer = 0;
     int frame = 0;
+    /// Активная ячейка векторного слоя и тайлкарты (этап 6).
+    std::vector<VecShape> shapes;
+    Grid<int> tileMap;
 };
+
+/// Какая команда идёт по всем ячейкам (forEachCel): цветовая меняет
+/// точки на месте, геометрическая — их положение.
+inline constexpr int CEL_COLOR = 0, CEL_GEOMETRY = 1;
 
 class Model {
 public:
@@ -314,6 +324,24 @@ public:
 
     std::vector<TileSnapshot> undoStack, redoStack;
     std::vector<MapDoc> mapUndo, mapRedo;
+
+    // --- этап 6: активная ячейка векторного слоя и тайлкарты ---
+    /// Фигуры активной ячейки векторного слоя; tile — их растр.
+    std::vector<VecShape> tileShapes;
+    /// Номера тайлов активной ячейки тайлкарты; tile — их отрисовка.
+    Grid<int> tileMap;
+    /// Тайлкарта правится точками: правка уходит в набор и меняет все копии
+    /// тайла. Иначе кисть кладёт тайл tileBrush целиком.
+    bool tilemapPixels = false;
+    int tileBrush = 1;
+    /// Вид линии: прямая (как в оригинале), ломаная, многоугольник, кривая
+    /// через точки, замкнутая кривая, звезда (этап 6).
+    int lineKind = 0;
+    /// Толщина, заливка вторым цветом и звезда — у фигур и векторных слоёв.
+    int shapeWidth = 1;
+    bool shapeFill = false;
+    int starPoints = 5;
+    int starInner = 50;
 
     /// Маска текущего штриха: пиксель закрашивается не больше раза,
     /// иначе полупрозрачная кисть накладывалась бы сама на себя.
@@ -536,12 +564,19 @@ public:
     bool activeLayerEditable() const;
     /// Применить правку ко всем ячейкам документа, включая активную. Так
     /// работают команды над всей картинкой: размер холста, поворот, палитра.
-    void forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>& fn);
+    /// Цветовая правка идёт и по цветам векторных фигур, и по тайлам наборов;
+    /// геометрическая двигает точки фигур через shapeFn, а без него — и
+    /// всегда у тайлкарты, чья сетка после неё не совпадёт, — переводит
+    /// слой в растр.
+    void forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>& fn,
+                    int what = CEL_COLOR, const std::function<void(VecShape&)>& shapeFn = {});
     /// Пройти по картинкам всех ячеек, ничего не меняя.
     void forEachCelConst(const std::function<void(const Grid<Color>&)>& fn) const;
     /// Видимые слои кадра f, сведённые с учётом непрозрачности слоя.
     Grid<Color> compositeFrame(int f) const;
     Color compositeAt(int f, int x, int y) const;
+    /// Сведение слоёв from..to кадра f с группами (этап 6).
+    Color compositeLayers(int f, int from, int to, int x, int y) const;
     /// То, что видно на холсте в точке: сведение и «луковая кожа», без шахматки.
     Color viewColorAt(int x, int y) const;
     int addLayer();
@@ -570,6 +605,51 @@ public:
     /// Документ из кадров анимации (APNG, GIF): один слой, кадры с их
     /// длительностями. Размер — по первому кадру.
     void setAnimation(const std::vector<AnimFrame>& frames, const std::string& fileName);
+    // --- этап 6: группы, вектор, тайлкарта (model_layers.cpp) ---
+    int activeKind() const;
+    /// Группа, в которой лежит слой, или -1.
+    int layerParent(int l) const;
+    /// Нижний слой поддерева группы; у прочих слоёв — сам слой.
+    int subtreeStart(int l) const;
+    /// Слой и все его группы видны / слой или одна из его групп заперты.
+    bool layerShownDeep(int l) const;
+    bool layerLockedDeep(int l) const;
+    /// Строка слоя видна на ленте: ни одна его группа не свёрнута.
+    bool layerRowVisible(int l) const;
+    void setLayerCollapsed(int l, bool c);
+    /// Сгруппировать активный слой с поддеревом; возвращает группу.
+    int groupLayer();
+    bool ungroupLayer();
+    /// В соседнюю группу над слоем верхним ребёнком / из своей группы.
+    bool indentLayer();
+    bool outdentLayer();
+    /// Группа → один растровый слой с её видом.
+    bool flattenGroup();
+    int addVectorLayer();
+    /// Векторный слой или тайлкарта становятся растровым слоем.
+    bool rasterizeLayer();
+    /// Фигура на векторный слой — правимой, на растровый — точками.
+    /// Возвращает номер фигуры или -1.
+    int addVectorShape(const VecShape& s);
+    /// Заменить фигуру без шага истории (его кладут в начале протяжки).
+    void setVectorShape(int i, const VecShape& s);
+    bool deleteVectorShape(int i);
+    void rerenderActiveVector();
+    int addTilemapLayer(int tw, int th);
+    /// Растровый слой → тайлкарта: одинаковые клетки — один тайл.
+    bool convertLayerToTilemap(int tw, int th);
+    void rerenderTileset(int t);
+    /// Правка тайлкарты точками уходит в набор (зовётся перед показом).
+    void syncActiveTilemap();
+    const Tileset* activeTileset() const;
+    int addTileToActiveSet(const Grid<Color>& g);
+    /// Тайлы разом, одним шагом истории; повторы не добавляются.
+    int addTilesToActiveSet(const std::vector<Grid<Color>>& tiles);
+    bool deleteTileFromActiveSet(int i);
+    int tileIndexAt(int x, int y) const;
+    void setTileCell(int cx, int cy, int v);
+    void stampTileAt(int x, int y);
+    void fillTilesAt(int x, int y);
     /// Следующий кадр проигрывания внутри метки tag (-1 — все кадры).
     /// pingDir — направление для «туда-обратно», меняется на краях.
     int nextPlayFrame(int f, int tag, int& pingDir) const;

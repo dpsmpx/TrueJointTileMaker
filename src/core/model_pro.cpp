@@ -13,6 +13,7 @@
 #include "core/imageops.h"
 #include "core/model.h"
 #include "core/pmath.h"
+#include "core/vector.h"
 
 namespace tjtm {
 
@@ -349,11 +350,29 @@ void Model::transformImage(int op) {
         needRepaint = true;
         return;
     }
-    // Вся картинка — это все слои и кадры: поворачивается спрайт целиком.
-    forEachCel([op](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = applyTf(img, op);
-        idx = applyTf(idx, op);
-    });
+    // Вся картинка — это все слои и кадры: поворачивается спрайт целиком,
+    // и точки векторных фигур — тем же преобразованием (центр точки x —
+    // x + ½, поэтому отражение — w - x, а не w - 1 - x).
+    const double w = tile.w;
+    const double h = tile.h;
+    forEachCel(
+        [op](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = applyTf(img, op);
+            idx = applyTf(idx, op);
+        },
+        CEL_GEOMETRY,
+        [op, w, h](VecShape& s) {
+            for (VecPoint& p : s.pts) {
+                const VecPoint q = p;
+                switch (op) {
+                    case TF_FLIP_H: p.x = w - q.x; break;
+                    case TF_FLIP_V: p.y = h - q.y; break;
+                    case TF_ROT90: p = {h - q.y, q.x}; break;
+                    case TF_ROT180: p = {w - q.x, h - q.y}; break;
+                    default: p = {q.y, w - q.x}; break;
+                }
+            }
+        });
     afterResize(*this);
 }
 
@@ -361,10 +380,22 @@ bool Model::scaleImageTo(int nw, int nh) {
     if (docMode != DOC_TILE || tile.empty()) return false;
     if (nw < 1 || nh < 1 || nw > MAX_TILE || nh > MAX_TILE) return false;
     pushUndo();
-    forEachCel([nw, nh](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::scaleNearest(img, nw, nh);
-        idx = img::scaleNearest(idx, nw, nh);
-    });
+    const double sx = static_cast<double>(nw) / tile.w;
+    const double sy = static_cast<double>(nh) / tile.h;
+    forEachCel(
+        [nw, nh](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::scaleNearest(img, nw, nh);
+            idx = img::scaleNearest(idx, nw, nh);
+        },
+        CEL_GEOMETRY,
+        [sx, sy](VecShape& s) {
+            for (VecPoint& p : s.pts) {
+                p.x *= sx;
+                p.y *= sy;
+            }
+            // Толщина растёт вместе с картинкой, как у растра.
+            s.width = std::max(1, pround(s.width * (sx + sy) / 2));
+        });
     afterResize(*this);
     return true;
 }
@@ -395,10 +426,12 @@ bool Model::cropToSelection() {
     const int y = selY;
     const int w = selW;
     const int h = selH;
-    forEachCel([=](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::crop(img, x, y, w, h, kClear);
-        idx = img::crop(idx, x, y, w, h, IDX_NONE);
-    });
+    forEachCel(
+        [=](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::crop(img, x, y, w, h, kClear);
+            idx = img::crop(idx, x, y, w, h, IDX_NONE);
+        },
+        CEL_GEOMETRY, [x, y](VecShape& s) { vec::translate(s, -x, -y); });
     afterResize(*this);
     return true;
 }
@@ -419,10 +452,12 @@ bool Model::cropToContent() {
     if (!img::maskBounds(any, x, y, w, h)) return false;
     if (x == 0 && y == 0 && w == tile.w && h == tile.h) return false;
     pushUndo();
-    forEachCel([=](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::crop(img, x, y, w, h, kClear);
-        idx = img::crop(idx, x, y, w, h, IDX_NONE);
-    });
+    forEachCel(
+        [=](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::crop(img, x, y, w, h, kClear);
+            idx = img::crop(idx, x, y, w, h, IDX_NONE);
+        },
+        CEL_GEOMETRY, [x, y](VecShape& s) { vec::translate(s, -x, -y); });
     afterResize(*this);
     return true;
 }
@@ -439,10 +474,14 @@ bool Model::resizeCanvas(int nw, int nh, int anchorX, int anchorY) {
     const bool single = doc.layerCount() <= 1;
     const Color fill = single ? blank : kClear;
     const PalIndex fillIdx = single ? bi : IDX_NONE;
-    forEachCel([&](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::resizeCanvas(img, nw, nh, anchorX, anchorY, fill);
-        idx = img::resizeCanvas(idx, nw, nh, anchorX, anchorY, fillIdx);
-    });
+    const int ox = img::anchorOffset(tile.w, nw, anchorX);
+    const int oy = img::anchorOffset(tile.h, nh, anchorY);
+    forEachCel(
+        [&](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::resizeCanvas(img, nw, nh, anchorX, anchorY, fill);
+            idx = img::resizeCanvas(idx, nw, nh, anchorX, anchorY, fillIdx);
+        },
+        CEL_GEOMETRY, [ox, oy](VecShape& s) { vec::translate(s, ox, oy); });
     afterResize(*this);
     return true;
 }
@@ -450,10 +489,14 @@ bool Model::resizeCanvas(int nw, int nh, int anchorX, int anchorY) {
 void Model::offsetImage(int dx, int dy) {
     if (docMode != DOC_TILE || tile.empty() || (dx == 0 && dy == 0)) return;
     pushUndo();
-    forEachCel([dx, dy](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::offsetWrap(img, dx, dy);
-        idx = img::offsetWrap(idx, dx, dy);
-    });
+    // Перенос через край рвёт фигуры пополам: векторный слой после него —
+    // растр, как и тайлкарта.
+    forEachCel(
+        [dx, dy](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::offsetWrap(img, dx, dy);
+            idx = img::offsetWrap(idx, dx, dy);
+        },
+        CEL_GEOMETRY);
     resetSelection();
     tileBmpDirty = true;
     needRepaint = true;
@@ -540,9 +583,25 @@ bool Model::rotateImageBy(double degrees, int method, bool expand) {
     if (expand) img::rotatedSize(tile.w, tile.h, degrees, nw, nh);
     if (nw > MAX_TILE || nh > MAX_TILE) return false;
     pushUndo();
-    forEachCel([&](Grid<Color>& img, Grid<PalIndex>& idx) {
-        unpack(img::rotateAny(pack(img, idx), degrees, method, expand, clear), img, idx);
-    });
+    const double a = degrees * std::numbers::pi / 180.0;
+    const double ca = std::cos(a);
+    const double sa = std::sin(a);
+    const double scx = tile.w / 2.0;
+    const double scy = tile.h / 2.0;
+    const double dcx = nw / 2.0;
+    const double dcy = nh / 2.0;
+    forEachCel(
+        [&](Grid<Color>& img, Grid<PalIndex>& idx) {
+            unpack(img::rotateAny(pack(img, idx), degrees, method, expand, clear), img, idx);
+        },
+        CEL_GEOMETRY,
+        [=](VecShape& s) {
+            for (VecPoint& p : s.pts) {
+                const double dx = p.x - scx;
+                const double dy = p.y - scy;
+                p = {dcx + dx * ca - dy * sa, dcy + dx * sa + dy * ca};
+            }
+        });
     afterResize(*this);
     return true;
 }

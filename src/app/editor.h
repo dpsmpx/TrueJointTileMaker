@@ -285,6 +285,18 @@ private:
     int rotateMethod_ = 1;
     bool rotateExpand_ = true;
 
+    // --- этап 6: векторные инструменты и тайлы (vector_ui.cpp) ---
+    /// Последняя тронутая фигура векторного слоя: её удаляет Delete.
+    int vecSel_ = -1;
+    static std::string lineKindName(int k);
+    VecShape styledShape(int type) const;
+    void previewShape(const VecShape& s);
+    void drawVectorHandles();
+    void doVectorTool(int mx, int my);
+    void showShapeOptions();
+    void showTilePickerScreen();
+    void importGameTiles();
+
     // --- этап 5: линейки и направляющие (guides.cpp) ---
     void drawGuides();
     void drawRadialAxes();
@@ -316,6 +328,9 @@ private:
     /// Высота холста по ленте: m.H — холст, окно — WIN_H.
     void applyLayout();
     void drawTimeline();
+    /// Слои строк ленты сверху вниз, без детей свёрнутых групп.
+    std::vector<int> timelineRows() const;
+    void drawLayerKindMark(int x, int cy, const Layer& layer);
     void handleTimelineClick();
     bool handleTimelineKey(int key);
     void timelineWheel(int wheel);

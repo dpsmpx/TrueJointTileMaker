@@ -85,3 +85,11 @@ prec5      02_polygon  0    0  600  560
 prec5      03_rotated  0    0  600  560
 prec5      04_outline  0    0  600  560
 prec5      05_tiff     0    0  600  560
+# Этап 6 — эталон со снимков переноса: холст над лентой и клетки ленты.
+layers6    01_vector   0    0  600  410
+layers6    02_edited   0    0  600  410
+layers6    03_group    0    0  600  410
+layers6    03_group  150  474  450   80
+layers6    04_tilemap  0    0  600  410
+layers6    05_propagated 0  0  600  410
+layers6    06_reloaded 0    0  600  410

@@ -24,6 +24,7 @@ add_executable(tjtm_core_tests
     test_doc.cpp
     test_formats.cpp
     test_imageops.cpp
+    test_layers.cpp
     test_map.cpp
     test_model.cpp
     test_palette.cpp

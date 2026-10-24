@@ -261,7 +261,14 @@ void Editor::drawInfoSection() {
     fb_.fillRect(PANEL_X, INFO_Y0 - 1, PANEL_X + PANEL_W, INFO_Y1 + 1, cPanel);
     if (m.docMode == DOC_TILE) {
         fb_.fillRect(PANEL_X + 2, INFO_Y0, PANEL_X + 42, INFO_Y0 + 40, cFace);
-        drawGridThumb(m.buffer, PANEL_X + 2, INFO_Y0, 40);
+        // У тайлкарты здесь — тайл кисти, у прочих — буфер выделения.
+        const Tileset* ts = m.activeTileset();
+        if (ts != nullptr && m.tileBrush > 0 && m.tileBrush < static_cast<int>(ts->tiles.size())) {
+            drawGridThumb(ts->tiles[static_cast<std::size_t>(m.tileBrush)], PANEL_X + 2, INFO_Y0,
+                          40);
+        } else {
+            drawGridThumb(m.buffer, PANEL_X + 2, INFO_Y0, 40);
+        }
         fb_.frameRect(PANEL_X + 2, INFO_Y0, PANEL_X + 42, INFO_Y0 + 40, cBorder);
     }
     const int tx = m.screenToTileX(mouseX());
@@ -326,8 +333,10 @@ void Editor::drawPanel() {
 }
 
 void Editor::repaint() {
-    // Команда могла положить цвет не из палитры: в строгом индексном режиме
-    // он сводится к ячейке до того, как его увидят.
+    // Правка точек тайлкарты уходит в её набор (этап 6), а команда могла
+    // положить цвет не из палитры: в строгом индексном режиме он сводится
+    // к ячейке до того, как его увидят.
+    m.syncActiveTilemap();
     m.enforceIndexed();
     drawCanvas();
     drawTimeline();

@@ -9,6 +9,7 @@
 
 #include "core/model.h"
 #include "core/pmath.h"
+#include "core/tilemap.h"
 
 namespace tjtm {
 
@@ -49,6 +50,8 @@ void Model::resetDoc() {
     doc.cels.assign(1, std::vector<CelPtr>(1));
     activeLayer = 0;
     activeFrame = 0;
+    tileShapes.clear();
+    tileMap.clear();
 }
 
 void Model::commitActiveCel() {
@@ -56,17 +59,22 @@ void Model::commitActiveCel() {
     activeLayer = clampI(activeLayer, 0, doc.layerCount() - 1);
     activeFrame = clampI(activeFrame, 0, doc.frameCount() - 1);
     ensureTileIdx();
+    // У группы ячеек нет: её картинка — сведение детей.
+    if (activeKind() == LK_GROUP) return;
     // Пустая картинка — пустая ячейка: файл короче, а на ленте кадров
     // видно, где рисунок есть.
     const CelPtr cur = doc.cel(activeLayer, activeFrame);
-    if (blankCel(tile, tileIdx)) {
+    const bool noTiles =
+        std::all_of(tileMap.d.begin(), tileMap.d.end(), [](int v) { return v == 0; });
+    if (blankCel(tile, tileIdx) && tileShapes.empty() && noTiles) {
         doc.setCel(activeLayer, activeFrame, nullptr);
     } else if (cur && cur->img.sameSize(tile.w, tile.h) && cur->img.d == tile.d &&
-               cur->idx.d == tileIdx.d) {
+               cur->idx.d == tileIdx.d && cur->shapes == tileShapes && cur->tiles == tileMap) {
         // Не правили — ячейка остаётся прежней и общей с копиями кадра:
         // листание кадров не плодит картинок и не рвёт связь копий.
     } else {
-        doc.setCel(activeLayer, activeFrame, std::make_shared<const Cel>(Cel{tile, tileIdx}));
+        doc.setCel(activeLayer, activeFrame,
+                   std::make_shared<const Cel>(Cel{tile, tileIdx, tileShapes, tileMap}));
     }
 }
 
@@ -78,9 +86,23 @@ void Model::loadActiveCel() {
         tile = c->img;
         tileIdx = c->idx;
         if (!tileIdx.sameSize(w, h)) tileIdx.resize(w, h, IDX_NONE);
+        tileShapes = c->shapes;
+        tileMap = c->tiles;
     } else {
         tile.resize(w, h, kClear);
         tileIdx.resize(w, h, IDX_NONE);
+        tileShapes.clear();
+        tileMap.clear();
+    }
+    // Пустая ячейка тайлкарты — карта из пустых клеток нужного размера.
+    if (const Tileset* ts = activeTileset();
+        ts != nullptr && !tileMap.sameSize(tmap::cols(w, ts->tw), tmap::rows(h, ts->th))) {
+        Grid<int> m(tmap::cols(w, ts->tw), tmap::rows(h, ts->th), 0);
+        for (int y = 0; y < std::min(m.h, tileMap.h); ++y) {
+            for (int x = 0; x < std::min(m.w, tileMap.w); ++x)
+                m.at(x, y) = tileMap.at(x, y);
+        }
+        tileMap = std::move(m);
     }
     tileBmpDirty = true;
     overDirty = true;
@@ -100,14 +122,60 @@ void Model::setActiveCel(int layer, int frame) {
 
 bool Model::activeLayerEditable() const {
     if (activeLayer < 0 || activeLayer >= doc.layerCount()) return true;
-    const Layer& l = doc.layers[static_cast<std::size_t>(activeLayer)];
-    return l.visible && !l.locked;
+    // Группа сама не рисуется, а скрытая или запертая группа прячет и
+    // запирает всех своих детей.
+    return activeKind() != LK_GROUP && layerShownDeep(activeLayer) && !layerLockedDeep(activeLayer);
 }
 
-void Model::forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>& fn) {
+void Model::forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>& fn, int what,
+                       const std::function<void(VecShape&)>& shapeFn) {
     ensureTileIdx();
-    fn(tile, tileIdx);
+    // Цвет фигуры меняется той же правкой, что и точки: она идёт по
+    // картинке 1x1 этого цвета.
+    auto recolor = [&](Color& c) {
+        if (c.a == 0) return;
+        Grid<Color> g(1, 1, c);
+        Grid<PalIndex> i(1, 1, indexOfColor(c));
+        fn(g, i);
+        c = g.at(0, 0);
+    };
+    std::vector<int> touchedSets;
+    std::vector<int> baked;
+    auto apply = [&](int l, Grid<Color>& img, Grid<PalIndex>& idx, std::vector<VecShape>& shapes,
+                     Grid<int>& tiles) {
+        const Layer& layer = doc.layers[static_cast<std::size_t>(l)];
+        if (layer.kind == LK_TILEMAP && what == CEL_COLOR) {
+            // Тайлкарта перекрашивается в своём наборе, отрисовка — потом.
+            if (std::find(touchedSets.begin(), touchedSets.end(), layer.tileset) ==
+                touchedSets.end())
+                touchedSets.push_back(layer.tileset);
+            return;
+        }
+        fn(img, idx);
+        if (layer.kind == LK_VECTOR) {
+            if (what == CEL_COLOR) {
+                for (VecShape& s : shapes) {
+                    recolor(s.stroke);
+                    recolor(s.fill);
+                }
+            } else if (shapeFn) {
+                for (VecShape& s : shapes)
+                    shapeFn(s);
+            } else {
+                shapes.clear();
+                if (std::find(baked.begin(), baked.end(), l) == baked.end()) baked.push_back(l);
+            }
+        }
+        if (layer.kind == LK_TILEMAP) {
+            // Сетка клеток после сдвига или поворота уже не совпадает с
+            // тайлами: слой остаётся картинкой.
+            tiles.clear();
+            if (std::find(baked.begin(), baked.end(), l) == baked.end()) baked.push_back(l);
+        }
+    };
+    if (activeKind() != LK_GROUP) apply(activeLayer, tile, tileIdx, tileShapes, tileMap);
     for (int l = 0; l < doc.layerCount(); ++l) {
+        if (doc.layers[static_cast<std::size_t>(l)].kind == LK_GROUP) continue;
         for (int f = 0; f < doc.frameCount(); ++f) {
             if (l == activeLayer && f == activeFrame) continue;
             const CelPtr c = doc.cel(l, f);
@@ -117,9 +185,25 @@ void Model::forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>&
             Cel copy = *c;
             if (!copy.idx.sameSize(copy.img.w, copy.img.h))
                 copy.idx.resize(copy.img.w, copy.img.h, IDX_NONE);
-            fn(copy.img, copy.idx);
+            apply(l, copy.img, copy.idx, copy.shapes, copy.tiles);
             doc.setCel(l, f, std::make_shared<const Cel>(std::move(copy)));
         }
+    }
+    for (const int l : baked) {
+        doc.layers[static_cast<std::size_t>(l)].kind = LK_RASTER;
+        doc.layers[static_cast<std::size_t>(l)].tileset = -1;
+    }
+    for (const int t : touchedSets) {
+        if (t < 0 || t >= static_cast<int>(doc.tilesets.size())) continue;
+        Tileset ts = *doc.tilesets[static_cast<std::size_t>(t)];
+        for (Grid<Color>& g : ts.tiles) {
+            Grid<PalIndex> i(g.w, g.h, IDX_NONE);
+            for (std::size_t k = 0; k < g.d.size(); ++k)
+                i.d[k] = indexOfColor(g.d[k]);
+            fn(g, i);
+        }
+        doc.tilesets[static_cast<std::size_t>(t)] = std::make_shared<const Tileset>(std::move(ts));
+        rerenderTileset(t);
     }
     tileBmpDirty = true;
     overDirty = true;
@@ -135,10 +219,36 @@ void Model::forEachCelConst(const std::function<void(const Grid<Color>&)>& fn) c
     }
 }
 
-Color Model::compositeAt(int f, int x, int y) const {
-    Color out = kClear;
-    for (int l = 0; l < doc.layerCount(); ++l) {
+Color Model::compositeLayers(int f, int from, int to, int x, int y) const {
+    // Слои снизу вверх; группа лежит над своими детьми. Дети копятся на
+    // своём уровне стопки, а группа сводит его на уровень ниже — со своей
+    // видимостью и непрозрачностью, как отдельная картинка.
+    std::vector<Color> stack{kClear};
+    const int base =
+        from >= 0 && from < doc.layerCount() ? doc.layers[static_cast<std::size_t>(from)].depth : 0;
+    auto fold = [&stack](std::size_t keep) {
+        while (stack.size() > keep) {
+            const Color c = stack.back();
+            stack.pop_back();
+            stack.back() = blendOver(c, stack.back());
+        }
+    };
+    for (int l = from; l <= to && l < doc.layerCount(); ++l) {
         const Layer& layer = doc.layers[static_cast<std::size_t>(l)];
+        const auto d = static_cast<std::size_t>(std::clamp(layer.depth - base, 0, 64));
+        while (stack.size() < d + 1)
+            stack.push_back(kClear);
+        if (layer.kind == LK_GROUP) {
+            fold(d + 2);
+            const Color inner = stack.size() > d + 1 ? stack[d + 1] : kClear;
+            stack.resize(d + 1);
+            if (layer.visible) {
+                const Color src = withOpacity(inner, layer.opacity);
+                if (src.a != 0) stack[d] = blendOver(src, stack[d]);
+            }
+            continue;
+        }
+        fold(d + 1);
         if (!layer.visible) continue;
         Color src = kClear;
         if (l == activeLayer && f == activeFrame) {
@@ -147,10 +257,15 @@ Color Model::compositeAt(int f, int x, int y) const {
             src = c->img.at(x, y);
         }
         src = withOpacity(src, layer.opacity);
-        if (src.a != 0) out = blendOver(src, out);
+        if (src.a != 0) stack[d] = blendOver(src, stack[d]);
     }
-    if (doc.layerCount() == 0 && tile.inside(x, y)) out = tile.at(x, y);
-    return out;
+    fold(1);
+    return stack[0];
+}
+
+Color Model::compositeAt(int f, int x, int y) const {
+    if (doc.layerCount() == 0) return tile.inside(x, y) ? tile.at(x, y) : kClear;
+    return compositeLayers(f, 0, doc.layerCount() - 1, x, y);
 }
 
 Grid<Color> Model::compositeFrame(int f) const {
@@ -185,9 +300,12 @@ int Model::addLayer() {
     if (docMode != DOC_TILE) return -1;
     pushUndo();
     commitActiveCel();
+    // Новый слой — сосед активного сверху, на его глубине: над группой —
+    // рядом с ней, внутри группы — внутри.
     const int at = activeLayer + 1;
-    doc.layers.insert(doc.layers.begin() + at,
-                      Layer{"Слой " + std::to_string(doc.layerCount() + 1)});
+    Layer l{"Слой " + std::to_string(doc.layerCount() + 1)};
+    l.depth = doc.layers[static_cast<std::size_t>(activeLayer)].depth;
+    doc.layers.insert(doc.layers.begin() + at, l);
     doc.cels.insert(doc.cels.begin() + at,
                     std::vector<CelPtr>(static_cast<std::size_t>(doc.frameCount())));
     activeLayer = at;
@@ -196,12 +314,21 @@ int Model::addLayer() {
 }
 
 bool Model::deleteLayer() {
-    if (docMode != DOC_TILE || doc.layerCount() <= 1) return false;
+    if (docMode != DOC_TILE) return false;
+    const int s = subtreeStart(activeLayer);
+    const int n = activeLayer - s + 1;
+    // Без единого слоя с картинкой документ не бывает.
+    int drawable = 0;
+    for (int l = 0; l < doc.layerCount(); ++l) {
+        if ((l < s || l > activeLayer) && doc.layers[static_cast<std::size_t>(l)].kind != LK_GROUP)
+            ++drawable;
+    }
+    if (drawable == 0) return false;
     pushUndo();
     commitActiveCel();
-    doc.layers.erase(doc.layers.begin() + activeLayer);
-    doc.cels.erase(doc.cels.begin() + activeLayer);
-    activeLayer = std::min(activeLayer, doc.layerCount() - 1);
+    doc.layers.erase(doc.layers.begin() + s, doc.layers.begin() + s + n);
+    doc.cels.erase(doc.cels.begin() + s, doc.cels.begin() + s + n);
+    activeLayer = std::min(s, doc.layerCount() - 1);
     loadActiveCel();
     return true;
 }
@@ -210,44 +337,87 @@ int Model::duplicateLayer() {
     if (docMode != DOC_TILE) return -1;
     pushUndo();
     commitActiveCel();
-    Layer copy = doc.layers[static_cast<std::size_t>(activeLayer)];
-    copy.name += " копия";
+    // Копия группы — копия всего её поддерева; ячейки общие, пока их не
+    // правят.
+    const int s = subtreeStart(activeLayer);
+    const int n = activeLayer - s + 1;
+    std::vector<Layer> layers(doc.layers.begin() + s, doc.layers.begin() + activeLayer + 1);
+    layers.back().name += " копия";
+    std::vector<std::vector<CelPtr>> cels(doc.cels.begin() + s, doc.cels.begin() + activeLayer + 1);
     const int at = activeLayer + 1;
-    doc.layers.insert(doc.layers.begin() + at, copy);
-    doc.cels.insert(doc.cels.begin() + at, doc.cels[static_cast<std::size_t>(activeLayer)]);
-    activeLayer = at;
+    doc.layers.insert(doc.layers.begin() + at, layers.begin(), layers.end());
+    doc.cels.insert(doc.cels.begin() + at, cels.begin(), cels.end());
+    activeLayer = at + n - 1;
     loadActiveCel();
-    return at;
+    return activeLayer;
 }
 
+namespace {
+
+/// Поменять местами соседние ряды [a0, a1] и [a1 + 1, b1] в списке.
+template <class V>
+void swapBlocks(V& v, int a0, int a1, int b1) {
+    std::rotate(v.begin() + a0, v.begin() + a1 + 1, v.begin() + b1 + 1);
+}
+
+}  // namespace
+
 bool Model::moveLayer(int dir) {
-    const int to = activeLayer + dir;
-    if (docMode != DOC_TILE || to < 0 || to >= doc.layerCount() || dir == 0) return false;
-    pushUndo();
-    commitActiveCel();
-    std::swap(doc.layers[static_cast<std::size_t>(activeLayer)],
-              doc.layers[static_cast<std::size_t>(to)]);
-    std::swap(doc.cels[static_cast<std::size_t>(activeLayer)],
-              doc.cels[static_cast<std::size_t>(to)]);
-    activeLayer = to;
+    if (docMode != DOC_TILE || dir == 0) return false;
+    const int a = activeLayer;
+    const int s = subtreeStart(a);
+    const int d = doc.layers[static_cast<std::size_t>(a)].depth;
+    // Слой ходит среди соседей своей глубины целым поддеревом и из группы
+    // так не выходит: для этого есть «из группы».
+    if (dir > 0) {
+        int t = a + 1;
+        while (t < doc.layerCount() && doc.layers[static_cast<std::size_t>(t)].depth > d)
+            ++t;
+        if (t >= doc.layerCount() || doc.layers[static_cast<std::size_t>(t)].depth != d ||
+            subtreeStart(t) != a + 1)
+            return false;
+        pushUndo();
+        commitActiveCel();
+        swapBlocks(doc.layers, s, a, t);
+        swapBlocks(doc.cels, s, a, t);
+        activeLayer = t;
+    } else {
+        if (s == 0) return false;
+        const int below = s - 1;
+        if (doc.layers[static_cast<std::size_t>(below)].depth != d) return false;
+        const int bs = subtreeStart(below);
+        pushUndo();
+        commitActiveCel();
+        swapBlocks(doc.layers, bs, below, a);
+        swapBlocks(doc.cels, bs, below, a);
+        activeLayer = bs + (a - s);
+    }
     loadActiveCel();
     return true;
 }
 
 bool Model::mergeLayerDown() {
     if (docMode != DOC_TILE || activeLayer <= 0) return false;
-    pushUndo();
-    commitActiveCel();
     const int up = activeLayer;
     const int lo = activeLayer - 1;
+    const Layer& upper0 = doc.layers[static_cast<std::size_t>(up)];
+    const Layer& lower0 = doc.layers[static_cast<std::size_t>(lo)];
+    // Сливаются соседи одной глубины, и в растровый слой: сводить группы —
+    // своя команда.
+    if (upper0.kind == LK_GROUP || lower0.kind != LK_RASTER || lower0.depth != upper0.depth)
+        return false;
+    pushUndo();
+    commitActiveCel();
     const Layer& upper = doc.layers[static_cast<std::size_t>(up)];
     for (int f = 0; f < doc.frameCount(); ++f) {
         const CelPtr a = doc.cel(up, f);
         if (!a || !upper.visible) continue;
         const CelPtr b = doc.cel(lo, f);
-        Cel merged =
-            b ? *b
-              : Cel{Grid<Color>(tile.w, tile.h, kClear), Grid<PalIndex>(tile.w, tile.h, IDX_NONE)};
+        Cel merged = b ? *b
+                       : Cel{Grid<Color>(tile.w, tile.h, kClear),
+                             Grid<PalIndex>(tile.w, tile.h, IDX_NONE),
+                             {},
+                             {}};
         if (!merged.idx.sameSize(merged.img.w, merged.img.h))
             merged.idx.resize(merged.img.w, merged.img.h, IDX_NONE);
         for (std::size_t k = 0; k < merged.img.d.size() && k < a->img.d.size(); ++k) {
@@ -437,8 +607,8 @@ void Model::setAnimation(const std::vector<AnimFrame>& frames, const std::string
     for (const AnimFrame& fr : frames) {
         doc.frames.push_back(Frame{clampI(fr.durationMs, 10, 60000)});
         // Кадры чужого файла могут быть меньше холста: недостающее прозрачно.
-        auto c =
-            std::make_shared<Cel>(Cel{Grid<Color>(w, h, kClear), Grid<PalIndex>(w, h, IDX_NONE)});
+        auto c = std::make_shared<Cel>(
+            Cel{Grid<Color>(w, h, kClear), Grid<PalIndex>(w, h, IDX_NONE), {}, {}});
         for (int y = 0; y < std::min(h, fr.image.h); ++y) {
             for (int x = 0; x < std::min(w, fr.image.w); ++x) {
                 c->img.at(x, y) = fr.image.at(x, y);

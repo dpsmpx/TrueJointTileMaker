@@ -381,6 +381,7 @@ bool Editor::handleProKey(int key) {
     };
     if (ctrl) {
         switch (key) {
+            case KEY_T: showTilePickerScreen(); return true;
             case KEY_A: m.selectAll(); return true;
             case KEY_D:
                 if (shift) {
@@ -399,6 +400,11 @@ bool Editor::handleProKey(int key) {
     switch (key) {
         case KEY_V: pasteHere(); return true;
         case KEY_DELETE:
+            // На векторном слое Delete убирает последнюю тронутую фигуру.
+            if (m.activeKind() == LK_VECTOR) {
+                if (vecSel_ >= 0 && m.deleteVectorShape(vecSel_)) vecSel_ = -1;
+                return true;
+            }
             // С выделением Delete стирает выделенное; без него — весь тайл.
             if (!m.hasSelection) return false;
             m.eraseSelection();

@@ -161,7 +161,7 @@ TEST_P(AppScreens, MatchOriginal) {
 
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
-                                           "anim4", "prec5"));
+                                           "anim4", "prec5", "layers6"));
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.
@@ -275,6 +275,32 @@ TEST(AppScreens, BmpAndTiffSaved) {
     ASSERT_EQ(pages.size(), 1U);
     EXPECT_EQ(pages[0].w, 79);
     EXPECT_EQ(pages[0].h, 79);
+    fs::remove_all(base);
+}
+
+/// Этап 6: проект сценария layers6 хранит группу, векторный слой с
+/// фигурами и тайлкарту с набором.
+TEST(AppScreens, LayersProjectSaved) {
+    const fs::path base = makeBase("layers6x");
+    ASSERT_TRUE(runScenario("layers6", base));
+    std::vector<std::uint8_t> bytes;
+    {
+        std::ifstream in(base / "layers.tjt", std::ios::binary);
+        bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    tjtm::Model m;
+    std::string err;
+    ASSERT_TRUE(tjtm::projectDecode(bytes, m, err)) << err;
+    ASSERT_EQ(m.doc.layerCount(), 4);
+    EXPECT_EQ(m.doc.layers[1].kind, tjtm::LK_VECTOR);
+    EXPECT_EQ(m.doc.layers[2].kind, tjtm::LK_GROUP);
+    EXPECT_TRUE(m.doc.layers[2].collapsed);
+    EXPECT_EQ(m.doc.layers[3].kind, tjtm::LK_TILEMAP);
+    ASSERT_TRUE(m.doc.cel(1, 0));
+    EXPECT_EQ(m.doc.cel(1, 0)->shapes.size(), 3U);
+    ASSERT_TRUE(m.doc.cel(3, 0));
+    for (const int v : m.doc.cel(3, 0)->tiles.d)
+        EXPECT_EQ(v, 2);
     fs::remove_all(base);
 }
 
