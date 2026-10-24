@@ -1,0 +1,10 @@
+# Тестам позволено больше: проверка опционального значения и временные
+# строки тут — способ сказать, что ожидается, а не ошибка.
+InheritParentConfig: true
+Checks: >
+  -bugprone-unchecked-optional-access,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -performance-inefficient-string-concatenation,
+  -performance-inefficient-vector-operation,
+  -modernize-use-emplace,
+  -modernize-use-auto

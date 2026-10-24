@@ -42,6 +42,13 @@
       "displayName": "Clang с clang-tidy при сборке",
       "inherits": "clang",
       "cacheVariables": { "CMAKE_CXX_CLANG_TIDY": "clang-tidy" }
+    },
+    {
+      "name": "mingw",
+      "displayName": "Windows, кросс-сборка MinGW-w64",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/mingw-w64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     }
   ],
   "buildPresets": [
@@ -49,7 +56,8 @@
     { "name": "release", "configurePreset": "release" },
     { "name": "asan", "configurePreset": "asan" },
     { "name": "clang", "configurePreset": "clang" },
-    { "name": "tidy", "configurePreset": "tidy" }
+    { "name": "tidy", "configurePreset": "tidy" },
+    { "name": "mingw", "configurePreset": "mingw" }
   ],
   "testPresets": [
     {
@@ -68,6 +76,16 @@
         "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
       }
     },
-    { "name": "clang", "inherits": "base", "configurePreset": "clang" }
+    { "name": "clang", "inherits": "base", "configurePreset": "clang" },
+    {
+      "name": "mingw",
+      "inherits": "base",
+      "configurePreset": "mingw",
+      "environment": {
+        "WINEDEBUG": "-all",
+        "WINEPREFIX": "$env{HOME}/.local/share/tjtm-tools/wine",
+        "LC_ALL": "C.UTF-8"
+      }
+    }
   ]
 }

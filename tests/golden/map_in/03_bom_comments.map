@@ -1,0 +1,16 @@
+﻿name BOM
+; комментарий
+
+size 4 4
+; ещё
+grid
+####
+#..#
+#..#
+####
+objects
+NPC 1 1 smith
+Item	2	1	bread	1
+bed 1 2
+end
+npc 9 9 after_end

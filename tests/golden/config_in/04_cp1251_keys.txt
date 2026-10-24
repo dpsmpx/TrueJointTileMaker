@@ -1,0 +1,2 @@
+StartupImage = Картинки/debug.png
+ShowGrid = да

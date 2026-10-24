@@ -1,0 +1,80 @@
+# Области снимков, которые обязаны совпасть с оригиналом попиксельно.
+#
+# Эталон — снимок оригинала под Mono, снятый tools/screens.sh и вырезанный
+# по области: tests/screens/golden/СЦЕНАРИЙ/СНИМОК_X_Y.png. Тест переноса
+# (tests/test_app.cpp) проходит сценарий без экрана и сверяет те же области.
+#
+# Текст и скругления сюда не входят: их эталон рисует средствами libgdiplus,
+# и они расходятся на точку (docs/porting.md, «Сверка экранов»). Рамка
+# выделения тоже: её «муравьи» бегут по времени, и фаза на снимке эталона
+# случайна.
+#
+# сценарий снимок     x    y    w    h
+tile       01_editor   0    0  600  560   # холст
+tile       01_editor 624  116  132  132   # палитра
+tile       01_editor 638  248  104  130   # квадрат цвета, полосы тона и прозрачности
+tile       01_editor 602  248   34   64   # первый и второй цвет
+tile       01_editor 640  382  100  100   # обзор
+tile       01_editor 601  483   42   42   # миниатюра буфера
+tile       02_grid     0    0  600  560
+tile       04_select 101   97   87   71   # внутри выделения
+tile       04_select   0    0   99  560   # холст вокруг рамки
+tile       04_select 190    0  410  560
+tile       04_select  99    0   91   95
+tile       04_select  99  170   91  390
+tile       04_select 638  248  104  130
+map        01_map      0    0  600  560
+map        01_map    640  382  100  100
+draw       01_drawn    0    0  600  560   # карандаш, линия, фигуры, заливка, ластик
+draw       01_drawn  640  382  100  100
+draw       02_undo     0    0  600  560   # две отмены
+draw       03_zoom     0    0  600  560   # ролик и сдвиг средней кнопкой
+draw       03_zoom   640  382  100  100
+draw       04_palette  0    0  600  560   # цвет из палитры
+draw       04_palette 602 248   34   64
+# Карта: всё, кроме букв на метках объектов (x 300..455, y 245..304).
+mapedit    01_painted   0    0  300  560
+mapedit    01_painted  456    0  144  560
+mapedit    01_painted  300    0  156  245
+mapedit    01_painted  300  305  156  255
+mapedit    01_painted  640  382  100  100
+mapedit    02_paste     0    0   83  560   # вокруг рамки выделения и меток
+mapedit    02_paste   456    0  144  560
+mapedit    02_paste    83    0  373  183
+mapedit    02_paste    83  307  373  253
+mapedit    02_paste    85  185  179  119   # внутри выделения
+mapedit    02_paste    640  382  100  100
+mapedit    03_undo      0    0  300  560
+mapedit    03_undo     456    0  144  560
+mapedit    03_undo     300    0  156  245
+mapedit    03_undo     300  305  156  255
+mapedit    03_undo     640  382  100  100
+mapedit    04_redo_fit  0    0  300  560
+mapedit    04_redo_fit 456    0  144  560
+mapedit    04_redo_fit 300    0  156  245
+mapedit    04_redo_fit 300  305  156  255
+mapedit    04_redo_fit 640  382  100  100
+# Этап 1 RoadToProLevel — эталон со снимков переноса (tools/port-golden.sh).
+pro1       01_mask     0    0  600  560
+pro1       02_moved    0    0  600  560
+pro1       03_rotated  0    0  600  560
+pro1       04_strokes  0    0  600  560
+pro1       05_cropped  0    0  600  560
+# Этап 2 RoadToProLevel — эталон со снимков переноса.
+pal2       01_indexed  0    0  600  560
+pal2       01_indexed 624  116  132  132
+pal2       02_transparent 0 0  600  560
+pal2       02_transparent 624 116 132 132
+pal2       03_ramp    624  116  132  132
+pal2       04_snapped  0    0  600  560
+pal2       04_snapped 602  248   34   64
+# Этап 4 RoadToProLevel — эталон со снимков переноса: холст над лентой и
+# клетки ленты без подписей.
+anim4      01_layers   0    0  600  410
+anim4      01_layers 150  474  450   80
+anim4      02_onion    0    0  600  410
+anim4      04_played   0    0  600  410
+anim4      04_played 150  474  450   80
+anim4      05_cell   150  474  450   80
+anim4      07_gif      0    0  600  410
+anim4      07_gif    150  474  450   80

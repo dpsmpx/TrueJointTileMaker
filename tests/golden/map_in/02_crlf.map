@@ -1,0 +1,10 @@
+name CRLF карта
+size 5 4
+grid
+#####
+#...#
+#...#
+#####
+objects
+exit 2 2 forest 2 8 key=rusty
+end

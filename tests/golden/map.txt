@@ -1,0 +1,432 @@
+file 01_ok.map
+ok 1
+error []
+warning []
+name [Тест]
+size 6 4
+row ######
+row #.,=:#
+row #~T..#
+row ######
+obj [npc 1 1 elder] kind=[npc] rest=[elder]
+obj [sign 2 2 Текст  с  пробелами  ] kind=[sign] rest=[Текст  с  пробелами  ]
+valid [sign 2 2 Текст  с  пробелами   — стоит на непроходимой клетке (дерево)]
+saved 6e616d6520d0a2d0b5d181d1820a73697a65203620340a677269640a2323232323230a232e2c3d3a230a237e542e2e230a2323232323230a6f626a656374730a6e70632031203120656c6465720a7369676e2032203220d0a2d0b5d0bad181d1822020d1812020d0bfd180d0bed0b1d0b5d0bbd0b0d0bcd0b820200a656e640a
+file 02_crlf.map
+ok 1
+error []
+warning []
+name [CRLF карта]
+size 5 4
+row #####
+row #...#
+row #...#
+row #####
+obj [exit 2 2 forest 2 8 key=rusty] kind=[exit] rest=[forest 2 8 key=rusty]
+saved 6e616d652043524c4620d0bad0b0d180d182d0b00a73697a65203520340a677269640a23232323230a232e2e2e230a232e2e2e230a23232323230a6f626a656374730a657869742032203220666f7265737420322038206b65793d72757374790a656e640a
+file 03_bom_comments.map
+ok 1
+error []
+warning []
+name [BOM]
+size 4 4
+row ####
+row #..#
+row #..#
+row ####
+obj [NPC 1 1 smith] kind=[NPC] rest=[smith]
+obj [Item 2 1 bread	1] kind=[Item] rest=[bread	1]
+obj [bed 1 2] kind=[bed] rest=[]
+saved 6e616d6520424f4d0a73697a65203420340a677269640a232323230a232e2e230a232e2e230a232323230a6f626a656374730a4e50432031203120736d6974680a4974656d2032203120627265616409310a626564203120320a656e640a
+file 04_bad_rows.map
+ok 1
+error []
+warning [строка сетки 2 была длиной 9 вместо 5; недостающее заполнено стеной]
+name [Короткие]
+size 5 4
+row #####
+row #....
+row #.###
+row ###..
+valid [Проходимая часть разбита на 2 несвязанных областей: до части локации не дойти.]
+saved 6e616d6520d09ad0bed180d0bed182d0bad0b8d0b50a73697a65203520340a677269640a23232323230a232e2e2e2e0a232e2323230a2323232e2e0a6f626a656374730a656e640a
+file 05_truncated.map
+ok 0
+error [сетка обрывается: не хватает строк]
+warning []
+file 06_grid_before_size.map
+ok 0
+error [строка 2: grid до объявления size]
+warning []
+file 07_size_zero.map
+ok 0
+error [строка 2: size ожидает два положительных числа]
+warning []
+file 08_size_big.map
+ok 0
+error [локация больше 256 клеток по стороне]
+warning []
+file 09_unknown.map
+ok 0
+error [строка 3: неизвестная директива warp]
+warning []
+file 10_no_grid.map
+ok 0
+error [в файле нет сетки]
+warning []
+file 11_validate.map
+ok 1
+error []
+warning []
+name [Пробелы в имени  ]
+size 5 4
+row #####
+row #.#.#
+row #.#.#
+row #####
+obj [spawn 3 2 rat 2 4] kind=[spawn] rest=[rat 2 4]
+obj [chest 1 1 0 - bread:1] kind=[chest] rest=[0 - bread:1]
+obj [note 3 1] kind=[note] rest=[]
+obj [item 0 0 coin 1] kind=[item] rest=[coin 1]
+obj [npc 99 99 ghost] kind=[npc] rest=[ghost]
+obj [sign 1 2] kind=[sign] rest=[]
+valid [item 0 0 coin 1 — стоит на непроходимой клетке (стена)]
+valid [npc 99 99 ghost — координаты вне локации]
+valid [Проходимая часть разбита на 2 несвязанных областей: до части локации не дойти.]
+saved 6e616d6520d09fd180d0bed0b1d0b5d0bbd18b20d0b220d0b8d0bcd0b5d0bdd0b820200a73697a65203520340a677269640a23232323230a232e232e230a232e232e230a23232323230a6f626a656374730a737061776e2033203220726174203220340a6368657374203120312030202d2062726561643a310a6e6f7465203320310a6974656d2030203020636f696e20310a6e70632039392039392067686f73740a7369676e203120320a656e640a
+file 12_no_walkable.map
+ok 1
+error []
+warning []
+name []
+size 4 4
+row ####
+row ####
+row ####
+row ####
+valid [В локации нет ни одной проходимой клетки.]
+saved 6e616d65200a73697a65203420340a677269640a232323230a232323230a232323230a232323230a6f626a656374730a656e640a
+file 13_size_text.map
+ok 0
+error [строка 2: size ожидает два положительных числа]
+warning []
+file 14_size_after_grid.map
+ok 1
+error []
+warning []
+name [X]
+size 6 6
+inconsistent 4 4
+file resize-3x3
+name [Пробелы в имени  ]
+size 4 4
+row ####
+row #.#.
+row #.#.
+row ####
+obj [spawn 3 2 rat 2 4] kind=[spawn] rest=[rat 2 4]
+obj [chest 1 1 0 - bread:1] kind=[chest] rest=[0 - bread:1]
+obj [note 3 1] kind=[note] rest=[]
+obj [item 0 0 coin 1] kind=[item] rest=[coin 1]
+obj [sign 1 2] kind=[sign] rest=[]
+valid [item 0 0 coin 1 — стоит на непроходимой клетке (стена)]
+valid [Проходимая часть разбита на 2 несвязанных областей: до части локации не дойти.]
+saved 6e616d6520d09fd180d0bed0b1d0b5d0bbd18b20d0b220d0b8d0bcd0b5d0bdd0b820200a73697a65203420340a677269640a232323230a232e232e0a232e232e0a232323230a6f626a656374730a737061776e2033203220726174203220340a6368657374203120312030202d2062726561643a310a6e6f7465203320310a6974656d2030203020636f696e20310a7369676e203120320a656e640a
+file resize-8x6
+name [Пробелы в имени  ]
+size 8 6
+row ########
+row #.#.####
+row #.#.####
+row ########
+row ########
+row ########
+obj [spawn 3 2 rat 2 4] kind=[spawn] rest=[rat 2 4]
+obj [chest 1 1 0 - bread:1] kind=[chest] rest=[0 - bread:1]
+obj [note 3 1] kind=[note] rest=[]
+obj [item 0 0 coin 1] kind=[item] rest=[coin 1]
+obj [sign 1 2] kind=[sign] rest=[]
+valid [item 0 0 coin 1 — стоит на непроходимой клетке (стена)]
+valid [Проходимая часть разбита на 2 несвязанных областей: до части локации не дойти.]
+saved 6e616d6520d09fd180d0bed0b1d0b5d0bbd18b20d0b220d0b8d0bcd0b5d0bdd0b820200a73697a65203820360a677269640a23232323232323230a232e232e232323230a232e232e232323230a23232323232323230a23232323232323230a23232323232323230a6f626a656374730a737061776e2033203220726174203220340a6368657374203120312030202d2062726561643a310a6e6f7465203320310a6974656d2030203020636f696e20310a7369676e203120320a656e640a
+file objects
+objectAt 6 3 -1
+name [Пробелы в имени  ]
+size 8 6
+row ########
+row #.#.####
+row #.#.####
+row ########
+row ########
+row ########
+obj [chest 1 1 0 - bread:1] kind=[chest] rest=[0 - bread:1]
+obj [note 3 1] kind=[note] rest=[]
+obj [item 0 0 coin 1] kind=[item] rest=[coin 1]
+obj [sign 1 2] kind=[sign] rest=[]
+obj [bed 2 2] kind=[bed] rest=[]
+obj [npc 2 2 elder] kind=[npc] rest=[elder]
+valid [item 0 0 coin 1 — стоит на непроходимой клетке (стена)]
+valid [bed 2 2 — стоит на непроходимой клетке (стена)]
+valid [npc 2 2 elder — стоит на непроходимой клетке (стена)]
+valid [Проходимая часть разбита на 2 несвязанных областей: до части локации не дойти.]
+saved 6e616d6520d09fd180d0bed0b1d0b5d0bbd18b20d0b220d0b8d0bcd0b5d0bdd0b820200a73697a65203820360a677269640a23232323232323230a232e232e232323230a232e232e232323230a23232323232323230a23232323232323230a23232323232323230a6f626a656374730a6368657374203120312030202d2062726561643a310a6e6f7465203320310a6974656d2030203020636f696e20310a7369676e203120320a626564203220320a6e70632032203220656c6465720a656e640a
+file new-2x300
+name [Новая локация]
+size 4 256
+row ####
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row #..#
+row ####
+saved 6e616d6520d09dd0bed0b2d0b0d18f20d0bbd0bed0bad0b0d186d0b8d18f0a73697a652034203235360a677269640a232323230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232e2e230a232323230a6f626a656374730a656e640a

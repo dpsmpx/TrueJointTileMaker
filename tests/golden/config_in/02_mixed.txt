@@ -1,0 +1,18 @@
+ShowGrid=ДА
+showchecker =  нет  
+  DEFAULTTILEWIDTH = 64 
+DefaultTileHeight=+8
+DefaultMapWidth = 999
+DefaultMapHeight = -3
+=пусто
+# ShowHelpOnStart = да
+; ShowMenuOnStart = нет
+ShowMenuOnStart = Вкл
+ShowSeamless = maybe
+StartInMapMode = yes
+AutoLoadLastFile = 1
+строка без знака
+LastFile =   C:\\tiles\\a b.png  
+LastFile = второй раз
+TilesFolder = data/tiles = with eq
+IconsFolder =

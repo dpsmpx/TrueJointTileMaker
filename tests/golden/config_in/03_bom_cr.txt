@@ -1,0 +1,6 @@
+﻿﻿ShowGrid = да
+DefaultTileWidth = 12abc
+DefaultTileHeight =   20  
+DefaultMapWidth = 99999999999
+DefaultMapHeight =	40	
+ShowChecker = 0ShowHelpOnStart = true

@@ -1,0 +1,11 @@
+name Тест
+size 6 4
+grid
+######
+#.,=:#
+#~T..#
+######
+objects
+npc 1 1 elder
+sign 2 2 Текст  с  пробелами  
+end

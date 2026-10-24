@@ -11,3 +11,4 @@ DerivePointerAlignment: false
 PointerAlignment: Left
 IncludeBlocks: Regroup
 SortIncludes: CaseSensitive
+AllowShortCaseLabelsOnASingleLine: true

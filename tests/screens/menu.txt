@@ -1,0 +1,30 @@
+# Главное меню при запуске и экраны, открываемые из него.
+# Кнопки меню: y = 100 + 36 * номер, высота 32; середина — +16.
+shot 01_menu
+move 390 296
+shot 02_hover
+click 390 440   # Настройки
+sleep 0.6
+shot 03_settings
+key Escape
+sleep 0.3
+click 390 476   # Справка и благодарности
+sleep 0.6
+shot 04_help
+key Escape
+sleep 0.3
+click 390 368   # Операции с цветом
+sleep 0.6
+shot 05_colorops
+key Escape
+sleep 0.3
+click 390 332   # Наборы тайлов
+sleep 0.8
+shot 06_tileset
+key Escape
+sleep 0.3
+click 390 188   # Создать файл
+sleep 0.6
+shot 07_new
+key Escape
+sleep 0.3

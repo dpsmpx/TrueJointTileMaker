@@ -1,0 +1,44 @@
+# Этап 2 RoadToProLevel: экран палитры (U), сортировка, извлечение из
+# картинки, строгий индексный режим, прозрачный номер, ряд цветов, кисть
+# свободным цветом в индексном режиме. Эталон — снимки переноса.
+key Escape
+sleep 0.4
+key u
+sleep 0.3
+click 441 236              # сортировать всю палитру по тону
+click 573 392              # извлечь из картинки…
+sleep 0.2
+key Return                 # не больше 64 цветов
+key Return                 # сообщение о числе цветов
+key Escape
+key i                      # индексный режим: все цвета уже в палитре
+sleep 0.3
+move 700 300
+shot 01_indexed
+key u
+sleep 0.3
+click 79 55                # ячейка 2
+click 290 466              # сделать прозрачной
+key Escape
+sleep 0.3
+move 700 300
+shot 02_transparent
+key u
+sleep 0.3
+click 35 55                # ячейка 0
+keydown shift
+click 123 55               # до ячейки 4
+keyup shift
+click 573 328              # ряд от первой до последней…
+sleep 0.2
+key Return                 # пять ступеней без изгиба
+key Escape
+sleep 0.3
+move 700 300
+shot 03_ramp
+click 700 300              # свободный цвет из квадрата насыщенности
+key 1
+drag 60 60 300 60          # карандаш: цвет сведётся к ближайшей ячейке
+move 700 300
+sleep 0.2
+shot 04_snapped
