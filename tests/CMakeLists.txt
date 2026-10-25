@@ -45,7 +45,11 @@ if(ZLIB_FOUND)
 endif()
 
 include(GoogleTest)
-gtest_discover_tests(tjtm_core_tests DISCOVERY_MODE PRE_TEST)
+# Список тестов спрашивается у самой программы. Под Wine первый запуск
+# поднимает префикс десятки секунд, и пяти секунд по умолчанию не хватает.
+set(TJTM_DISCOVERY_TIMEOUT 120)
+gtest_discover_tests(tjtm_core_tests DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT ${TJTM_DISCOVERY_TIMEOUT})
 
 # Программа целиком: сценарии без экрана и сверка снимков с оригиналом.
 if(TARGET tjtm)
@@ -55,5 +59,6 @@ if(TARGET tjtm)
         TJTM_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
         TJTM_APP_EXE="$<TARGET_FILE:tjtm>")
     add_dependencies(tjtm_app_tests tjtm)
-    gtest_discover_tests(tjtm_app_tests DISCOVERY_MODE PRE_TEST)
+    gtest_discover_tests(tjtm_app_tests DISCOVERY_MODE PRE_TEST
+        DISCOVERY_TIMEOUT ${TJTM_DISCOVERY_TIMEOUT})
 endif()

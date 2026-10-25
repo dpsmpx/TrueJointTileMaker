@@ -117,6 +117,17 @@ SDL_VIDEODRIVER=offscreen build/debug/tjtm --base КАТАЛОГ \
 
 Проверка кода: `tools/lint.sh` — C++ и скрипты (с `--fix` правит оформление).
 
+CI (`.github/workflows/ci.yml`) на каждый push и PR повторяет то же самое:
+отладочная сборка, все тесты с корпусом карт игры и `tools/lint.sh`;
+отдельно `asan`; Windows — пресет `mingw` с тестами под Wine, и готовая
+программа для Windows лежит артефактом прогона. Пакеты ставит
+`tools/ci-deps.sh` — подмножество `setup-env.sh` без эталона: CI сверяется
+с эталонами, уже лежащими в репозитории.
+
+Выпуск (`.github/workflows/release.yml`) — тегом `vX.Y.Z`: тег обязан
+совпадать с `project(VERSION)`, архивы для Windows x64 и Linux x86-64
+собираются со статической SDL3 и выкладываются на страницу релиза.
+
 Отладка: `gdb build/debug/tjtm`, `valgrind build/debug/tjtm --frames 2`,
 `compile_commands.json` для clangd лежит в каталоге сборки.
 

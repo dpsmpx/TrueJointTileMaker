@@ -1,0 +1,113 @@
+# Выпуск: готовые программы для Windows и Linux на странице релиза.
+#
+# Запускается тегом vX.Y.Z или вручную с именем тега. Версия в теге обязана
+# совпадать с project(VERSION) в CMakeLists.txt: иначе в окне программы
+# стояла бы одна версия, а на странице релиза — другая.
+#
+# Обе сборки самодостаточны: SDL3 скачивается и собирается статически
+# (cmake/sdl3.cmake), рядом с программой — ресурсы, стартовая картинка и
+# настройки, как у TJTM.exe оригинала. Тесты — дело CI, здесь только сборка.
+name: Выпуск
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Тег выпуска, например v1.4.0
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  version:
+    name: Версия
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        name: Тег и версия проекта
+        run: |
+          want="${TAG#v}"
+          have="$(sed -n 's/^project(TrueJointTileMaker VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          if [ "$want" != "$have" ]; then
+              echo "::error::тег $TAG, а в CMakeLists.txt версия $have"
+              exit 1
+          fi
+          echo "version=$have" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows x64
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Пакеты
+        run: tools/ci-deps.sh mingw
+      - name: Сборка
+        run: |
+          cmake --preset mingw -DBUILD_TESTING=OFF
+          cmake --build --preset mingw --target tjtm
+      - name: Архив
+        run: |
+          name="TrueJointTileMaker-${{ needs.version.outputs.version }}-windows-x64"
+          mkdir -p "dist/$name"
+          cp build/mingw/tjtm.exe Config.txt README.md LICENSE "dist/$name/"
+          cp -r Resources Картинки "dist/$name/"
+          (cd dist && zip -qr "$name.zip" "$name")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip
+
+  linux:
+    name: Linux x86-64
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # Заголовки X11 и Wayland нужны, чтобы статическая SDL3 умела оба;
+      # сами библиотеки она находит у пользователя при запуске.
+      - name: Пакеты
+        run: tools/ci-deps.sh linux
+      - name: Сборка
+        run: |
+          cmake --preset release -DBUILD_TESTING=OFF
+          cmake --build --preset release --target tjtm
+      - name: Архив
+        run: |
+          name="TrueJointTileMaker-${{ needs.version.outputs.version }}-linux-x86_64"
+          mkdir -p "dist/$name"
+          cp build/release/tjtm Config.txt README.md LICENSE "dist/$name/"
+          strip "dist/$name/tjtm"
+          cp -r Resources Картинки "dist/$name/"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*.tar.gz
+
+  publish:
+    name: Страница релиза
+    needs: [version, windows, linux]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="${{ needs.version.outputs.version }}"
+          notes="Готовые сборки True Joint Tile Maker $ver: Windows x64 (один exe без DLL) и Linux x86-64. Распакуйте архив и запустите tjtm — рядом с ним ресурсы, стартовая картинка и Config.txt. Что сделано — docs/roadmap.md, справка — клавиша H в программе."
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "True Joint Tile Maker $ver" --notes "$notes"
