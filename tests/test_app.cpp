@@ -337,8 +337,11 @@ TEST(AppScreens, GameSetExported) {
     }
 
     const tjtm::Grid<tjtm::Color> atlas = load(base / "atlas.png");
-    std::ifstream jin(base / "atlas.json", std::ios::binary);
-    const std::string json((std::istreambuf_iterator<char>(jin)), std::istreambuf_iterator<char>());
+    // Поток закрыт сразу: в Windows открытый файл не даёт убрать каталог.
+    const std::string json = [&] {
+        std::ifstream jin(base / "atlas.json", std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(jin)), std::istreambuf_iterator<char>());
+    }();
     int frames = 0;
     for (const auto& e : fs::directory_iterator(fixture)) {
         const std::string name = e.path().filename().string();
