@@ -322,8 +322,19 @@ private:
     /// Фильтр с параметрами экрана; boxed — он видит рамку выделения.
     Grid<Color> runFilter(const Grid<Color>& g) const;
     bool filterBoxed() const;
-    void showBrushOptions();
     void doAirbrushStroke(int startX, int startY);
+
+    // --- этап 9: инструменты пиксель-арта (art_ui.cpp) ---
+    /// Карандаш и его виды: чистые точки, аэрограф, кисть из выделения,
+    /// затенение. Правая кнопка по карандашу.
+    void showBrushOptions();
+    /// Заливка цветом или градиентом узором. Правая кнопка по заливке.
+    void showFillOptions();
+    void doGradientTool(int ax, int ay);
+    bool brushGhostShown();
+    /// Призрак был на холсте в прошлом кадре: уйдя с холста, его надо стереть.
+    bool ghostShown_ = false;
+    void drawBrushGhost();
     void drawChecker(int x0, int y0, int x1, int y1);
 
     // --- этап 7: связь с игрой (gameset_ui.cpp) ---

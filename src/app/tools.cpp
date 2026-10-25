@@ -358,6 +358,13 @@ void Editor::handleCanvasClick() {
                     "Группа сама не рисуется: выберите слой внутри неё на ленте кадров (J).");
         return;
     }
+    if (kind == LK_REFERENCE && m.toolTile != T_SELECT) {
+        showMessage("Слой-образец",
+                    "Образец — подложка для срисовки: на нём не рисуют, и в выгрузку он не "
+                    "попадает. Выберите слой рисунка на ленте кадров (J) или клавишами PgUp и "
+                    "PgDn.");
+        return;
+    }
     const bool shapeTool = m.toolTile == T_LINE || m.toolTile == T_RECT || m.toolTile == T_ELLIPSE;
     if (kind == LK_VECTOR && !shapeTool) {
         showMessage("Векторный слой",
@@ -385,8 +392,14 @@ void Editor::handleCanvasClick() {
         case T_DITHER:
             // Аэрограф — вид карандаша (этап 8); тайлкарту тайлами он не
             // штампует — там карандаш кладёт тайл.
-            if (m.toolTile == T_PEN && m.airbrush && !tileStamp) {
+            if (m.toolTile == T_PEN && m.penMode == PEN_AIRBRUSH && !tileStamp) {
                 doAirbrushStroke(mx, my);
+            } else if (m.toolTile == T_PEN && m.penMode == PEN_SHADE && !tileStamp) {
+                // Shift — затенение в другую сторону, только на этот мазок.
+                const bool flip = isKeyPressed(KEY_SHIFT);
+                m.shadeDarker = m.shadeDarker != flip;
+                doPaintStroke(mx, my);
+                m.shadeDarker = m.shadeDarker != flip;
             } else {
                 doPaintStroke(mx, my);
             }
@@ -394,6 +407,10 @@ void Editor::handleCanvasClick() {
         case T_FILL:
             if (tileStamp) {
                 m.fillTilesAt(mx, my);
+                break;
+            }
+            if (m.fillGradient) {
+                doGradientTool(mx, my);
                 break;
             }
             m.pushUndo();
@@ -523,6 +540,8 @@ void Editor::handlePanelClick() {
                     showShapeOptions();
                 } else if (idx == T_PEN) {
                     showBrushOptions();
+                } else if (idx == T_FILL) {
+                    showFillOptions();
                 } else {
                     showToolOptions();
                 }

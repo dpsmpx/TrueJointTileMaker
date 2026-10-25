@@ -54,9 +54,12 @@ std::string Editor::toolLabel(int i) const {
         }
     }
     switch (i) {
-        case T_PEN: return m.airbrush ? "Аэр" : "Кар";
+        case T_PEN: {
+            static const char* const kPen[PEN_MODES] = {"Кар", "Аэр", "Кисть", "Тень"};
+            return kPen[std::clamp(m.penMode, 0, PEN_MODES - 1)];
+        }
         case T_ERASER: return "Ласт";
-        case T_FILL: return "Зал";
+        case T_FILL: return m.fillGradient ? "Град" : "Зал";
         case T_PICK: return "Пип";
         case T_LINE: return "Лин";
         case T_RECT: return "Прям";
@@ -83,8 +86,10 @@ void Editor::drawToolsSection() {
         // Нарисованный значок заменяет подпись, ненарисованный — нет: набор
         // делается по одному, и пока значка нет, кнопка выглядит как раньше.
         const int ic = m.docMode == DOC_MAP ? T_TILE_COUNT + i : i;
-        // Аэрограф — подписью: значок карандаша соврал бы, что кисть точная.
-        const bool airLabel = m.docMode == DOC_TILE && i == T_PEN && m.airbrush;
+        // Вид карандаша и градиент — подписью: значок карандаша или заливки
+        // соврал бы, что инструмент обычный.
+        const bool airLabel = m.docMode == DOC_TILE && ((i == T_PEN && m.penMode != PEN_PENCIL) ||
+                                                        (i == T_FILL && m.fillGradient));
         if (!airLabel && ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
             !iconBmp_[static_cast<std::size_t>(ic)].empty()) {
             fb_.drawImage(iconBmp_[static_cast<std::size_t>(ic)], x0 + (TOOL_CW - 2 - ICON_PX) / 2,

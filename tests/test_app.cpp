@@ -167,7 +167,7 @@ TEST_P(AppScreens, MatchOriginal) {
 
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
-                                           "anim4", "prec5", "layers6", "game7", "fx8"));
+                                           "anim4", "prec5", "layers6", "game7", "fx8", "art9"));
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.

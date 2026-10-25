@@ -603,6 +603,12 @@ void Model::paintOne(int x, int y) {
         if (strokeMask.at(x, y) != 0) return;
         strokeMask.at(x, y) = 1;
     }
+    // Затенение (этап 9) меняет цвет самой точки, а не кладёт цвет кисти;
+    // маска мазка выше не даёт пройти по точке дважды за мазок.
+    if (toolTile == T_PEN && penMode == PEN_SHADE) {
+        shadeOne(x, y);
+        return;
+    }
     tileBmpDirty = true;
     const Color c = brushColorAt(x, y);
     // Неполная непрозрачность кисти — всегда смешивание: заменить точку
@@ -657,6 +663,9 @@ void Model::emitPixel(int x, int y) {
         forEachSymmetric(x, y, [this](int px, int py) { drawPreviewPixel(px, py); });
     } else if (docMode == DOC_MAP) {
         putMapCell(x, y);
+    } else if (strokeActive && toolTile == T_PEN && penMode == PEN_STAMP && !customBrush.empty()) {
+        // Кисть из выделения (этап 9) ложится целиком в каждую точку пути.
+        stampBrushAt(x, y);
     } else if (strokeActive && pixelPerfect &&
                (toolTile == T_PEN || toolTile == T_ERASER || toolTile == T_DITHER)) {
         emitPixelPerfect(x, y);
@@ -669,7 +678,8 @@ void Model::beginStroke() {
     strokeMask.resize(docW(), docH(), 0);
     strokePts.clear();
     strokeActive = docMode == DOC_TILE;
-    if (strokeActive && pixelPerfect) {
+    const bool stamp = toolTile == T_PEN && penMode == PEN_STAMP && !customBrush.empty();
+    if (strokeActive && (pixelPerfect || stamp)) {
         ensureTileIdx();
         strokeBase = tile;
         strokeBaseIdx = tileIdx;

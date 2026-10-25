@@ -263,6 +263,7 @@ void Editor::drawCanvas() {
     }
     fb_.resetClip();
     drawVectorHandles();
+    drawBrushGhost();
     drawRadialAxes();
     drawGuides();
     drawRulers();

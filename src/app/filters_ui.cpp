@@ -1,5 +1,5 @@
 // Вне пиксель-арта (этап 8 RoadToProLevel, раздел 24 плана): экран
-// «Фильтры и эффекты», параметры аэрографа и его мазок.
+// «Фильтры и эффекты» и мазок аэрографа.
 //
 // План советовал всего этого не добавлять: размытие, фото-фильтры,
 // кривые, мягкая кисть и плавные преобразования дают новые цвета и мягкие
@@ -462,64 +462,8 @@ void Editor::showFiltersScreen() {
 }
 
 // ---------------------------------------------------------------------------
-// Аэрограф
+// Мазок аэрографа; его параметры — на экране карандаша (art_ui.cpp)
 // ---------------------------------------------------------------------------
-
-void Editor::showBrushOptions() {
-    bool done = false;
-    dropInput();
-    pf_.input().keys.clear();
-    constexpr int LX = 60;
-    while (!done && !quitNow_) {
-        beginFrameInput();
-        fb_.clear(cWindow);
-        textCentered(0, 12, WIN_W, 40, "Карандаш и аэрограф", cText);
-        if (uiToggle(LX, 70, 320, 34, "Карандаш: чистые точки", !m.airbrush)) m.airbrush = false;
-        if (uiToggle(LX + 330, 70, 320, 34, "Аэрограф: мягкая кисть", m.airbrush))
-            m.airbrush = true;
-        uiLabel(0, 108, WIN_W, 20, "Аэрограф — не пиксель-арт: мягкий край и смесь цветов.", cWarn);
-        uiLabel(0, 126, WIN_W, 20,
-                "В строгом индексном режиме точка становится цветом кисти, когда напор "
-                "перевалит за половину.",
-                cWarn);
-        uiStepper(LX, 150, "Диаметр", m.airSize, 1, 64, 4);
-        uiStepper(LX, 192, "Жёсткость", m.airHardness, 0, 100, 10, "%");
-        uiStepper(LX, 234, "Напор", m.airFlow, 1, 100, 10, "%");
-        uiLabelLeft(LX, 276, 22, "Жёсткость — доля радиуса со сплошной серединой; напор", cTextDim);
-        uiLabelLeft(LX, 296, 22, "копится за мазок: проведите по месту ещё раз — гуще.", cTextDim);
-
-        // Отпечаток первым цветом по точке экрана на четыре точки шахматки.
-        const Grid<float> dab = fx::softDab(m.airSize, m.airHardness);
-        const int cell = std::max(1, std::min(8, 200 / std::max(1, dab.w)));
-        const int ox = 470 + (220 - dab.w * cell) / 2;
-        const int oy = 150 + (200 - dab.h * cell) / 2;
-        drawChecker(ox, oy, ox + dab.w * cell, oy + dab.h * cell);
-        const Color c = m.firstColor;
-        for (int y = 0; y < dab.h; ++y) {
-            for (int x = 0; x < dab.w; ++x) {
-                const float v = dab.at(x, y) * static_cast<float>(m.airFlow) / 100.0F;
-                if (v <= 0) continue;
-                const Color px =
-                    argb(static_cast<int>(std::lround(v * static_cast<float>(c.a))), c.r, c.g, c.b);
-                const Color under = ((x * cell / 8 + y * cell / 8) % 2 == 0) ? cCheckA : cCheckB;
-                fb_.fillRect(ox + x * cell, oy + y * cell, ox + (x + 1) * cell, oy + (y + 1) * cell,
-                             blendOver(px, under));
-            }
-        }
-        fb_.frameRect(ox - 1, oy - 1, ox + dab.w * cell + 1, oy + dab.h * cell + 1, cBorder);
-
-        if (uiButton(LX, 340, 320, 30, "Все параметры инструментов…   O", true)) showToolOptions();
-        uiLabelLeft(LX, 390, 22, "Сглаживание линии и фигур — в параметрах фигур:", cTextDim);
-        uiLabelLeft(LX, 410, 22, "правая кнопка по линии, прямоугольнику или овалу.", cTextDim);
-        if (uiButton(WIN_W / 2 - 90, WIN_H - 52, 180, 36, "Закрыть", true)) done = true;
-        redraw();
-        const int key = takeKey();
-        if (key == KEY_ESC || key == KEY_ENTER) done = true;
-        idle();
-    }
-    waitMouseRelease();
-    m.needRepaint = true;
-}
 
 void Editor::doAirbrushStroke(int startX, int startY) {
     m.pushUndo();

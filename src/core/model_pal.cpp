@@ -379,6 +379,7 @@ int Model::enforceGrid(Grid<Color>& img, Grid<PalIndex>& idx) const {
 
 void Model::enforceIndexed() {
     if (!strictIndexedOn() || tile.empty() || palette.empty()) return;
+    if (activeKind() == LK_REFERENCE) return;
     ensureTileIdx();
     if (enforceGrid(tile, tileIdx) > 0) {
         tileBmpDirty = true;

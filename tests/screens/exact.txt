@@ -111,3 +111,10 @@ fx8        06_airbrush      0    0  600  560
 fx8        07_smooth_line   0    0  600  560
 fx8        08_rotate_dialog 0    0  780  560
 fx8        09_rotated       0    0  600  560
+# Этап 9 — эталон со снимков переноса: окно целиком, с подписью вида
+# карандаша и заливки на панели.
+art9       01_reference     0    0  600  560
+art9       02_stamp         0    0  780  560
+art9       03_shade         0    0  780  560
+art9       04_fill_options  0    0  780  560
+art9       05_gradient      0    0  780  560
