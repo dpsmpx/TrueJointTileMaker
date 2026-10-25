@@ -1,0 +1,108 @@
+# Проверка каждого изменения: сборка и все тесты на Linux и Windows,
+# санитайзеры и линтеры.
+#
+# Windows — кросс-сборка MinGW-w64 с тестами под Wine, ровно как
+# `ctest --preset mingw` у разработчика: CI и локальный прогон — одно и то
+# же, и расхождение в одном месте видно в другом. Снимки экрана сверяются
+# попиксельно на обеих платформах.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux — сборка, тесты, линтеры
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Пакеты
+        run: tools/ci-deps.sh linux
+      # SDL3 собирается из исходников закреплённых выпусков (в Ubuntu 24.04
+      # её нет) — раз, дальше берётся из кэша. Ключ — сам скрипт: выпуски
+      # записаны в нём.
+      - name: Кэш SDL3
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/tjtm-tools/sdl3
+          key: sdl3-linux-${{ hashFiles('tools/setup-env.sh') }}
+      - name: SDL3 и корпус карт игры
+        run: tools/setup-env.sh --skip-apt --skip-pabcnet
+      - name: Сборка
+        run: |
+          . ~/.local/share/tjtm-tools/env.sh
+          cmake --preset debug
+          cmake --build --preset debug
+      - name: Тесты
+        run: |
+          . ~/.local/share/tjtm-tools/env.sh
+          ctest --preset debug -j "$(nproc)"
+      - name: Линтеры
+        run: tools/lint.sh
+
+  sanitizers:
+    name: Linux — ASan и UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Пакеты
+        run: tools/ci-deps.sh linux
+      - name: Кэш SDL3
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/tjtm-tools/sdl3
+          key: sdl3-linux-${{ hashFiles('tools/setup-env.sh') }}
+      - name: SDL3 и корпус карт игры
+        run: tools/setup-env.sh --skip-apt --skip-pabcnet
+      - name: Сборка
+        run: |
+          . ~/.local/share/tjtm-tools/env.sh
+          cmake --preset asan
+          cmake --build --preset asan
+      - name: Тесты
+        run: |
+          . ~/.local/share/tjtm-tools/env.sh
+          ctest --preset asan -j "$(nproc)"
+
+  windows:
+    name: Windows — MinGW-w64, тесты под Wine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Пакеты
+        run: tools/ci-deps.sh mingw
+      - name: Сборка
+        run: |
+          cmake --preset mingw
+          cmake --build --preset mingw
+      # Префикс Wine поднимается заранее: первый запуск идёт десятки секунд.
+      - name: Префикс Wine
+        run: |
+          export WINEPREFIX="$HOME/.local/share/tjtm-tools/wine" WINEDEBUG=-all
+          mkdir -p "$WINEPREFIX"
+          wineboot --init
+          wineserver -w
+      - name: Тесты
+        run: ctest --preset mingw -j 4
+      - name: Программа для Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrueJointTileMaker-windows
+          path: |
+            build/mingw/tjtm.exe
+            build/mingw/Config.txt
+            build/mingw/Resources
+            build/mingw/Картинки
