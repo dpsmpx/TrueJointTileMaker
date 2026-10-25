@@ -304,7 +304,7 @@ TEST(ModelFx, StrictIndexedSnapsFiltersToPalette) {
 TEST(ModelFx, AirbrushBuildsUpAlongStroke) {
     Model m = spriteModel(32, 16);
     m.firstColor = kRed;
-    m.airbrush = true;
+    m.penMode = PEN_AIRBRUSH;
     m.airSize = 6;
     m.airHardness = 0;
     m.airFlow = 30;
@@ -321,7 +321,7 @@ TEST(ModelFx, AirbrushBuildsUpAlongStroke) {
     // от того, как мышь разбила движение.
     Model n = spriteModel(32, 16);
     n.firstColor = kRed;
-    n.airbrush = true;
+    n.penMode = PEN_AIRBRUSH;
     n.airSize = 6;
     n.airHardness = 0;
     n.airFlow = 30;

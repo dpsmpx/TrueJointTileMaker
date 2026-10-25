@@ -77,8 +77,10 @@ struct Cel {
 };
 using CelPtr = std::shared_ptr<const Cel>;
 
-/// Вид слоя: растр, группа, вектор, тайлкарта.
-inline constexpr int LK_RASTER = 0, LK_GROUP = 1, LK_VECTOR = 2, LK_TILEMAP = 3;
+/// Вид слоя: растр, группа, вектор, тайлкарта, образец.
+/// LK_REFERENCE — слой-образец (этап 9): подложка для срисовки. Версии до
+/// 1.5 его не знают и читают обычным растровым слоем.
+inline constexpr int LK_RASTER = 0, LK_GROUP = 1, LK_VECTOR = 2, LK_TILEMAP = 3, LK_REFERENCE = 4;
 
 struct Layer {
     std::string name;

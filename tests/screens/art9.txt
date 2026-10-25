@@ -1,0 +1,83 @@
+# Этап 9: слой-образец, кисть из выделения, затенение по ряду палитры,
+# градиент узором. Палитра со ступенчатыми рядами и картинка-образец —
+# свои файлы сценария (art9.files), ответы диалогам — art9.dialogs.
+# Тайл 64x64 по 8 точек — с (44, 24); палитра на панели: ячейка (c, r) —
+# (634 + 16c, 126 + 16r).
+key Escape
+sleep 0.4
+key u
+sleep 0.3
+click 484 452              # загрузить палитру
+sleep 0.3
+key Escape
+sleep 0.2
+key Delete                 # тайл — прозрачный
+sleep 0.2
+key j
+sleep 0.2
+click 485 425              # экран слоёв и кадров
+sleep 0.3
+click 299 402              # слой-образец
+sleep 0.3
+key j
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 01_reference
+# Ленту спрятали, масштаб остался 6 — точка (x, y) на экране — (111 + 6x,
+# 91 + 6y).
+click 714 142 3            # красный из палитры
+key 1
+click 177 151              # крестик 3x3
+click 171 157
+click 183 157
+click 177 163
+click 682 142 3            # тёмно-красный — в середину
+click 177 157
+key 9
+drag 171 151 183 163       # выделить крестик
+key ctrl+e                 # кисть из выделения
+key ctrl+d
+drag 231 139 411 139       # мазок кистью
+move 770 550
+sleep 0.2
+shot 02_stamp
+click 622 20 3             # параметры карандаша
+sleep 0.3
+click 142 87               # чистые точки
+key Escape
+sleep 0.2
+click 682 126 3            # средний серый
+key 6
+keydown ctrl
+drag 159 271 447 331       # залитый прямоугольник
+keyup ctrl
+click 622 20 3
+sleep 0.3
+click 652 87               # затенение
+key Escape
+sleep 0.2
+drag 159 289 447 289       # светлее
+keydown shift
+drag 159 313 447 313       # с Shift — темнее
+keyup shift
+move 770 550
+sleep 0.2
+shot 03_shade
+click 710 20 3             # параметры заливки
+sleep 0.3
+click 445 87               # градиентом узором
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 04_fill_options
+key Escape
+sleep 0.2
+click 746 174 3            # светлый синий
+key x                      # — вторым цветом
+click 730 190 3            # охра — первым
+key 3
+drag 123 361 471 451       # градиент по пустому
+move 770 550
+sleep 0.2
+shot 05_gradient

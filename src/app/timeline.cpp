@@ -9,6 +9,7 @@
 #include <algorithm>
 
 #include "app/editor.h"
+#include "core/fsutil.h"
 #include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -313,6 +314,12 @@ void Editor::drawLayerKindMark(int x, int cy, const Layer& layer) {
             fb_.frameRect(x + 1, cy - 4, x + 10, cy + 5, c);
             fb_.fillRect(x + 5, cy - 4, x + 6, cy + 5, c);
             fb_.fillRect(x + 1, cy, x + 10, cy + 1, c);
+            break;
+        case LK_REFERENCE:
+            // Рамка с горкой — картинка, которую срисовывают.
+            fb_.frameRect(x + 1, cy - 4, x + 10, cy + 5, c);
+            for (int k = 0; k < 3; ++k)
+                fb_.fillRect(x + 3 + k, cy + 2 - k, x + 8 - k, cy + 3 - k, c);
             break;
         default: break;
     }
@@ -735,6 +742,15 @@ void Editor::showAnimationScreen() {
         if (act(c2, y, "Растрировать слой",
                 tile && (layer.kind == LK_VECTOR || layer.kind == LK_TILEMAP)))
             m.rasterizeLayer();
+        y += ST;
+        if (act(c2, y, "Слой-образец…", tile)) {
+            // Подложка для срисовки (этап 9): любая картинка, вписанная в
+            // документ; не правится и в выгрузку не попадает.
+            const std::string path = askOpenFile("Слой-образец");
+            Grid<Color> img;
+            if (!path.empty() && readImageGrid(path, img, false))
+                m.addReferenceLayer(img, pathStem(path));
+        }
 
         // --- кадр и метки ---
         y = 78;

@@ -382,6 +382,16 @@ bool Editor::handleProKey(int key) {
     if (ctrl) {
         switch (key) {
             case KEY_T: showTilePickerScreen(); return true;
+            case KEY_E:
+                // Кисть из выделения (этап 9): сразу карандашом этого вида.
+                if (m.brushFromSelection()) {
+                    m.setTool(T_PEN);
+                    m.needRepaint = true;
+                } else {
+                    showMessage("Кисть из выделения",
+                                "Выделите кусок активного слоя — он станет кистью карандаша.");
+                }
+                return true;
             case KEY_A: m.selectAll(); return true;
             case KEY_D:
                 if (shift) {

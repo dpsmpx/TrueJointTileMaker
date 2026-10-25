@@ -31,7 +31,7 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.4.0";
+inline constexpr const char* kAppVersion = "1.5.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -95,6 +95,9 @@ inline constexpr int MOBJ_CH = 25;
 inline constexpr int T_PEN = 0, T_ERASER = 1, T_FILL = 2, T_PICK = 3, T_LINE = 4, T_RECT = 5,
                      T_ELLIPSE = 6, T_DITHER = 7, T_SELECT = 8, T_TILE_COUNT = 9;
 inline constexpr int M_PAINT = 0, M_FILL = 1, M_RECT = 2, M_OBJ = 3, M_SELECT = 4, T_MAP_COUNT = 5;
+/// Вид карандаша: чистые точки, аэрограф (этап 8), кисть из выделения и
+/// затенение по ряду палитры (этап 9).
+inline constexpr int PEN_PENCIL = 0, PEN_AIRBRUSH = 1, PEN_STAMP = 2, PEN_SHADE = 3, PEN_MODES = 4;
 inline constexpr int DOC_TILE = 0, DOC_MAP = 1;
 
 /// Преобразования картинки или содержимого выделения (этап 1).
@@ -263,10 +266,10 @@ public:
     /// Сглаживание линии, прямоугольника, овала и фигур: край — долями
     /// покрытия. Новые цвета, поэтому выключено и у окна.
     bool antialias = false;
-    /// Карандаш — аэрограф: мягкий круглый отпечаток диаметром airSize,
-    /// с жёсткостью airHardness и напором airFlow (проценты). Напор копится
-    /// за мазок до полной непрозрачности.
-    bool airbrush = false;
+    /// Вид карандаша (PEN_*). Аэрограф — мягкий круглый отпечаток
+    /// диаметром airSize, с жёсткостью airHardness и напором airFlow
+    /// (проценты); напор копится за мазок до полной непрозрачности.
+    int penMode = PEN_PENCIL;
     int airSize = 8;
     int airHardness = 30;
     int airFlow = 25;
@@ -275,6 +278,19 @@ public:
     Grid<float> airAcc;
     double airCarry = 0;
     int airLastX = 0, airLastY = 0;
+
+    // --- этап 9: инструменты пиксель-арта ---
+
+    /// Кисть из выделения: картинка и номера палитры; середина кисти —
+    /// под курсором. Прозрачные точки кисти ничего не кладут.
+    Grid<Color> customBrush;
+    Grid<PalIndex> customBrushIdx;
+    /// Затенение ведёт цвет к тёмному концу ряда палитры, а не к светлому.
+    bool shadeDarker = false;
+    /// Заливка — градиентом узором Байера между первым и вторым цветом:
+    /// новых цветов он не даёт. Круговой — от точки нажатия во все стороны.
+    bool fillGradient = false;
+    bool gradientRadial = false;
 
     /// Начало холста в окне: справа и снизу его край — W и H, слева и
     /// сверху — линейки, когда они видны.
@@ -598,9 +614,11 @@ public:
     void forEachCelConst(const std::function<void(const Grid<Color>&)>& fn) const;
     /// Видимые слои кадра f, сведённые с учётом непрозрачности слоя.
     Grid<Color> compositeFrame(int f) const;
-    Color compositeAt(int f, int x, int y) const;
+    /// withReference — со слоями-образцами (этап 9): так их видно на холсте,
+    /// а в выгрузку и сведение они не попадают.
+    Color compositeAt(int f, int x, int y, bool withReference = false) const;
     /// Сведение слоёв from..to кадра f с группами (этап 6).
-    Color compositeLayers(int f, int from, int to, int x, int y) const;
+    Color compositeLayers(int f, int from, int to, int x, int y, bool withReference = false) const;
     /// То, что видно на холсте в точке: сведение и «луковая кожа», без шахматки.
     Color viewColorAt(int x, int y) const;
     int addLayer();
@@ -768,6 +786,27 @@ public:
     void airbrushTo(int x, int y);
     void airbrushEnd();
     void airbrushDab(int cx, int cy);
+
+    // --- инструменты пиксель-арта (этап 9) ---
+    /// Кисть из содержимого выделения; false — выделения нет или в нём пусто.
+    bool brushFromSelection();
+    /// Кисть ложится в (cx, cy) серединой: каждая её точка — через
+    /// симметрию, так что зеркало отражает и саму кисть.
+    void stampBrushAt(int cx, int cy);
+    void stampOne(int x, int y, Color c, PalIndex idx);
+    /// Ячейка на шаг светлее (или темнее) в её ряду палитры; та же, если
+    /// шагать некуда. Светлый конец ряда — тот, где ярче крайняя ячейка.
+    PalIndex shadeTarget(PalIndex idx, bool darker) const;
+    void shadeOne(int x, int y);
+    /// Область градиента: связная область цвета под (x, y), в выделении.
+    Grid<std::uint8_t> gradientRegion(int x, int y) const;
+    /// Градиент узором от первого цвета у (ax, ay) ко второму у (bx, by)
+    /// по точкам области. Шаг истории — на вызывающем. Число точек.
+    int applyGradient(const Grid<std::uint8_t>& region, int ax, int ay, int bx, int by);
+    /// Слой-образец под всеми слоями: картинка вписана в документ с
+    /// сохранением пропорций, видна полупрозрачной, не правится и в
+    /// выгрузку не попадает. Номер слоя.
+    int addReferenceLayer(const Grid<Color>& img, const std::string& name);
 
     // --- карта и набор тайлов ---
     /// Файл тайла, которым нарисована клетка карты, без расширения.

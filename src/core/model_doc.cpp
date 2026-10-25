@@ -124,7 +124,9 @@ bool Model::activeLayerEditable() const {
     if (activeLayer < 0 || activeLayer >= doc.layerCount()) return true;
     // Группа сама не рисуется, а скрытая или запертая группа прячет и
     // запирает всех своих детей.
-    return activeKind() != LK_GROUP && layerShownDeep(activeLayer) && !layerLockedDeep(activeLayer);
+    // Образец (этап 9) — подложка для срисовки, а не рисунок.
+    return activeKind() != LK_GROUP && activeKind() != LK_REFERENCE &&
+           layerShownDeep(activeLayer) && !layerLockedDeep(activeLayer);
 }
 
 void Model::forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>& fn, int what,
@@ -144,6 +146,9 @@ void Model::forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>&
     auto apply = [&](int l, Grid<Color>& img, Grid<PalIndex>& idx, std::vector<VecShape>& shapes,
                      Grid<int>& tiles) {
         const Layer& layer = doc.layers[static_cast<std::size_t>(l)];
+        // Образец — чужая картинка: палитра и индексный режим её не трогают,
+        // а геометрия двигает вместе с рисунком, чтобы не разъехались.
+        if (layer.kind == LK_REFERENCE && what == CEL_COLOR) return;
         if (layer.kind == LK_TILEMAP && what == CEL_COLOR) {
             // Тайлкарта перекрашивается в своём наборе, отрисовка — потом.
             if (std::find(touchedSets.begin(), touchedSets.end(), layer.tileset) ==
@@ -210,8 +215,9 @@ void Model::forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>&
 }
 
 void Model::forEachCelConst(const std::function<void(const Grid<Color>&)>& fn) const {
-    fn(tile);
+    if (activeKind() != LK_REFERENCE) fn(tile);
     for (int l = 0; l < doc.layerCount(); ++l) {
+        if (doc.layers[static_cast<std::size_t>(l)].kind == LK_REFERENCE) continue;
         for (int f = 0; f < doc.frameCount(); ++f) {
             if (l == activeLayer && f == activeFrame) continue;
             if (const CelPtr c = doc.cel(l, f)) fn(c->img);
@@ -219,7 +225,7 @@ void Model::forEachCelConst(const std::function<void(const Grid<Color>&)>& fn) c
     }
 }
 
-Color Model::compositeLayers(int f, int from, int to, int x, int y) const {
+Color Model::compositeLayers(int f, int from, int to, int x, int y, bool withReference) const {
     // Слои снизу вверх; группа лежит над своими детьми. Дети копятся на
     // своём уровне стопки, а группа сводит его на уровень ниже — со своей
     // видимостью и непрозрачностью, как отдельная картинка.
@@ -251,7 +257,15 @@ Color Model::compositeLayers(int f, int from, int to, int x, int y) const {
         fold(d + 1);
         if (!layer.visible) continue;
         Color src = kClear;
-        if (l == activeLayer && f == activeFrame) {
+        if (layer.kind == LK_REFERENCE) {
+            // Образец один на все кадры — картинка первого кадра.
+            if (!withReference) continue;
+            if (l == activeLayer && activeFrame == 0) {
+                if (tile.inside(x, y)) src = tile.at(x, y);
+            } else if (const CelPtr c = doc.cel(l, 0); c && c->img.inside(x, y)) {
+                src = c->img.at(x, y);
+            }
+        } else if (l == activeLayer && f == activeFrame) {
             if (tile.inside(x, y)) src = tile.at(x, y);
         } else if (const CelPtr c = doc.cel(l, f); c && c->img.inside(x, y)) {
             src = c->img.at(x, y);
@@ -263,9 +277,9 @@ Color Model::compositeLayers(int f, int from, int to, int x, int y) const {
     return stack[0];
 }
 
-Color Model::compositeAt(int f, int x, int y) const {
+Color Model::compositeAt(int f, int x, int y, bool withReference) const {
     if (doc.layerCount() == 0) return tile.inside(x, y) ? tile.at(x, y) : kClear;
-    return compositeLayers(f, 0, doc.layerCount() - 1, x, y);
+    return compositeLayers(f, 0, doc.layerCount() - 1, x, y, withReference);
 }
 
 Grid<Color> Model::compositeFrame(int f) const {
@@ -278,7 +292,7 @@ Grid<Color> Model::compositeFrame(int f) const {
 }
 
 Color Model::viewColorAt(int x, int y) const {
-    const Color cur = compositeAt(activeFrame, x, y);
+    const Color cur = compositeAt(activeFrame, x, y, true);
     if (!onionSkin || doc.frameCount() < 2) return cur;
     Color under = kClear;
     // Дальние кадры — бледнее ближних, и рисуются раньше них.
@@ -317,11 +331,11 @@ bool Model::deleteLayer() {
     if (docMode != DOC_TILE) return false;
     const int s = subtreeStart(activeLayer);
     const int n = activeLayer - s + 1;
-    // Без единого слоя с картинкой документ не бывает.
+    // Без единого слоя с картинкой документ не бывает; образец — не картинка.
     int drawable = 0;
     for (int l = 0; l < doc.layerCount(); ++l) {
-        if ((l < s || l > activeLayer) && doc.layers[static_cast<std::size_t>(l)].kind != LK_GROUP)
-            ++drawable;
+        const int kind = doc.layers[static_cast<std::size_t>(l)].kind;
+        if ((l < s || l > activeLayer) && kind != LK_GROUP && kind != LK_REFERENCE) ++drawable;
     }
     if (drawable == 0) return false;
     pushUndo();

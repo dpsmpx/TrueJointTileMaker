@@ -371,7 +371,7 @@ bool parseBody(const std::vector<std::uint8_t>& body, Parsed& out, std::string& 
     for (std::size_t l = 0; l < out.layx.size() && l < out.doc.layers.size(); ++l) {
         Layer& layer = out.doc.layers[l];
         const Parsed::LayerX& x = out.layx[l];
-        layer.kind = x.kind >= LK_RASTER && x.kind <= LK_TILEMAP ? x.kind : LK_RASTER;
+        layer.kind = x.kind >= LK_RASTER && x.kind <= LK_REFERENCE ? x.kind : LK_RASTER;
         layer.depth = x.depth;
         layer.collapsed = x.collapsed;
         layer.tileset = x.tileset >= 0 && x.tileset < static_cast<int>(out.doc.tilesets.size())

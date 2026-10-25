@@ -229,6 +229,9 @@ void Editor::appStep() {
         lastStatX_ = tx;
         lastStatY_ = ty;
         if (!m.needRepaint) {
+            // Кисть из выделения (этап 9) идёт за курсором по холсту.
+            if (brushGhostShown() || ghostShown_) drawCanvas();
+            ghostShown_ = brushGhostShown();
             drawInfoSection();
             // Метка курсора на линейках идёт за мышью.
             drawRulers();
