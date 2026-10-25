@@ -115,8 +115,10 @@ bool Editor::appInit(int argc, char** argv) {
     m.clipToSelection = true;
     // Этап 2: индексный режим — настоящий: точка хранит номер ячейки.
     m.strictIndexed = true;
-    // Этап 7: карта картинками набора подбирает варианты стыков.
+    // Этап 7: карта картинками набора подбирает варианты стыков; с этапа 10
+    // карта картинками — сразу, как в игре (без папки набора — цветами).
     m.mapAutotile = true;
+    m.mapTiles = true;
     m.syncHSVFromColor();
     m.setDefaultPalette();
     m.buffer.clear();

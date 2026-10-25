@@ -46,7 +46,7 @@ key Tab                    # карта
 sleep 0.3
 key l
 sleep 0.3
-key shift+b                # карта картинками тайлов
+# карта картинками тайлов — сразу (этап 10), Shift+B её выключает
 move 770 550
 sleep 0.2
 shot 03_maptiles

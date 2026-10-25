@@ -648,7 +648,7 @@ void Model::putMapOne(int x, int y) {
         if (strokeMask.at(x, y) != 0) return;
         strokeMask.at(x, y) = 1;
     }
-    map.at(x, y) = static_cast<std::uint8_t>(mapBrush);
+    map.at(x, y) = static_cast<std::uint8_t>(mapBrushAt(x, y));
 }
 
 void Model::putMapCell(int x, int y) {
@@ -676,6 +676,8 @@ void Model::emitPixel(int x, int y) {
 
 void Model::beginStroke() {
     strokeMask.resize(docW(), docH(), 0);
+    // Новый мазок — новая раскладка смеси местностей.
+    if (docMode == DOC_MAP) ++mapMixSeed;
     strokePts.clear();
     strokeActive = docMode == DOC_TILE;
     const bool stamp = toolTile == T_PEN && penMode == PEN_STAMP && !customBrush.empty();
@@ -808,7 +810,10 @@ void Model::floodFillTile(int sx, int sy, Color newColor) {
 void Model::floodFillMap(int sx, int sy, int newCode) {
     if (!map.inside(sx, sy)) return;
     const int target = map.at(sx, sy);
-    if (target == newCode) return;
+    // Смесь может положить и ту же местность — заливать есть что.
+    const bool mix = mapMix && newCode == mapBrush;
+    if (target == newCode && !mix) return;
+    if (mix) ++mapMixSeed;
     Grid<std::uint8_t> visited(map.w, map.h, 0);
     std::vector<int> qx(static_cast<std::size_t>(map.w) * static_cast<std::size_t>(map.h));
     std::vector<int> qy(qx.size());
@@ -827,7 +832,7 @@ void Model::floodFillMap(int sx, int sy, int newCode) {
         const int x = qx[head];
         const int y = qy[head];
         ++head;
-        map.at(x, y) = static_cast<std::uint8_t>(newCode);
+        map.at(x, y) = static_cast<std::uint8_t>(mix ? mapBrushAt(x, y) : newCode);
         push(x + 1, y);
         push(x - 1, y);
         push(x, y + 1);

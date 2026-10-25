@@ -29,6 +29,7 @@ add_executable(tjtm_core_tests
     test_imageops.cpp
     test_layers.cpp
     test_map.cpp
+    test_mapedit.cpp
     test_model.cpp
     test_palette.cpp
     test_precision.cpp

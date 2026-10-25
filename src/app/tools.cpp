@@ -323,7 +323,7 @@ void Editor::handleCanvasClick() {
         if (m.docMode == DOC_MAP && m.toolMap == M_OBJ && m.inDoc(mx, my)) {
             const int idx = m.map.objectAt(mx, my);
             if (idx >= 0) {
-                editObject(idx);
+                showObjectForm(idx);
                 return;
             }
         }
@@ -535,6 +535,11 @@ void Editor::handlePanelClick() {
             m.setTool(idx);
             // Правая кнопка по инструменту тайла — его параметры; у линии и
             // фигур — параметры фигур (этап 6).
+            // На карте правая кнопка по кисти, прямоугольнику или заливке —
+            // кисть карты: одной местностью или смесью (этап 10).
+            if (m.docMode == DOC_MAP && frameClickButton_ == MB_RIGHT &&
+                (idx == M_PAINT || idx == M_FILL || idx == M_RECT))
+                showMapBrushOptions();
             if (m.docMode == DOC_TILE && frameClickButton_ == MB_RIGHT) {
                 if (idx == T_LINE || idx == T_RECT || idx == T_ELLIPSE) {
                     showShapeOptions();
@@ -602,6 +607,10 @@ void Editor::handleEditorKey(int key) {
     if (handleTimelineKey(key)) return;
     const int step = std::max(1, m.pixelSize * 4);
     const bool tile = m.docMode == DOC_TILE;
+    if (!tile && lastKey_.ctrl && key == KEY_F) {
+        showMapFindScreen();
+        return;
+    }
     switch (key) {
         case KEY_ESC:
         case KEY_M: showMainMenu(); break;

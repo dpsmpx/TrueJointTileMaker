@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "app/editor.h"
+#include "app/textfield.h"
 #include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -285,55 +286,72 @@ void Editor::showColorScreen() {
 // Поле ввода
 // ---------------------------------------------------------------------------
 
-namespace {
-
-/// Однострочное поле: каретка, выделение мышью и Shift, слова по Ctrl,
-/// буфер обмена, раскладки и IME. Оригинал ради этого клал поверх окна
-/// настоящий TextBox: строки объектов карты длинные, и их переносят между
-/// локациями целиком.
-struct TextField {
-    std::u32string text;
-    std::size_t caret = 0;
-    std::size_t anchor = 0;  // начало выделения; == caret — выделения нет
-    int scroll = 0;
-
-    [[nodiscard]] bool hasSel() const { return anchor != caret; }
-    [[nodiscard]] std::size_t selLo() const { return std::min(anchor, caret); }
-    [[nodiscard]] std::size_t selHi() const { return std::max(anchor, caret); }
-
-    void eraseSel() {
-        if (!hasSel()) return;
-        text.erase(selLo(), selHi() - selLo());
-        caret = anchor = selLo();
+/// Клавиша правки поля: стрелки, Home и End, удаление, слова по Ctrl,
+/// выделение по Shift, буфер обмена. Enter, Escape и Tab решает окно.
+bool editTextField(TextField& tf, const KeyPress& kp, Platform& pf) {
+    const bool shift = kp.shift;
+    auto moveTo = [&](std::size_t p) {
+        tf.caret = p;
+        if (!shift) tf.anchor = p;
+    };
+    switch (kp.vk) {
+        case KEY_LEFT:
+            if (!shift && tf.hasSel() && !kp.ctrl) {
+                moveTo(tf.selLo());
+            } else {
+                moveTo(kp.ctrl ? tf.wordLeft(tf.caret) : (tf.caret > 0 ? tf.caret - 1 : 0));
+            }
+            return true;
+        case KEY_RIGHT:
+            if (!shift && tf.hasSel() && !kp.ctrl) {
+                moveTo(tf.selHi());
+            } else {
+                moveTo(kp.ctrl ? tf.wordRight(tf.caret) : std::min(tf.text.size(), tf.caret + 1));
+            }
+            return true;
+        case KEY_HOME: moveTo(0); return true;
+        case KEY_END: moveTo(tf.text.size()); return true;
+        case KEY_BACK:
+            if (tf.hasSel()) {
+                tf.eraseSel();
+            } else if (tf.caret > 0) {
+                const std::size_t from = kp.ctrl ? tf.wordLeft(tf.caret) : tf.caret - 1;
+                tf.text.erase(from, tf.caret - from);
+                tf.caret = tf.anchor = from;
+            }
+            return true;
+        case KEY_DELETE:
+            if (tf.hasSel()) {
+                tf.eraseSel();
+            } else if (tf.caret < tf.text.size()) {
+                const std::size_t to = kp.ctrl ? tf.wordRight(tf.caret) : tf.caret + 1;
+                tf.text.erase(tf.caret, to - tf.caret);
+            }
+            return true;
+        case KEY_A:
+            if (!kp.ctrl) return false;
+            tf.anchor = 0;
+            tf.caret = tf.text.size();
+            return true;
+        case KEY_C:
+        case KEY_X:
+            if (!kp.ctrl) return false;
+            if (tf.hasSel()) {
+                pf.setClipboardText(u32ToUtf8(tf.text.substr(tf.selLo(), tf.selHi() - tf.selLo())));
+                if (kp.vk == KEY_X) tf.eraseSel();
+            }
+            return true;
+        case KEY_V:
+            if (!kp.ctrl) return false;
+            tf.insert(utf8ToU32(pf.clipboardText()));
+            return true;
+        case KEY_INSERT:
+            if (!kp.shift) return false;
+            tf.insert(utf8ToU32(pf.clipboardText()));
+            return true;
+        default: return false;
     }
-    void insert(const std::u32string& s) {
-        eraseSel();
-        std::u32string clean;
-        for (char32_t c : s) {
-            if (c != U'\n' && c != U'\r') clean.push_back(c == U'\t' ? U' ' : c);
-        }
-        text.insert(caret, clean);
-        caret += clean.size();
-        anchor = caret;
-    }
-    static bool isWord(char32_t c) { return c != U' '; }
-    [[nodiscard]] std::size_t wordLeft(std::size_t p) const {
-        while (p > 0 && !isWord(text[p - 1]))
-            --p;
-        while (p > 0 && isWord(text[p - 1]))
-            --p;
-        return p;
-    }
-    [[nodiscard]] std::size_t wordRight(std::size_t p) const {
-        while (p < text.size() && isWord(text[p]))
-            ++p;
-        while (p < text.size() && !isWord(text[p]))
-            ++p;
-        return p;
-    }
-};
-
-}  // namespace
+}
 
 /// Ввод строки. true — подтверждено, значение в value.
 bool Editor::askText(const std::string& title, const std::string& prompt,
@@ -394,72 +412,13 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
         while (!in.presses.empty()) {
             const KeyPress kp = in.presses.front();
             in.presses.pop_front();
-            const bool shift = kp.shift;
-            auto moveTo = [&](std::size_t p) {
-                tf.caret = p;
-                if (!shift) tf.anchor = p;
-            };
-            switch (kp.vk) {
-                case KEY_ENTER:
-                    ok = true;
-                    done = true;
-                    break;
-                case KEY_ESC: done = true; break;
-                case KEY_LEFT:
-                    if (!shift && tf.hasSel() && !kp.ctrl) {
-                        moveTo(tf.selLo());
-                    } else {
-                        moveTo(kp.ctrl ? tf.wordLeft(tf.caret) : (tf.caret > 0 ? tf.caret - 1 : 0));
-                    }
-                    break;
-                case KEY_RIGHT:
-                    if (!shift && tf.hasSel() && !kp.ctrl) {
-                        moveTo(tf.selHi());
-                    } else {
-                        moveTo(kp.ctrl ? tf.wordRight(tf.caret)
-                                       : std::min(tf.text.size(), tf.caret + 1));
-                    }
-                    break;
-                case KEY_HOME: moveTo(0); break;
-                case KEY_END: moveTo(tf.text.size()); break;
-                case KEY_BACK:
-                    if (tf.hasSel()) {
-                        tf.eraseSel();
-                    } else if (tf.caret > 0) {
-                        const std::size_t from = kp.ctrl ? tf.wordLeft(tf.caret) : tf.caret - 1;
-                        tf.text.erase(from, tf.caret - from);
-                        tf.caret = tf.anchor = from;
-                    }
-                    break;
-                case KEY_DELETE:
-                    if (tf.hasSel()) {
-                        tf.eraseSel();
-                    } else if (tf.caret < tf.text.size()) {
-                        const std::size_t to = kp.ctrl ? tf.wordRight(tf.caret) : tf.caret + 1;
-                        tf.text.erase(tf.caret, to - tf.caret);
-                    }
-                    break;
-                case KEY_A:
-                    if (kp.ctrl) {
-                        tf.anchor = 0;
-                        tf.caret = tf.text.size();
-                    }
-                    break;
-                case KEY_C:
-                case KEY_X:
-                    if (kp.ctrl && tf.hasSel()) {
-                        pf_.setClipboardText(
-                            u32ToUtf8(tf.text.substr(tf.selLo(), tf.selHi() - tf.selLo())));
-                        if (kp.vk == KEY_X) tf.eraseSel();
-                    }
-                    break;
-                case KEY_V:
-                    if (kp.ctrl) tf.insert(utf8ToU32(pf_.clipboardText()));
-                    break;
-                case KEY_INSERT:
-                    if (kp.shift) tf.insert(utf8ToU32(pf_.clipboardText()));
-                    break;
-                default: break;
+            if (kp.vk == KEY_ENTER) {
+                ok = true;
+                done = true;
+            } else if (kp.vk == KEY_ESC) {
+                done = true;
+            } else {
+                editTextField(tf, kp, pf_);
             }
         }
         if (!in.text.empty()) {
@@ -694,6 +653,8 @@ void Editor::showMapPropertiesScreen() {
             }
         }
 
+        if (uiButton(WIN_W / 2 - 240, WIN_H - 104, 220, 36, "Найти и заменить…   Ctrl+F", true))
+            showMapFindScreen();
         if (uiButton(WIN_W / 2 - 240, WIN_H - 60, 220, 36, "Проверить локацию", true))
             showMapReport();
         if (uiButton(WIN_W / 2 + 20, WIN_H - 60, 220, 36, "Закрыть", true)) done = true;

@@ -1,0 +1,57 @@
+# Этап 10: редактор карт — форма объекта, кисть смесью местностей, замена
+# местности и поиск объектов. Карта — своя (map10.files), 14x9 по 42
+# точки: клетка (x, y) — (27 + 42x, 112 + 42y).
+key Escape
+sleep 0.4
+key Tab
+sleep 0.3
+key l
+sleep 0.3
+key 4                      # инструмент объектов
+click 195 364 2            # средняя кнопка по жителю: форма
+sleep 0.3
+key ctrl+a
+type smith
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 01_npc_form
+key Return
+sleep 0.3
+click 531 406 2            # переход
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 02_exit_form
+key Escape
+sleep 0.3
+click 622 20 3             # правая кнопка по кисти карты
+sleep 0.3
+click 520 77               # смесью местностей
+click 360 261              # дерево +1
+click 360 261              # дерево +1
+move 770 550
+sleep 0.2
+shot 03_mix
+key Escape
+sleep 0.3
+key 2                      # заливка
+click 69 154               # пол комнаты — смесью
+move 770 550
+sleep 0.2
+shot 04_mixed
+key ctrl+f
+sleep 0.3
+click 434 85               # что: дерево
+click 338 123              # на что: вода
+click 615 163              # заменить
+move 770 550
+sleep 0.2
+shot 05_find
+click 390 292              # первый объект — к нему
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 06_jump
+key s                      # сохранить карту
+sleep 0.3

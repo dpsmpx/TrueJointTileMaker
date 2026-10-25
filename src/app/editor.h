@@ -324,6 +324,18 @@ private:
     bool filterBoxed() const;
     void doAirbrushStroke(int startX, int startY);
 
+    // --- этап 10: редактор карт (map_ui.cpp) ---
+    /// Выбор из списка; -1 — отмена.
+    int askChoice(const std::string& title, const std::string& hint,
+                  const std::vector<std::string>& items);
+    /// Объект карты формой: поля по грамматике игры, координаты, удаление.
+    void showObjectForm(int idx);
+    /// Кисть карты одной местностью или смесью. Правая кнопка по кисти,
+    /// прямоугольнику или заливке карты.
+    void showMapBrushOptions();
+    /// Замена местности и поиск объектов. Ctrl+F на карте.
+    void showMapFindScreen();
+
     // --- этап 9: инструменты пиксель-арта (art_ui.cpp) ---
     /// Карандаш и его виды: чистые точки, аэрограф, кисть из выделения,
     /// затенение. Правая кнопка по карандашу.

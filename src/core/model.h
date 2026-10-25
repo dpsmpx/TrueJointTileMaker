@@ -12,6 +12,7 @@
 // floodFillTile. По ним перенос сличается с исходником строка к строке.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <random>
@@ -31,7 +32,7 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.5.0";
+inline constexpr const char* kAppVersion = "1.6.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -349,6 +350,12 @@ public:
     int toolTile = T_PEN;
     int toolMap = M_PAINT;
     int mapBrush = MT_GRASS;
+    /// Кисть карты смесью (этап 10): каждая клетка — случайная местность
+    /// с весами mapMixWeights. Случай — хэш клетки и номера мазка: тот же
+    /// мазок на той же клетке даёт то же, и снимки окна не плывут.
+    bool mapMix = false;
+    std::array<int, MT_COUNT> mapMixWeights{};
+    std::uint32_t mapMixSeed = 1;
     int mapObjKind = 0;
 
     std::string currentFile;
@@ -807,6 +814,17 @@ public:
     /// сохранением пропорций, видна полупрозрачной, не правится и в
     /// выгрузку не попадает. Номер слоя.
     int addReferenceLayer(const Grid<Color>& img, const std::string& name);
+
+    // --- редактор карт (этап 10) ---
+    /// Местность, которую кисть карты кладёт в клетку: mapBrush или, со
+    /// смесью, случайная по весам.
+    int mapBrushAt(int x, int y) const;
+    /// Заменить местность from на to во всей карте или в выделении (с
+    /// отменой). Число клеток.
+    int replaceMapTerrain(int from, int to, bool inSelection);
+    /// Объекты, у которых вид или строка содержат query (без учёта
+    /// регистра латиницы и кириллицы); пустой запрос — все.
+    std::vector<int> findMapObjects(const std::string& query) const;
 
     // --- карта и набор тайлов ---
     /// Файл тайла, которым нарисована клетка карты, без расширения.

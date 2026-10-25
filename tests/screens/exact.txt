@@ -118,3 +118,10 @@ art9       02_stamp         0    0  780  560
 art9       03_shade         0    0  780  560
 art9       04_fill_options  0    0  780  560
 art9       05_gradient      0    0  780  560
+# Этап 10 — эталон со снимков переноса: окно целиком.
+map10      01_npc_form      0    0  780  560
+map10      02_exit_form     0    0  780  560
+map10      03_mix           0    0  780  560
+map10      04_mixed         0    0  780  560
+map10      05_find          0    0  780  560
+map10      06_jump          0    0  780  560
