@@ -19,6 +19,7 @@
 #include "core/anim.h"
 #include "core/gameset.h"
 #include "core/gif.h"
+#include "core/mapdoc.h"
 #include "core/model.h"
 #include "core/png.h"
 #include "core/project.h"
@@ -167,7 +168,8 @@ TEST_P(AppScreens, MatchOriginal) {
 
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
-                                           "anim4", "prec5", "layers6", "game7", "fx8", "art9"));
+                                           "anim4", "prec5", "layers6", "game7", "fx8", "art9",
+                                           "map10"));
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.
@@ -367,6 +369,28 @@ TEST(AppScreens, GameSetExported) {
     EXPECT_EQ(load(base / "tiles" / "wall_0.png").d, wall.d);
     EXPECT_EQ(load(base / "tiles" / "wall_10.png").d, load(fixture / "wall_10.png").d);
     EXPECT_NE(load(base / "tiles" / "wall_5.png").d, wall.d);
+    fs::remove_all(base);
+}
+
+/// Этап 10: правка формой и замена местности попадают в файл карты, а
+/// нетронутый объект пишется прежней строкой.
+TEST(AppScreens, MapEditsSaved) {
+    const fs::path base = makeBase("map10x", "map10");
+    ASSERT_TRUE(runScenario("map10", base));
+    tjtm::MapDoc m;
+    const tjtm::MapParseResult r = tjtm::mapLoad((base / "maps" / "probe.map").string(), m);
+    ASSERT_TRUE(r.ok) << r.error;
+    ASSERT_EQ(m.objects.size(), 2U);
+    EXPECT_EQ(tjtm::mapObjectLine(m.objects[0]), "npc 4 6 smith");
+    EXPECT_EQ(tjtm::mapObjectLine(m.objects[1]), "exit 12 7 cells 24 9");
+    int trees = 0;
+    int water = 0;
+    for (const std::uint8_t c : m.grid) {
+        trees += c == tjtm::MT_TREE ? 1 : 0;
+        water += c == tjtm::MT_WATER ? 1 : 0;
+    }
+    EXPECT_EQ(trees, 0) << "деревья смеси заменены водой";
+    EXPECT_GT(water, 6);
     fs::remove_all(base);
 }
 

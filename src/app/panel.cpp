@@ -46,7 +46,7 @@ void Editor::initColorBars() {
 std::string Editor::toolLabel(int i) const {
     if (m.docMode == DOC_MAP) {
         switch (i) {
-            case M_PAINT: return "Мест";
+            case M_PAINT: return m.mapMix ? "Смесь" : "Мест";
             case M_FILL: return "Зал";
             case M_RECT: return "Прям";
             case M_OBJ: return "Объ";
@@ -88,8 +88,9 @@ void Editor::drawToolsSection() {
         const int ic = m.docMode == DOC_MAP ? T_TILE_COUNT + i : i;
         // Вид карандаша и градиент — подписью: значок карандаша или заливки
         // соврал бы, что инструмент обычный.
-        const bool airLabel = m.docMode == DOC_TILE && ((i == T_PEN && m.penMode != PEN_PENCIL) ||
-                                                        (i == T_FILL && m.fillGradient));
+        const bool airLabel = (m.docMode == DOC_TILE && ((i == T_PEN && m.penMode != PEN_PENCIL) ||
+                                                         (i == T_FILL && m.fillGradient))) ||
+                              (m.docMode == DOC_MAP && i == M_PAINT && m.mapMix);
         if (!airLabel && ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
             !iconBmp_[static_cast<std::size_t>(ic)].empty()) {
             fb_.drawImage(iconBmp_[static_cast<std::size_t>(ic)], x0 + (TOOL_CW - 2 - ICON_PX) / 2,
