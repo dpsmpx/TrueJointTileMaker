@@ -294,6 +294,95 @@ int outline(Grid<Color>& g, const Mask& within, Color c, bool eightWay, bool out
     return static_cast<int>(hits.size());
 }
 
+int outlineThick(Grid<Color>& g, const Mask& within, Color c, bool eightWay, bool outside,
+                 int thickness) {
+    thickness = std::max(1, thickness);
+    if (outside) {
+        // Снаружи каждое кольцо ложится на предыдущее: оно уже непрозрачно,
+        // и следующее идёт дальше.
+        int n = 0;
+        for (int k = 0; k < thickness; ++k)
+            n += outline(g, within, c, eightWay, true);
+        return n;
+    }
+    // Внутри — расстояние до края по слоям: перекраска первого слоя не
+    // делает следующий краем, поэтому слои снимаются с копии маски.
+    const bool all = within.empty();
+    Mask solid(g.w, g.h, 0);
+    for (std::size_t k = 0; k < g.d.size(); ++k)
+        solid.d[k] = g.d[k].a != 0 ? 1 : 0;
+    std::vector<std::pair<int, int>> hits;
+    for (int layer = 0; layer < thickness; ++layer) {
+        std::vector<std::pair<int, int>> ring;
+        for (int y = 0; y < g.h; ++y) {
+            for (int x = 0; x < g.w; ++x) {
+                if (solid.at(x, y) == 0) continue;
+                bool edge = false;
+                for (int dy = -1; dy <= 1 && !edge; ++dy) {
+                    for (int dx = -1; dx <= 1 && !edge; ++dx) {
+                        if ((dx == 0 && dy == 0) || (!eightWay && dx != 0 && dy != 0)) continue;
+                        edge = !solid.inside(x + dx, y + dy) || solid.at(x + dx, y + dy) == 0;
+                    }
+                }
+                if (edge) ring.emplace_back(x, y);
+            }
+        }
+        for (const auto& [x, y] : ring) {
+            solid.at(x, y) = 0;
+            if (all || (within.inside(x, y) && within.at(x, y) != 0)) hits.emplace_back(x, y);
+        }
+    }
+    for (const auto& [x, y] : hits)
+        g.at(x, y) = c;
+    return static_cast<int>(hits.size());
+}
+
+int growEdge(Grid<Color>& g, const Mask& within, bool eightWay) {
+    const bool all = within.empty();
+    static const int kOrder[8][2] = {{-1, 0},  {1, 0},  {0, -1}, {0, 1},
+                                     {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+    std::vector<std::pair<std::pair<int, int>, Color>> fixes;
+    for (int y = 0; y < g.h; ++y) {
+        for (int x = 0; x < g.w; ++x) {
+            if (g.at(x, y).a != 0) continue;
+            if (!all && (!within.inside(x, y) || within.at(x, y) == 0)) continue;
+            for (int k = 0; k < (eightWay ? 8 : 4); ++k) {
+                const int nx = x + kOrder[k][0];
+                const int ny = y + kOrder[k][1];
+                if (g.inside(nx, ny) && g.at(nx, ny).a != 0) {
+                    fixes.push_back({{x, y}, g.at(nx, ny)});
+                    break;
+                }
+            }
+        }
+    }
+    for (const auto& [p, c] : fixes)
+        g.at(p.first, p.second) = c;
+    return static_cast<int>(fixes.size());
+}
+
+int shrinkEdge(Grid<Color>& g, const Mask& within, bool eightWay) {
+    const bool all = within.empty();
+    std::vector<std::pair<int, int>> hits;
+    for (int y = 0; y < g.h; ++y) {
+        for (int x = 0; x < g.w; ++x) {
+            if (g.at(x, y).a == 0) continue;
+            if (!all && (!within.inside(x, y) || within.at(x, y) == 0)) continue;
+            bool edge = false;
+            for (int dy = -1; dy <= 1 && !edge; ++dy) {
+                for (int dx = -1; dx <= 1 && !edge; ++dx) {
+                    if ((dx == 0 && dy == 0) || (!eightWay && dx != 0 && dy != 0)) continue;
+                    edge = !g.inside(x + dx, y + dy) || g.at(x + dx, y + dy).a == 0;
+                }
+            }
+            if (edge) hits.emplace_back(x, y);
+        }
+    }
+    for (const auto& [x, y] : hits)
+        g.at(x, y) = Color(0, 0, 0, 0);
+    return static_cast<int>(hits.size());
+}
+
 int removeIsolated(Grid<Color>& g, const Mask& within) {
     const bool all = within.empty();
     std::vector<std::pair<std::pair<int, int>, Color>> fixes;

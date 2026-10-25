@@ -6,11 +6,14 @@
 // привязкам палитры, и к маске выделения, и они не расходятся.
 //
 // Главное правило пиксель-арта: у каждой операции предсказуемое
-// пиксельное представление. Масштаб — только ближайшим соседом, повороты —
-// только на четверти оборота, никакого сглаживания.
+// пиксельное представление. Масштаб — только ближайшим соседом; поворот на
+// любой угол (этап 5) — ближайшим соседом или RotSprite, без новых цветов.
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <numbers>
 #include <string>
 #include <vector>
 
@@ -138,6 +141,95 @@ Grid<T> scaleNearest(const Grid<T>& g, int nw, int nh) {
     return t;
 }
 
+// --- поворот на любой угол (этап 5) -------------------------------------------
+
+/// Способ поворота: ближайший сосед или RotSprite — увеличение в 8 раз по
+/// Scale2x, поворот ближайшим соседом и обратное уменьшение. RotSprite
+/// держит линии пиксель-арта целыми, но, как и ближайший, не вводит ни
+/// одного нового цвета.
+/// ROT_SMOOTH — билинейно (этап 8, не пиксель-арт): новые цвета и мягкий
+/// край; поворачивает его fx::rotateSmooth, а не rotateAny.
+inline constexpr int ROT_NEAREST = 0, ROT_SPRITE = 1, ROT_SMOOTH = 2;
+
+namespace detail {
+
+/// Точка (X, Y) картинки, увеличенной Scale2x Level раз, без самой
+/// увеличенной картинки: 512x512 в 8 раз — 16 миллионов точек, а точке
+/// поворота нужны лишь её соседи. Уровень — параметр шаблона: глубина
+/// известна при сборке, и каждая ступень — своя функция.
+template <int Level, class T>
+T scale2xAt(const Grid<T>& g, int X, int Y) {
+    X = std::clamp(X, 0, (g.w << Level) - 1);
+    Y = std::clamp(Y, 0, (g.h << Level) - 1);
+    if constexpr (Level == 0) {
+        return g.at(X, Y);
+    } else {
+        const int bx = X >> 1;
+        const int by = Y >> 1;
+        const T P = scale2xAt<Level - 1>(g, bx, by);
+        const T A = scale2xAt<Level - 1>(g, bx, by - 1);
+        const T B = scale2xAt<Level - 1>(g, bx + 1, by);
+        const T C = scale2xAt<Level - 1>(g, bx - 1, by);
+        const T D = scale2xAt<Level - 1>(g, bx, by + 1);
+        const bool right = (X & 1) != 0;
+        const bool down = (Y & 1) != 0;
+        if (!right && !down) return (C == A && C != D && A != B) ? A : P;
+        if (right && !down) return (A == B && A != C && B != D) ? B : P;
+        if (!right) return (D == C && D != B && C != A) ? C : P;
+        return (B == D && B != A && D != C) ? D : P;
+    }
+}
+
+}  // namespace detail
+
+/// Размер картинки w x h, повёрнутой на degrees, если холст растёт до
+/// описанного прямоугольника.
+inline void rotatedSize(int w, int h, double degrees, int& nw, int& nh) {
+    const double a = degrees * std::numbers::pi / 180.0;
+    const double ca = std::fabs(std::cos(a));
+    const double sa = std::fabs(std::sin(a));
+    nw = std::max(1, static_cast<int>(std::ceil(w * ca + h * sa - 1e-6)));
+    nh = std::max(1, static_cast<int>(std::ceil(w * sa + h * ca - 1e-6)));
+}
+
+/// Поворот на degrees по часовой вокруг середины. expand — холст растёт до
+/// описанного прямоугольника, иначе размер прежний и углы срезаются.
+/// Точка приёмника берёт точку источника под своим центром: на четверти
+/// оборота это в точности rotate90 и прочие.
+template <class T>
+Grid<T> rotateAny(const Grid<T>& g, double degrees, int method, bool expand, const T& clear) {
+    int nw = g.w;
+    int nh = g.h;
+    if (expand) rotatedSize(g.w, g.h, degrees, nw, nh);
+    Grid<T> t(nw, nh, clear);
+    if (g.empty()) return t;
+    const double a = degrees * std::numbers::pi / 180.0;
+    const double ca = std::cos(a);
+    const double sa = std::sin(a);
+    const double scx = g.w / 2.0;
+    const double scy = g.h / 2.0;
+    const double dcx = nw / 2.0;
+    const double dcy = nh / 2.0;
+    for (int y = 0; y < nh; ++y) {
+        for (int x = 0; x < nw; ++x) {
+            // Обратный поворот центра точки приёмника (ось y смотрит вниз).
+            const double dx = x + 0.5 - dcx;
+            const double dy = y + 0.5 - dcy;
+            const double sx = scx + dx * ca + dy * sa;
+            const double sy = scy - dx * sa + dy * ca;
+            if (sx < 0 || sy < 0 || sx >= g.w || sy >= g.h) continue;
+            if (method == ROT_SPRITE) {
+                t.at(x, y) = detail::scale2xAt<3>(g, static_cast<int>(std::floor(sx * 8)),
+                                                  static_cast<int>(std::floor(sy * 8)));
+            } else {
+                t.at(x, y) = g.at(std::min(g.w - 1, static_cast<int>(std::floor(sx))),
+                                  std::min(g.h - 1, static_cast<int>(std::floor(sy))));
+            }
+        }
+    }
+    return t;
+}
+
 // --- маски ------------------------------------------------------------------
 
 /// Как новая область сочетается с прежним выделением.
@@ -177,6 +269,16 @@ bool contentBounds(const Grid<Color>& g, int& x, int& y, int& w, int& h);
 /// непрозрачных точек, внутри — по непрозрачным точкам у края. Только в
 /// пределах маски (пустая — вся картинка). Возвращает число точек.
 int outline(Grid<Color>& g, const Mask& within, Color c, bool eightWay, bool outside);
+/// Контур толщиной в thickness точек: снаружи — кольцами наружу, внутри —
+/// все непрозрачные точки не дальше thickness от края (по 4 или 8 соседям).
+int outlineThick(Grid<Color>& g, const Mask& within, Color c, bool eightWay, bool outside,
+                 int thickness);
+/// Нарастить край на точку: прозрачная точка у непрозрачной берёт цвет
+/// соседа (сначала слева, справа, сверху, снизу, потом по диагоналям).
+int growEdge(Grid<Color>& g, const Mask& within, bool eightWay);
+/// Срезать край на точку: непрозрачная точка у прозрачной или у края
+/// картинки становится прозрачной.
+int shrinkEdge(Grid<Color>& g, const Mask& within, bool eightWay);
 /// Одиночная точка — та, все соседи которой (в пределах картинки) одного
 /// цвета, и не её: она перекрашивается в этот цвет. Возвращает число.
 int removeIsolated(Grid<Color>& g, const Mask& within);

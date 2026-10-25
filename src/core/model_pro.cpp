@@ -6,11 +6,15 @@
 // шаг в историю: их зовут из меню и клавиш, и забыть отмену негде.
 
 #include <algorithm>
+#include <cmath>
+#include <numbers>
 #include <set>
 
+#include "core/filters.h"
 #include "core/imageops.h"
 #include "core/model.h"
 #include "core/pmath.h"
+#include "core/vector.h"
 
 namespace tjtm {
 
@@ -28,6 +32,36 @@ int Model::mirrorX(int x) const {
 
 int Model::mirrorY(int y) const {
     return axisY2() - 1 - y;
+}
+
+void Model::forEachSymmetric(int x, int y, const std::function<void(int, int)>& fn) const {
+    // Порядок оригинала: точка, зеркало по X, по Y, по обоим. Совпавшие
+    // точки не отсеиваются — так и было, а повтор в мазке гасит strokeMask.
+    std::pair<int, int> base[4];
+    int n = 0;
+    base[n++] = {x, y};
+    if (symX) base[n++] = {mirrorX(x), y};
+    if (symY) base[n++] = {x, mirrorY(y)};
+    if (symX && symY) base[n++] = {mirrorX(x), mirrorY(y)};
+    for (int k = 0; k < n; ++k)
+        fn(base[k].first, base[k].second);
+    if (symRadial < 2) return;
+    // Повороты вокруг точки пересечения осей: центр точки (x + ½, y + ½)
+    // поворачивается и попадает в ту точку, в которую лёг. Зеркала тоже
+    // поворачиваются — включённые вместе, оси и лучи дают узор снежинки.
+    const double cx = axisX2() / 2.0;
+    const double cy = axisY2() / 2.0;
+    for (int r = 1; r < symRadial; ++r) {
+        const double a = 2.0 * std::numbers::pi * r / symRadial;
+        const double ca = std::cos(a);
+        const double sa = std::sin(a);
+        for (int k = 0; k < n; ++k) {
+            const double dx = base[k].first + 0.5 - cx;
+            const double dy = base[k].second + 0.5 - cy;
+            fn(static_cast<int>(std::floor(cx + dx * ca - dy * sa + 1e-7)),
+               static_cast<int>(std::floor(cy + dx * sa + dy * ca + 1e-7)));
+        }
+    }
 }
 
 // --- «пиксель-перфект» ------------------------------------------------------
@@ -57,10 +91,7 @@ void Model::emitPixelPerfect(int x, int y) {
             }
             if (tile.inside(qx, qy)) t.emplace(qx, qy);
         };
-        add(px, py);
-        if (symX) add(mirrorX(px), py);
-        if (symY) add(px, mirrorY(py));
-        if (symX && symY) add(mirrorX(px), mirrorY(py));
+        forEachSymmetric(px, py, add);
         return t;
     };
     std::set<std::pair<int, int>> drop = targets(bx, by);
@@ -294,6 +325,15 @@ void Model::placeFloating(const Grid<Color>& content, const Grid<std::uint8_t>& 
     floatSel = selectionMask();
 }
 
+/// Плавное преобразование (этап 8) дало новые цвета: номера палитры — по
+/// итогу, в строгом индексном режиме итог сводится к палитре.
+static void smoothIndices(const Model& m, Grid<Color>& img, Grid<PalIndex>& idx) {
+    if (m.strictIndexedOn()) m.snapStrict(img, Grid<Color>(img.w, img.h, argb(0, 0, 0, 0)));
+    idx.resize(img.w, img.h, IDX_NONE);
+    for (std::size_t k = 0; k < img.d.size(); ++k)
+        idx.d[k] = img.d[k].a == 0 ? IDX_NONE : m.indexOfColor(img.d[k]);
+}
+
 /// После смены размеров картинки: выделение и штрих относились к старой.
 static void afterResize(Model& m) {
     m.resetSelection();
@@ -320,22 +360,57 @@ void Model::transformImage(int op) {
         needRepaint = true;
         return;
     }
-    // Вся картинка — это все слои и кадры: поворачивается спрайт целиком.
-    forEachCel([op](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = applyTf(img, op);
-        idx = applyTf(idx, op);
-    });
+    // Вся картинка — это все слои и кадры: поворачивается спрайт целиком,
+    // и точки векторных фигур — тем же преобразованием (центр точки x —
+    // x + ½, поэтому отражение — w - x, а не w - 1 - x).
+    const double w = tile.w;
+    const double h = tile.h;
+    forEachCel(
+        [op](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = applyTf(img, op);
+            idx = applyTf(idx, op);
+        },
+        CEL_GEOMETRY,
+        [op, w, h](VecShape& s) {
+            for (VecPoint& p : s.pts) {
+                const VecPoint q = p;
+                switch (op) {
+                    case TF_FLIP_H: p.x = w - q.x; break;
+                    case TF_FLIP_V: p.y = h - q.y; break;
+                    case TF_ROT90: p = {h - q.y, q.x}; break;
+                    case TF_ROT180: p = {w - q.x, h - q.y}; break;
+                    default: p = {q.y, w - q.x}; break;
+                }
+            }
+        });
     afterResize(*this);
 }
 
-bool Model::scaleImageTo(int nw, int nh) {
+bool Model::scaleImageTo(int nw, int nh, bool smooth) {
     if (docMode != DOC_TILE || tile.empty()) return false;
     if (nw < 1 || nh < 1 || nw > MAX_TILE || nh > MAX_TILE) return false;
     pushUndo();
-    forEachCel([nw, nh](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::scaleNearest(img, nw, nh);
-        idx = img::scaleNearest(idx, nw, nh);
-    });
+    const double sx = static_cast<double>(nw) / tile.w;
+    const double sy = static_cast<double>(nh) / tile.h;
+    forEachCel(
+        [this, nw, nh, smooth](Grid<Color>& img, Grid<PalIndex>& idx) {
+            if (smooth) {
+                img = fx::scaleSmooth(img, nw, nh);
+                smoothIndices(*this, img, idx);
+                return;
+            }
+            img = img::scaleNearest(img, nw, nh);
+            idx = img::scaleNearest(idx, nw, nh);
+        },
+        CEL_GEOMETRY,
+        [sx, sy](VecShape& s) {
+            for (VecPoint& p : s.pts) {
+                p.x *= sx;
+                p.y *= sy;
+            }
+            // Толщина растёт вместе с картинкой, как у растра.
+            s.width = std::max(1, pround(s.width * (sx + sy) / 2));
+        });
     afterResize(*this);
     return true;
 }
@@ -366,10 +441,12 @@ bool Model::cropToSelection() {
     const int y = selY;
     const int w = selW;
     const int h = selH;
-    forEachCel([=](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::crop(img, x, y, w, h, kClear);
-        idx = img::crop(idx, x, y, w, h, IDX_NONE);
-    });
+    forEachCel(
+        [=](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::crop(img, x, y, w, h, kClear);
+            idx = img::crop(idx, x, y, w, h, IDX_NONE);
+        },
+        CEL_GEOMETRY, [x, y](VecShape& s) { vec::translate(s, -x, -y); });
     afterResize(*this);
     return true;
 }
@@ -390,10 +467,12 @@ bool Model::cropToContent() {
     if (!img::maskBounds(any, x, y, w, h)) return false;
     if (x == 0 && y == 0 && w == tile.w && h == tile.h) return false;
     pushUndo();
-    forEachCel([=](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::crop(img, x, y, w, h, kClear);
-        idx = img::crop(idx, x, y, w, h, IDX_NONE);
-    });
+    forEachCel(
+        [=](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::crop(img, x, y, w, h, kClear);
+            idx = img::crop(idx, x, y, w, h, IDX_NONE);
+        },
+        CEL_GEOMETRY, [x, y](VecShape& s) { vec::translate(s, -x, -y); });
     afterResize(*this);
     return true;
 }
@@ -410,10 +489,14 @@ bool Model::resizeCanvas(int nw, int nh, int anchorX, int anchorY) {
     const bool single = doc.layerCount() <= 1;
     const Color fill = single ? blank : kClear;
     const PalIndex fillIdx = single ? bi : IDX_NONE;
-    forEachCel([&](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::resizeCanvas(img, nw, nh, anchorX, anchorY, fill);
-        idx = img::resizeCanvas(idx, nw, nh, anchorX, anchorY, fillIdx);
-    });
+    const int ox = img::anchorOffset(tile.w, nw, anchorX);
+    const int oy = img::anchorOffset(tile.h, nh, anchorY);
+    forEachCel(
+        [&](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::resizeCanvas(img, nw, nh, anchorX, anchorY, fill);
+            idx = img::resizeCanvas(idx, nw, nh, anchorX, anchorY, fillIdx);
+        },
+        CEL_GEOMETRY, [ox, oy](VecShape& s) { vec::translate(s, ox, oy); });
     afterResize(*this);
     return true;
 }
@@ -421,10 +504,14 @@ bool Model::resizeCanvas(int nw, int nh, int anchorX, int anchorY) {
 void Model::offsetImage(int dx, int dy) {
     if (docMode != DOC_TILE || tile.empty() || (dx == 0 && dy == 0)) return;
     pushUndo();
-    forEachCel([dx, dy](Grid<Color>& img, Grid<PalIndex>& idx) {
-        img = img::offsetWrap(img, dx, dy);
-        idx = img::offsetWrap(idx, dx, dy);
-    });
+    // Перенос через край рвёт фигуры пополам: векторный слой после него —
+    // растр, как и тайлкарта.
+    forEachCel(
+        [dx, dy](Grid<Color>& img, Grid<PalIndex>& idx) {
+            img = img::offsetWrap(img, dx, dy);
+            idx = img::offsetWrap(idx, dx, dy);
+        },
+        CEL_GEOMETRY);
     resetSelection();
     tileBmpDirty = true;
     needRepaint = true;
@@ -449,11 +536,109 @@ static int editWithUndo(Model& m, F&& f) {
     return n;
 }
 
-int Model::outlineImage(Color c, bool eightWay, bool outside) {
+int Model::outlineImage(Color c, bool eightWay, bool outside, int thickness) {
     if (docMode != DOC_TILE || tile.empty()) return 0;
     const Grid<std::uint8_t> within = hasSelection ? selectionMask() : Grid<std::uint8_t>{};
-    return editWithUndo(
-        *this, [&](Grid<Color>& t) { return img::outline(t, within, c, eightWay, outside); });
+    return editWithUndo(*this, [&](Grid<Color>& t) {
+        return img::outlineThick(t, within, c, eightWay, outside, thickness);
+    });
+}
+
+int Model::growImageEdge(bool eightWay) {
+    if (docMode != DOC_TILE || tile.empty()) return 0;
+    const Grid<std::uint8_t> within = hasSelection ? selectionMask() : Grid<std::uint8_t>{};
+    return editWithUndo(*this, [&](Grid<Color>& t) { return img::growEdge(t, within, eightWay); });
+}
+
+int Model::shrinkImageEdge(bool eightWay) {
+    if (docMode != DOC_TILE || tile.empty()) return 0;
+    const Grid<std::uint8_t> within = hasSelection ? selectionMask() : Grid<std::uint8_t>{};
+    return editWithUndo(*this,
+                        [&](Grid<Color>& t) { return img::shrinkEdge(t, within, eightWay); });
+}
+
+bool Model::rotateImageBy(double degrees, int method, bool expand) {
+    if (docMode != DOC_TILE || tile.empty()) return false;
+    // Цвет и номер палитры поворачиваются одним значением: RotSprite
+    // сравнивает точки, и пара должна ехать вместе.
+    auto pack = [](const Grid<Color>& img, const Grid<PalIndex>& idx) {
+        Grid<std::uint64_t> p(img.w, img.h, 0);
+        for (std::size_t k = 0; k < p.d.size(); ++k)
+            p.d[k] = (static_cast<std::uint64_t>(img.d[k].argb()) << 16) |
+                     (k < idx.d.size() ? idx.d[k] : IDX_NONE);
+        return p;
+    };
+    auto unpack = [](const Grid<std::uint64_t>& p, Grid<Color>& img, Grid<PalIndex>& idx) {
+        img.resize(p.w, p.h);
+        idx.resize(p.w, p.h);
+        for (std::size_t k = 0; k < p.d.size(); ++k) {
+            img.d[k] = Color::fromArgb(static_cast<std::uint32_t>(p.d[k] >> 16));
+            idx.d[k] = static_cast<PalIndex>(p.d[k] & 0xFFFF);
+        }
+    };
+    const std::uint64_t clear = IDX_NONE;  // прозрачный цвет и «без номера»
+    ensureTileIdx();
+    const bool smooth = method == img::ROT_SMOOTH;
+    if (hasSelection && smooth) {
+        pushUndo();
+        Grid<Color> content;
+        Grid<std::uint8_t> mask;
+        liftSelection(true, content, mask);
+        content = fx::rotateSmooth(content, degrees, true);
+        if (strictIndexedOn())
+            snapStrict(content, Grid<Color>(content.w, content.h, argb(0, 0, 0, 0)));
+        // Мягкий край — тоже часть куска: маска — всё, что не прозрачно.
+        mask = img::maskOpaque(content);
+        placeFloating(content, mask, selX + (selW - content.w) / 2, selY + (selH - content.h) / 2);
+        needRepaint = true;
+        return true;
+    }
+    if (hasSelection) {
+        pushUndo();
+        Grid<Color> content;
+        Grid<std::uint8_t> mask;
+        liftSelection(true, content, mask);
+        Grid<PalIndex> noIdx;
+        const Grid<std::uint64_t> r =
+            img::rotateAny(pack(content, noIdx), degrees, method, true, clear);
+        Grid<PalIndex> ridx;
+        unpack(r, content, ridx);
+        mask = img::rotateAny(mask, degrees, method, true, std::uint8_t{0});
+        placeFloating(content, mask, selX + (selW - content.w) / 2, selY + (selH - content.h) / 2);
+        needRepaint = true;
+        return true;
+    }
+    int nw = tile.w;
+    int nh = tile.h;
+    if (expand) img::rotatedSize(tile.w, tile.h, degrees, nw, nh);
+    if (nw > MAX_TILE || nh > MAX_TILE) return false;
+    pushUndo();
+    const double a = degrees * std::numbers::pi / 180.0;
+    const double ca = std::cos(a);
+    const double sa = std::sin(a);
+    const double scx = tile.w / 2.0;
+    const double scy = tile.h / 2.0;
+    const double dcx = nw / 2.0;
+    const double dcy = nh / 2.0;
+    forEachCel(
+        [&](Grid<Color>& img, Grid<PalIndex>& idx) {
+            if (smooth) {
+                img = fx::rotateSmooth(img, degrees, expand);
+                smoothIndices(*this, img, idx);
+                return;
+            }
+            unpack(img::rotateAny(pack(img, idx), degrees, method, expand, clear), img, idx);
+        },
+        CEL_GEOMETRY,
+        [=](VecShape& s) {
+            for (VecPoint& p : s.pts) {
+                const double dx = p.x - scx;
+                const double dy = p.y - scy;
+                p = {dcx + dx * ca - dy * sa, dcy + dx * sa + dy * ca};
+            }
+        });
+    afterResize(*this);
+    return true;
 }
 
 int Model::removeIsolatedPixels() {

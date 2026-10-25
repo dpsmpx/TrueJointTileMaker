@@ -29,6 +29,8 @@ constexpr int TL_NAME_W = 150;
 constexpr int TL_EYE_W = 20;
 constexpr int TL_LOCK_W = 20;
 constexpr int TL_CELL_W = 26;
+/// Место под знак вида слоя перед именем.
+constexpr int TL_MARK_W = 12;
 constexpr int TL_Y0 = CANVAS_H - TL_H;
 constexpr int TL_TAG_Y = TL_Y0 + TL_BAR_H;
 constexpr int TL_HEAD_Y = TL_TAG_Y + TL_TAG_H;
@@ -71,12 +73,16 @@ bool blankGrid(const Grid<Color>& g) {
 
 void Editor::applyLayout() {
     const int h = timelineShown() ? TL_Y0 : CANVAS_H;
-    if (m.H == h) return;
+    const int r = m.rulersOn ? RULER_SIZE : 0;
+    if (m.H == h && m.X0 == r && m.Y0 == r) return;
     // Тайл, что влезал в холст целиком, влезает и в укороченный; иначе
     // масштаб остаётся прежним, а вид лишь поджимается к краям.
-    const bool fitted = m.docW() * m.pixelSize <= m.W && m.docH() * m.pixelSize <= m.H;
+    const bool fitted =
+        m.docW() * m.pixelSize <= m.W - m.X0 && m.docH() * m.pixelSize <= m.H - m.Y0;
     m.H = h;
-    if (fitted && m.docH() * m.pixelSize > m.H) {
+    m.X0 = r;
+    m.Y0 = r;
+    if (fitted && (m.docW() * m.pixelSize > m.W - m.X0 || m.docH() * m.pixelSize > m.H - m.Y0)) {
         m.fitScale();
     } else {
         m.clampView();
@@ -100,14 +106,18 @@ void Editor::drawTimeline() {
         if (af >= tlFirstFrame_ + TL_VIS_FRAMES) tlFirstFrame_ = af - TL_VIS_FRAMES + 1;
         tlSeenFrame_ = af;
     }
-    const int activeRow = nl - 1 - al;
-    if (al != tlSeenLayer_) {
+    // Строки ленты — слои сверху вниз без детей свёрнутых групп.
+    const std::vector<int> rows = timelineRows();
+    const int nrows = static_cast<int>(rows.size());
+    const auto found = std::find(rows.begin(), rows.end(), al);
+    const int activeRow = found == rows.end() ? -1 : static_cast<int>(found - rows.begin());
+    if (al != tlSeenLayer_ && activeRow >= 0) {
         if (activeRow < tlFirstRow_) tlFirstRow_ = activeRow;
         if (activeRow >= tlFirstRow_ + TL_VIS_ROWS) tlFirstRow_ = activeRow - TL_VIS_ROWS + 1;
         tlSeenLayer_ = al;
     }
     tlFirstFrame_ = clampI(tlFirstFrame_, 0, std::max(0, nf - TL_VIS_FRAMES));
-    tlFirstRow_ = clampI(tlFirstRow_, 0, std::max(0, nl - TL_VIS_ROWS));
+    tlFirstRow_ = clampI(tlFirstRow_, 0, std::max(0, nrows - TL_VIS_ROWS));
 
     fb_.resetClip();
     fb_.fillRect(0, TL_Y0, CANVAS_W, CANVAS_H, cPanel);
@@ -182,8 +192,8 @@ void Editor::drawTimeline() {
     const bool activeHas = !blankGrid(m.tile);
     for (int r = 0; r < TL_VIS_ROWS; ++r) {
         const int row = tlFirstRow_ + r;
-        if (row >= nl) break;
-        const int l = nl - 1 - row;
+        if (row >= nrows) break;
+        const int l = rows[static_cast<std::size_t>(row)];
         const Layer& layer = d.layers[static_cast<std::size_t>(l)];
         const bool activeL = l == al;
         const int y = TL_ROWS_Y + r * TL_ROW_H;
@@ -208,8 +218,11 @@ void Editor::drawTimeline() {
         std::string name = layer.name;
         if (layer.opacity < 255)
             name += "  " + std::to_string(pround(layer.opacity * 100.0 / 255)) + "%";
+        // Дерево — сдвигом по глубине; перед именем — знак вида слоя.
+        const int nx = TL_EYE_W + TL_LOCK_W + 2 + std::min(layer.depth, 6) * 8;
         fb_.setClip(gfx::Rect{TL_EYE_W + TL_LOCK_W + 2, y, TL_NAME_W - 4, y + TL_ROW_H});
-        textOut(TL_EYE_W + TL_LOCK_W + 4, y + (TL_ROW_H - textHeight()) / 2, name,
+        drawLayerKindMark(nx, cy, layer);
+        textOut(nx + TL_MARK_W, y + (TL_ROW_H - textHeight()) / 2, name,
                 layer.visible ? cText : cTextDim);
         fb_.resetClip();
 
@@ -225,7 +238,10 @@ void Editor::drawTimeline() {
             const bool isActive = activeL && f == af;
             const bool has = isActive ? activeHas : d.cel(l, f) != nullptr;
             const int cx = x + TL_CELL_W / 2;
-            if (has) {
+            if (layer.kind == LK_GROUP) {
+                // У группы своих ячеек нет: полоса через кадры.
+                fb_.fillRect(x, cy - 1, x + TL_CELL_W, cy + 1, cBorder);
+            } else if (has) {
                 fb_.fillRoundRect(cx - 4, cy - 4, cx + 5, cy + 5, 9, 9,
                                   layer.visible ? cText : cTextDim);
             } else {
@@ -254,11 +270,51 @@ void Editor::drawTimeline() {
         fb_.fillRect(bx, CANVAS_H - 3, bx + std::max(8, TL_VIS_FRAMES * span / nf), CANVAS_H - 1,
                      cTextDim);
     }
-    if (nl > TL_VIS_ROWS) {
+    if (nrows > TL_VIS_ROWS) {
         const int span = TL_VIS_ROWS * TL_ROW_H;
-        const int by = TL_ROWS_Y + tlFirstRow_ * span / nl;
-        fb_.fillRect(TL_NAME_W - 4, by, TL_NAME_W - 2, by + std::max(6, TL_VIS_ROWS * span / nl),
+        const int by = TL_ROWS_Y + tlFirstRow_ * span / nrows;
+        fb_.fillRect(TL_NAME_W - 4, by, TL_NAME_W - 2, by + std::max(6, TL_VIS_ROWS * span / nrows),
                      cTextDim);
+    }
+}
+
+std::vector<int> Editor::timelineRows() const {
+    std::vector<int> rows;
+    for (int l = m.doc.layerCount() - 1; l >= 0; --l) {
+        if (m.layerRowVisible(l)) rows.push_back(l);
+    }
+    return rows;
+}
+
+void Editor::drawLayerKindMark(int x, int cy, const Layer& layer) {
+    const Color c = layer.visible ? cText : cTextDim;
+    switch (layer.kind) {
+        case LK_GROUP:
+            // Треугольник: вершиной вправо — свёрнута, вниз — открыта.
+            for (int k = 0; k < 4; ++k) {
+                if (layer.collapsed) {
+                    fb_.fillRect(x + 2 + k, cy - 3 + k, x + 3 + k, cy + 4 - k, c);
+                } else {
+                    fb_.fillRect(x + 1 + k, cy - 2 + k, x + 8 - k, cy - 1 + k, c);
+                }
+            }
+            break;
+        case LK_VECTOR:
+            // Ромб — опорная точка кривой.
+            for (int k = 0; k < 4; ++k) {
+                fb_.fillRect(x + 4 - k, cy - 3 + k, x + 5 - k, cy - 2 + k, c);
+                fb_.fillRect(x + 4 + k, cy - 3 + k, x + 5 + k, cy - 2 + k, c);
+                fb_.fillRect(x + 4 - k, cy + 3 - k, x + 5 - k, cy + 4 - k, c);
+                fb_.fillRect(x + 4 + k, cy + 3 - k, x + 5 + k, cy + 4 - k, c);
+            }
+            break;
+        case LK_TILEMAP:
+            // Решётка 2x2 — клетки тайлов.
+            fb_.frameRect(x + 1, cy - 4, x + 10, cy + 5, c);
+            fb_.fillRect(x + 5, cy - 4, x + 6, cy + 5, c);
+            fb_.fillRect(x + 1, cy, x + 10, cy + 1, c);
+            break;
+        default: break;
     }
 }
 
@@ -267,7 +323,6 @@ void Editor::handleTimelineClick() {
     const int y = frameClickY_;
     const bool right = frameClickButton_ == MB_RIGHT;
     const int nf = m.doc.frameCount();
-    const int nl = m.doc.layerCount();
     const int frameAt = x >= TL_NAME_W ? tlFirstFrame_ + (x - TL_NAME_W) / TL_CELL_W : -1;
     const bool frameOk = frameAt >= 0 && frameAt < nf;
     m.needRepaint = true;
@@ -327,10 +382,17 @@ void Editor::handleTimelineClick() {
         return;
     }
 
+    const std::vector<int> rows = timelineRows();
     const int row = tlFirstRow_ + (y - TL_ROWS_Y) / TL_ROW_H;
-    if (row >= nl) return;
-    const int l = nl - 1 - row;
+    if (row >= static_cast<int>(rows.size())) return;
+    const int l = rows[static_cast<std::size_t>(row)];
     const Layer& layer = m.doc.layers[static_cast<std::size_t>(l)];
+    // Треугольник группы сворачивает и разворачивает её.
+    const int nx = TL_EYE_W + TL_LOCK_W + 2 + std::min(layer.depth, 6) * 8;
+    if (layer.kind == LK_GROUP && x >= nx && x < nx + TL_MARK_W) {
+        m.setLayerCollapsed(l, !layer.collapsed);
+        return;
+    }
     if (x < TL_EYE_W) {
         m.setLayerVisible(l, !layer.visible);
         return;
@@ -568,12 +630,23 @@ void Editor::showAnimationScreen() {
     bool done = false;
     dropInput();
     pf_.input().keys.clear();
-    constexpr int CW = 228;
+    // Четыре колонки: слой, его вид и место в дереве, кадр с метками,
+    // просмотр с выгрузкой.
+    constexpr int CW = 178;
     constexpr int BH = 28;
     constexpr int ST = 31;
-    const int c1 = 30;
-    const int c2 = c1 + CW + 18;
-    const int c3 = c2 + CW + 18;
+    const int c1 = 20;
+    const int c2 = c1 + CW + 12;
+    const int c3 = c2 + CW + 12;
+    const int c4 = c3 + CW + 12;
+
+    auto tileSizeAsk = [&](const std::string& title, int& tw, int& th) {
+        tw = m.majorGridW > 0 ? m.majorGridW : std::min(16, m.tile.w);
+        th = m.majorGridH > 0 ? m.majorGridH : std::min(16, m.tile.h);
+        return askTwoNumbers(title, "Размер тайла в точках; клетки идут от левого верхнего угла",
+                             "Ширина тайла", tw, 1, m.tile.w, "Высота тайла", th, 1, m.tile.h,
+                             "Создать", nullptr);
+    };
 
     while (!done && !quitNow_) {
         beginFrameInput();
@@ -587,6 +660,7 @@ void Editor::showAnimationScreen() {
         // Копия: кнопки ниже меняют список слоёв посреди кадра.
         const Layer layer = m.doc.layers[static_cast<std::size_t>(al)];
         const int tag = m.tagOfFrame(af);
+        const bool group = layer.kind == LK_GROUP;
         uiLabel(0, 32, WIN_W, 20,
                 std::to_string(nl) + " сл. · " + std::to_string(nf) + " кадр. · " +
                     std::to_string(m.doc.tags.size()) + " меток   ·   " + std::to_string(m.tile.w) +
@@ -618,56 +692,90 @@ void Editor::showAnimationScreen() {
         y += ST;
         if (act(c1, y, "Новый слой", tile)) m.addLayer();
         y += ST;
-        if (act(c1, y, "Копия слоя", tile)) m.duplicateLayer();
+        if (act(c1, y, group ? "Копия группы" : "Копия слоя", tile)) m.duplicateLayer();
         y += ST;
-        if (act(c1, y, "Удалить слой", tile && nl > 1)) m.deleteLayer();
+        if (act(c1, y, group ? "Удалить группу" : "Удалить слой", tile && nl > 1)) m.deleteLayer();
         y += ST;
-        if (act(c1, y, "Слить с нижним", tile && al > 0)) m.mergeLayerDown();
+        if (act(c1, y, "Слить с нижним", tile && al > 0 && !group)) m.mergeLayerDown();
         y += ST;
-        if (act(c1, y, "Выше   PgUp — выбрать", tile && al < nl - 1)) m.moveLayer(1);
+        if (act(c1, y, "Выше   PgUp — выбрать", tile)) m.moveLayer(1);
         y += ST;
-        if (act(c1, y, "Ниже   PgDn — выбрать", tile && al > 0)) m.moveLayer(-1);
+        if (act(c1, y, "Ниже   PgDn — выбрать", tile)) m.moveLayer(-1);
+
+        // --- дерево и вид слоя (этап 6) ---
+        y = 78;
+        uiLabelLeft(c2, y - 24, 20, "Группы и вид слоя", cTextDim);
+        if (act(c2, y, "Сгруппировать", tile)) m.groupLayer();
+        y += ST;
+        if (act(c2, y, "Распустить группу", tile && group)) m.ungroupLayer();
+        y += ST;
+        if (act(c2, y, "В группу над ним", tile)) m.indentLayer();
+        y += ST;
+        if (act(c2, y, "Из группы", tile && m.layerParent(al) >= 0)) m.outdentLayer();
+        y += ST;
+        if (act(c2, y, "Свести группу", tile && group)) m.flattenGroup();
+        y += ST;
+        if (act(c2, y, "Новый векторный слой", tile)) m.addVectorLayer();
+        y += ST;
+        if (act(c2, y, "Новая тайлкарта…", tile)) {
+            int tw = 16;
+            int th = 16;
+            if (tileSizeAsk("Новая тайлкарта", tw, th)) m.addTilemapLayer(tw, th);
+        }
+        y += ST;
+        if (act(c2, y, "Слой → тайлкарта…", tile && layer.kind == LK_RASTER)) {
+            int tw = 16;
+            int th = 16;
+            if (tileSizeAsk("Слой в тайлкарту", tw, th)) m.convertLayerToTilemap(tw, th);
+        }
+        y += ST;
+        if (act(c2, y, "Тайлы слоя…   Ctrl+T", tile && layer.kind == LK_TILEMAP))
+            showTilePickerScreen();
+        y += ST;
+        if (act(c2, y, "Растрировать слой",
+                tile && (layer.kind == LK_VECTOR || layer.kind == LK_TILEMAP)))
+            m.rasterizeLayer();
 
         // --- кадр и метки ---
         y = 78;
-        uiLabelLeft(c2, y - 24, 20, "Кадр " + std::to_string(af + 1) + " из " + std::to_string(nf),
+        uiLabelLeft(c3, y - 24, 20, "Кадр " + std::to_string(af + 1) + " из " + std::to_string(nf),
                     cTextDim);
-        if (act(c2, y, "Длительность…", tile)) editFrameDuration(af);
+        if (act(c3, y, "Длительность…", tile)) editFrameDuration(af);
         y += ST;
-        if (act(c2, y, "Длительность всех кадров…", tile)) {
+        if (act(c3, y, "Длительность всех…", tile)) {
             int ms = m.doc.frames[static_cast<std::size_t>(af)].durationMs;
             if (askNumbers("Длительность всех кадров", "Миллисекунды на каждый кадр",
                            {{"Длительность, мс", &ms, 10, 60000, 10}}, "Применить", nullptr))
                 m.setFramesDuration(0, nf - 1, ms);
         }
         y += ST;
-        if (act(c2, y, "Новый кадр", tile)) m.addFrame(false);
+        if (act(c3, y, "Новый кадр", tile)) m.addFrame(false);
         y += ST;
-        if (act(c2, y, "Копия кадра", tile)) m.addFrame(true);
+        if (act(c3, y, "Копия кадра", tile)) m.addFrame(true);
         y += ST;
-        if (act(c2, y, "Удалить кадр", tile && nf > 1)) m.deleteFrame();
+        if (act(c3, y, "Удалить кадр", tile && nf > 1)) m.deleteFrame();
         y += ST;
-        if (act(c2, y, "Левее", tile && af > 0)) m.moveFrame(-1);
+        if (act(c3, y, "Левее", tile && af > 0)) m.moveFrame(-1);
         y += ST;
-        if (act(c2, y, "Правее", tile && af < nf - 1)) m.moveFrame(1);
+        if (act(c3, y, "Правее", tile && af < nf - 1)) m.moveFrame(1);
         y += ST + 8;
-        uiLabelLeft(c2, y - 6, 20, "Метки анимации", cTextDim);
+        uiLabelLeft(c3, y - 6, 20, "Метки анимации", cTextDim);
         y += 16;
-        if (act(c2, y, "Новая метка…", tile)) editTag(-1);
+        if (act(c3, y, "Новая метка…", tile)) editTag(-1);
         y += ST;
-        if (act(c2, y, "Изменить метку кадра…", tile && tag >= 0)) editTag(tag);
+        if (act(c3, y, "Изменить метку кадра…", tile && tag >= 0)) editTag(tag);
 
         // --- просмотр и экспорт ---
         y = 78;
-        uiLabelLeft(c3, y - 24, 20, "Просмотр", cTextDim);
-        if (uiToggle(c3, y, CW, BH, "Лента кадров   J", timelineOn_)) timelineOn_ = !timelineOn_;
+        uiLabelLeft(c4, y - 24, 20, "Просмотр", cTextDim);
+        if (uiToggle(c4, y, CW, BH, "Лента кадров   J", timelineOn_)) timelineOn_ = !timelineOn_;
         y += ST;
-        if (uiToggle(c3, y, CW, BH, "Луковая кожа   F3", m.onionSkin)) {
+        if (uiToggle(c4, y, CW, BH, "Луковая кожа   F3", m.onionSkin)) {
             m.onionSkin = !m.onionSkin;
             m.tileBmpDirty = true;
         }
         y += ST;
-        if (act(c3, y, "Кадров до и после…", tile)) {
+        if (act(c4, y, "Кадров до и после…", tile)) {
             int prev = m.onionPrev;
             int next = m.onionNext;
             askTwoNumbers("Луковая кожа", "Прошлые кадры — красноватые, будущие — синеватые",
@@ -678,25 +786,33 @@ void Editor::showAnimationScreen() {
             m.tileBmpDirty = true;
         }
         y += ST + 8;
-        uiLabelLeft(c3, y - 6, 20,
-                    playTag_ >= 0 && playTag_ < static_cast<int>(m.doc.tags.size())
-                        ? fitText("Экспорт: метка «" +
-                                      m.doc.tags[static_cast<std::size_t>(playTag_)].name + "»",
-                                  CW)
-                        : "Экспорт: все кадры",
-                    cTextDim);
+        uiLabelLeft(
+            c4, y - 6, 20,
+            playTag_ >= 0 && playTag_ < static_cast<int>(m.doc.tags.size())
+                ? fitText("Экспорт: «" + m.doc.tags[static_cast<std::size_t>(playTag_)].name + "»",
+                          CW)
+                : "Экспорт: все кадры",
+            cTextDim);
         y += 16;
-        if (act(c3, y, "Лист спрайтов и JSON…", tile)) exportSheetAsk();
+        if (act(c4, y, "Лист спрайтов и JSON…", tile)) exportSheetAsk();
         y += ST;
-        if (act(c3, y, "Анимация GIF…", tile)) exportAnimationAsk(true);
+        if (act(c4, y, "Анимация GIF…", tile)) exportAnimationAsk(true);
         y += ST;
-        if (act(c3, y, "Анимация APNG…", tile)) exportAnimationAsk(false);
+        if (act(c4, y, "Анимация APNG…", tile)) exportAnimationAsk(false);
         y += ST;
-        if (act(c3, y, "Кадры отдельными PNG…", tile)) exportFramesAsk();
+        if (act(c4, y, "Кадры отдельными PNG…", tile)) exportFramesAsk();
         y += ST;
-        if (act(c3, y, "Проект .tjt…", tile)) commandSaveAs();
+        if (act(c4, y, "Проект .tjt…", tile)) commandSaveAs();
+        y += ST;
+        // Документ, открытый из набора тайлов, помнит свой слот: первый
+        // кадр сведённым PNG уходит туда, где его ищет игра.
+        const std::string slot = m.metaValue("tileset.slot");
+        if (act(c4, y,
+                slot.empty() ? "В набор игры — слота нет" : fitText("В набор: " + slot, CW - 8),
+                tile && !slot.empty()))
+            exportToTilesetSlot();
 
-        if (uiButton(c3, WIN_H - 50, CW, 34, "Закрыть", true)) done = true;
+        if (uiButton(c4, WIN_H - 50, CW, 34, "Закрыть", true)) done = true;
         redraw();
         const int key = takeKey();
         if (key == KEY_ESC) done = true;

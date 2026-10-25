@@ -54,7 +54,7 @@ std::string Editor::toolLabel(int i) const {
         }
     }
     switch (i) {
-        case T_PEN: return "Кар";
+        case T_PEN: return m.airbrush ? "Аэр" : "Кар";
         case T_ERASER: return "Ласт";
         case T_FILL: return "Зал";
         case T_PICK: return "Пип";
@@ -83,7 +83,9 @@ void Editor::drawToolsSection() {
         // Нарисованный значок заменяет подпись, ненарисованный — нет: набор
         // делается по одному, и пока значка нет, кнопка выглядит как раньше.
         const int ic = m.docMode == DOC_MAP ? T_TILE_COUNT + i : i;
-        if (ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
+        // Аэрограф — подписью: значок карандаша соврал бы, что кисть точная.
+        const bool airLabel = m.docMode == DOC_TILE && i == T_PEN && m.airbrush;
+        if (!airLabel && ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
             !iconBmp_[static_cast<std::size_t>(ic)].empty()) {
             fb_.drawImage(iconBmp_[static_cast<std::size_t>(ic)], x0 + (TOOL_CW - 2 - ICON_PX) / 2,
                           y0 + (TOOL_CH - 2 - ICON_PX) / 2);
@@ -261,15 +263,23 @@ void Editor::drawInfoSection() {
     fb_.fillRect(PANEL_X, INFO_Y0 - 1, PANEL_X + PANEL_W, INFO_Y1 + 1, cPanel);
     if (m.docMode == DOC_TILE) {
         fb_.fillRect(PANEL_X + 2, INFO_Y0, PANEL_X + 42, INFO_Y0 + 40, cFace);
-        drawGridThumb(m.buffer, PANEL_X + 2, INFO_Y0, 40);
+        // У тайлкарты здесь — тайл кисти, у прочих — буфер выделения.
+        const Tileset* ts = m.activeTileset();
+        if (ts != nullptr && m.tileBrush > 0 && m.tileBrush < static_cast<int>(ts->tiles.size())) {
+            drawGridThumb(ts->tiles[static_cast<std::size_t>(m.tileBrush)], PANEL_X + 2, INFO_Y0,
+                          40);
+        } else {
+            drawGridThumb(m.buffer, PANEL_X + 2, INFO_Y0, 40);
+        }
         fb_.frameRect(PANEL_X + 2, INFO_Y0, PANEL_X + 42, INFO_Y0 + 40, cBorder);
     }
     const int tx = m.screenToTileX(mouseX());
     const int ty = m.screenToTileY(mouseY());
     std::string s;
     std::string alpha;
-    if (mouseX() < m.W && m.inDoc(tx, ty)) {
-        s = std::to_string(tx) + " : " + std::to_string(ty);
+    if (overCanvas(mouseX(), mouseY()) && m.inDoc(tx, ty)) {
+        // Координаты — от начала, которое можно сдвинуть (этап 5).
+        s = std::to_string(tx - m.originX) + " : " + std::to_string(ty - m.originY);
         if (m.docMode == DOC_MAP) {
             s += "  " + mapTileName(m.map.at(tx, ty));
         } else {
@@ -325,8 +335,10 @@ void Editor::drawPanel() {
 }
 
 void Editor::repaint() {
-    // Команда могла положить цвет не из палитры: в строгом индексном режиме
-    // он сводится к ячейке до того, как его увидят.
+    // Правка точек тайлкарты уходит в её набор (этап 6), а команда могла
+    // положить цвет не из палитры: в строгом индексном режиме он сводится
+    // к ячейке до того, как его увидят.
+    m.syncActiveTilemap();
     m.enforceIndexed();
     drawCanvas();
     drawTimeline();

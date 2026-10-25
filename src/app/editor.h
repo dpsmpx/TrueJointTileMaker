@@ -8,6 +8,8 @@
 // исходником.
 #pragma once
 
+#include <array>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -104,6 +106,10 @@ private:
     bool uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
                     bool on);
     void uiLabel(int x, int y, int bw, int bh, const std::string& caption, Color c);
+    /// Число со ступенями: подпись, −big, −1, значение, +1, +big. Ширина
+    /// 358 точек, высота 30. true — значение изменилось.
+    bool uiStepper(int x, int y, const std::string& label, int& v, int lo, int hi, int big,
+                   const std::string& unit = "");
     void uiLabelLeft(int x, int y, int bh, const std::string& caption, Color c);
     void textCentered(int x0, int y0, int x1, int y1, const std::string& s, Color c);
     void textOut(int x, int y, const std::string& s, Color c);
@@ -114,6 +120,11 @@ private:
                                         int maxWidth) const;
 
     // --- холст ---
+    /// Холст в окне: от (X0, Y0) — слева и сверху могут стоять линейки.
+    [[nodiscard]] gfx::Rect canvasRect() const { return gfx::Rect{m.X0, m.Y0, m.W, m.H}; }
+    [[nodiscard]] bool overCanvas(int x, int y) const {
+        return x >= m.X0 && x < m.W && y >= m.Y0 && y < m.H;
+    }
     void drawTilePixel(int x, int y);
     void drawPreviewPixel(int x, int y);
     void ensureTileBmp();
@@ -235,11 +246,14 @@ private:
     void handleChipClick(int chip);
     void selectToolPro(int mx, int my);
     void defineSelectionPro(int ax, int ay, int op);
+    void definePolygonSelection(int ax, int ay, int op);
     void moveSelectionPro(int mx, int my, bool copy);
     void drawSelectionMask();
     bool handleProKey(int key);
     void showToolOptions();
     void showImageScreen();
+    void showRotateDialog();
+    void showOutlineDialog();
     /// Два числа со ступенями ±1 и ±8; anchor — сетка якоря 3x3 (номер
     /// ay * 3 + ax) или nullptr.
     bool askTwoNumbers(const std::string& title, const std::string& hint, const std::string& label1,
@@ -267,6 +281,96 @@ private:
     /// Последняя разобранная клавиша с модификаторами в миг нажатия.
     KeyPress lastKey_;
     bool outlineEight_ = false;
+    bool outlineOutside_ = true;
+    int outlineThick_ = 1;
+    int rotateDeg_ = 15;
+    int rotateMethod_ = 1;
+    bool rotateExpand_ = true;
+
+    // --- этап 8: вне пиксель-арта (filters_ui.cpp) ---
+    /// Параметры экрана «Фильтры и эффекты»: помнятся до конца сеанса,
+    /// чтобы фильтр можно было повторить на другом кадре.
+    struct FxParams {
+        int kind = 0;
+        bool wrap = false;
+        int blurRadius = 2;
+        int sharpAmount = 100;
+        int sharpRadius = 2;
+        int noiseAmount = 16;
+        bool noiseMono = false;
+        int noiseSeed = 1;
+        int brightness = 0;
+        int contrast = 0;
+        int saturation = 0;
+        int inLo = 0;
+        int inHi = 255;
+        int gammaPct = 100;
+        int outLo = 0;
+        int outHi = 255;
+        /// Кривые: общая и по каналам, точки (вход, выход).
+        std::array<std::vector<std::pair<int, int>>, 4> curves;
+        int curveChannel = 0;
+        int skewX = 15;
+        int skewY = 0;
+        /// Углы перспективы в долях рамки (0..1), по часовой с левого
+        /// верхнего: так они не зависят от размера картинки.
+        std::array<double, 8> quad{0, 0, 1, 0, 1, 1, 0, 1};
+        bool operator==(const FxParams&) const = default;
+    };
+    FxParams fx_;
+    void showFiltersScreen();
+    /// Фильтр с параметрами экрана; boxed — он видит рамку выделения.
+    Grid<Color> runFilter(const Grid<Color>& g) const;
+    bool filterBoxed() const;
+    void showBrushOptions();
+    void doAirbrushStroke(int startX, int startY);
+    void drawChecker(int x0, int y0, int x1, int y1);
+
+    // --- этап 7: связь с игрой (gameset_ui.cpp) ---
+    /// Картинки тайлов набора игры по имени файла без расширения; пустая —
+    /// файла нет. Сбрасывается, когда в набор что-то записали.
+    std::map<std::string, Grid<Color>> gameTiles_;
+    bool gameTilesDirty_ = true;
+    /// Какое по счёту место местности на карте показывает окружение тайла.
+    int mapCtxIndex_ = 0;
+    const Grid<Color>* gameTile(const std::string& name);
+    /// Картинка клетки карты: вариант стыка, если он нарисован, иначе тайл.
+    const Grid<Color>* mapCellImage(int x, int y);
+    /// Местность, которую рисует открытый тайл (слот 0..6), или -1.
+    int editedTerrain() const;
+    /// Клетка карты, вокруг которой показывать тайл; false — такой нет.
+    bool mapContextCell(int& cx, int& cy, int& count);
+    void drawMapContext(int ox, int oy, int sw, int sh);
+    void drawMapContextLabel();
+    void toggleMapContext();
+    /// true — открыт новый документ (заготовка стыков): экран наборов
+    /// тоже закрывается.
+    bool showGameSetScreen();
+    void exportGameSheet();
+    void exportGameAtlas();
+    void sliceGameSheetAsk();
+    bool autotileTemplate(int terrain);
+    void autotileSlice();
+
+    // --- этап 6: векторные инструменты и тайлы (vector_ui.cpp) ---
+    /// Последняя тронутая фигура векторного слоя: её удаляет Delete.
+    int vecSel_ = -1;
+    static std::string lineKindName(int k);
+    VecShape styledShape(int type) const;
+    void previewShape(const VecShape& s);
+    void drawVectorHandles();
+    void doVectorTool(int mx, int my);
+    void showShapeOptions();
+    void showTilePickerScreen();
+    void importGameTiles();
+
+    // --- этап 5: линейки и направляющие (guides.cpp) ---
+    void drawGuides();
+    void drawRadialAxes();
+    void drawRulers();
+    void handleRulerPress();
+    bool handleGuideKey(int key);
+    void showGridScreen();
 
     // --- этап 4: лента слоёв и кадров (timeline.cpp) ---
     /// Лента под холстом. Видна только в режиме тайла; включается J или
@@ -291,6 +395,9 @@ private:
     /// Высота холста по ленте: m.H — холст, окно — WIN_H.
     void applyLayout();
     void drawTimeline();
+    /// Слои строк ленты сверху вниз, без детей свёрнутых групп.
+    std::vector<int> timelineRows() const;
+    void drawLayerKindMark(int x, int cy, const Layer& layer);
     void handleTimelineClick();
     bool handleTimelineKey(int key);
     void timelineWheel(int wheel);
@@ -305,14 +412,30 @@ private:
     // --- экспорт и импорт анимации ---
     /// 1 — открыта анимация, 0 — файл не анимация, -1 — ошибка (сказано).
     int tryLoadAnimation(const std::string& path, bool quiet);
-    bool saveAnimationTo(const std::string& path, bool gif, int from, int to, int scale, int plays,
+    /// Кадры from..to в файл; формат — по расширению. asDocument — файл
+    /// становится документом, если в нём ничего не потеряно.
+    bool saveAnimationTo(const std::string& path, int from, int to, int scale, int plays,
                          bool asDocument);
+    /// Форматы картинок по расширению (этап 5): PNG и APNG, GIF, BMP, TIFF.
+    enum { FMT_PNG, FMT_GIF, FMT_BMP, FMT_TIFF };
+    static int imageFormatOf(const std::string& path);
+    bool writeImageFile(const std::string& path, const std::vector<AnimFrame>& frames, int plays);
     /// Диалог сохранения выгрузки с заданным расширением.
     std::string askExportFile(const std::string& title, const std::string& suggested,
                               const std::string& ext, const std::string& filterName);
     void exportSheetAsk();
     void exportAnimationAsk(bool gif);
     void exportFramesAsk();
+    /// Первый кадр сведённым PNG — в слот набора тайлов из метаданных.
+    void exportToTilesetSlot();
+    /// Настройки листа спрайтов живут до конца работы: лист обычно
+    /// выгружают раз за разом с теми же полями.
+    int sheetCols_ = 0;
+    int sheetMargin_ = 0;
+    int sheetSpacing_ = 0;
+    int sheetPadding_ = 0;
+    int sheetScale_ = 1;
+    int sheetBg_ = 0;
     /// Кадры для выгрузки: метка проигрывания или все.
     void exportRange(int& from, int& to) const;
 

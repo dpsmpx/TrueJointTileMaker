@@ -166,6 +166,20 @@ bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption
     return false;
 }
 
+bool Editor::uiStepper(int x, int y, const std::string& label, int& v, int lo, int hi, int big,
+                       const std::string& unit) {
+    const int before = v;
+    uiLabelLeft(x, y, 30, label, cText);
+    const std::string b = std::to_string(big);
+    if (uiButton(x + 130, y, 44, 30, "−" + b, v > lo)) v = std::max(lo, v - big);
+    if (uiButton(x + 178, y, 36, 30, "−1", v > lo)) v = std::max(lo, v - 1);
+    fb_.fillRoundRect(x + 218, y, x + 278, y + 30, 6, 6, cFace);
+    uiLabel(x + 218, y, 60, 30, std::to_string(v) + unit, cText);
+    if (uiButton(x + 282, y, 36, 30, "+1", v < hi)) v = std::min(hi, v + 1);
+    if (uiButton(x + 322, y, 44, 30, "+" + b, v < hi)) v = std::min(hi, v + big);
+    return v != before;
+}
+
 void Editor::uiLabel(int x, int y, int bw, int bh, const std::string& caption, Color c) {
     textCentered(x, y, x + bw, y + bh, caption, c);
 }

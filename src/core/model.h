@@ -29,8 +29,9 @@ namespace tjtm {
 
 inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
-// RoadToProLevel поднимают младший номер; 1.0 — когда пройдены все четыре.
-inline constexpr const char* kAppVersion = "1.0.0";
+// RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
+// 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
+inline constexpr const char* kAppVersion = "1.4.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -41,6 +42,9 @@ inline constexpr int PANEL_X = CANVAS_W;
 inline constexpr int PANEL_W = 180;
 inline constexpr int WIN_W = CANVAS_W + PANEL_W;
 inline constexpr int WIN_H = CANVAS_H;
+
+/// Ширина линеек слева и сверху холста (этап 5).
+inline constexpr int RULER_SIZE = 20;
 
 inline constexpr int MIN_TILE = 4;
 inline constexpr int MAX_TILE = 512;
@@ -95,9 +99,13 @@ inline constexpr int DOC_TILE = 0, DOC_MAP = 1;
 
 /// Преобразования картинки или содержимого выделения (этап 1).
 inline constexpr int TF_FLIP_H = 0, TF_FLIP_V = 1, TF_ROT90 = 2, TF_ROT180 = 3, TF_ROT270 = 4;
-/// Вид выделения: рамка, овал, лассо, волшебная палочка, по цвету.
+/// Вид линии инструмента «Линия» (этап 6).
+inline constexpr int LINE_STRAIGHT = 0, LINE_POLY = 1, LINE_POLYGON = 2, LINE_CURVE = 3,
+                     LINE_CLOSED_CURVE = 4, LINE_STAR = 5, LINE_KINDS = 6;
+/// Вид выделения: рамка, овал, лассо, волшебная палочка, по цвету,
+/// многоугольник по вершинам (этап 5).
 inline constexpr int SS_RECT = 0, SS_ELLIPSE = 1, SS_LASSO = 2, SS_WAND = 3, SS_COLOR = 4,
-                     SS_COUNT = 5;
+                     SS_POLYGON = 5, SS_COUNT = 6;
 
 inline constexpr int MIN_ZOOM = 1;
 inline constexpr int MAX_ZOOM = 64;
@@ -157,7 +165,14 @@ struct TileSnapshot {
     SpriteDoc doc;
     int layer = 0;
     int frame = 0;
+    /// Активная ячейка векторного слоя и тайлкарты (этап 6).
+    std::vector<VecShape> shapes;
+    Grid<int> tileMap;
 };
+
+/// Какая команда идёт по всем ячейкам (forEachCel): цветовая меняет
+/// точки на месте, геометрическая — их положение.
+inline constexpr int CEL_COLOR = 0, CEL_GEOMETRY = 1;
 
 class Model {
 public:
@@ -233,6 +248,55 @@ public:
     /// никто не трогал, повторное вынимание возвращает то, что было под
     /// вставкой, а не прозрачность. Проверка — сравнением с результатом.
     Grid<Color> floatUnder, floatResult;
+
+    // --- этап 5: точность ---
+
+    /// Радиальная симметрия: столько секторов вокруг точки пересечения
+    /// осей. 0 и 1 — её нет.
+    int symRadial = 0;
+    /// Непрозрачность кисти, 1..255. Точка мазка ложится один раз, поэтому
+    /// повторный проход по ней в том же мазке не сгущает цвет.
+    int brushOpacity = 255;
+
+    // --- этап 8: вне пиксель-арта ---
+
+    /// Сглаживание линии, прямоугольника, овала и фигур: край — долями
+    /// покрытия. Новые цвета, поэтому выключено и у окна.
+    bool antialias = false;
+    /// Карандаш — аэрограф: мягкий круглый отпечаток диаметром airSize,
+    /// с жёсткостью airHardness и напором airFlow (проценты). Напор копится
+    /// за мазок до полной непрозрачности.
+    bool airbrush = false;
+    int airSize = 8;
+    int airHardness = 30;
+    int airFlow = 25;
+    /// Накопленная за мазок непрозрачность аэрографа и непройденный остаток
+    /// шага между отпечатками.
+    Grid<float> airAcc;
+    double airCarry = 0;
+    int airLastX = 0, airLastY = 0;
+
+    /// Начало холста в окне: справа и снизу его край — W и H, слева и
+    /// сверху — линейки, когда они видны.
+    int X0 = 0, Y0 = 0;
+    bool rulersOn = false;
+    bool guidesOn = true;
+    /// Свои направляющие в половинах точки: 2·x — граница перед точкой x.
+    std::vector<int> guidesX2, guidesY2;
+    /// Направляющие через середину документа.
+    bool guideCenter = false;
+    /// Крупная сетка: клетка в точках, 0 — её нет. Для листа тайлов 16x16
+    /// это границы тайлов.
+    int majorGridW = 0, majorGridH = 0;
+    /// Направляющие через середины клеток крупной сетки.
+    bool guideCellCenters = false;
+    /// Начало координат линеек и строки координат.
+    int originX = 0, originY = 0;
+    /// Пары «ключ = значение» документа: слот набора тайлов, откуда он
+    /// открыт, и всё, что проект принёс и чего эта версия не знает.
+    std::vector<std::pair<std::string, std::string>> docMeta;
+    std::string metaValue(const std::string& key) const;
+    void setMeta(const std::string& key, const std::string& value);
     Grid<PalIndex> floatUnderIdx;
     Grid<std::uint8_t> floatSel;
 
@@ -279,6 +343,29 @@ public:
 
     std::vector<TileSnapshot> undoStack, redoStack;
     std::vector<MapDoc> mapUndo, mapRedo;
+
+    // --- этап 6: активная ячейка векторного слоя и тайлкарты ---
+    /// Фигуры активной ячейки векторного слоя; tile — их растр.
+    std::vector<VecShape> tileShapes;
+    /// Номера тайлов активной ячейки тайлкарты; tile — их отрисовка.
+    Grid<int> tileMap;
+    /// Тайлкарта правится точками: правка уходит в набор и меняет все копии
+    /// тайла. Иначе кисть кладёт тайл tileBrush целиком.
+    bool tilemapPixels = false;
+    int tileBrush = 1;
+    /// Этап 7: карта картинками тайлов из набора игры, со стыками по
+    /// соседям, и тайл местности среди соседей настоящей карты.
+    bool mapTiles = false;
+    bool mapAutotile = false;
+    bool mapContext = false;
+    /// Вид линии: прямая (как в оригинале), ломаная, многоугольник, кривая
+    /// через точки, замкнутая кривая, звезда (этап 6).
+    int lineKind = 0;
+    /// Толщина, заливка вторым цветом и звезда — у фигур и векторных слоёв.
+    int shapeWidth = 1;
+    bool shapeFill = false;
+    int starPoints = 5;
+    int starInner = 50;
 
     /// Маска текущего штриха: пиксель закрашивается не больше раза,
     /// иначе полупрозрачная кисть накладывалась бы сама на себя.
@@ -501,12 +588,19 @@ public:
     bool activeLayerEditable() const;
     /// Применить правку ко всем ячейкам документа, включая активную. Так
     /// работают команды над всей картинкой: размер холста, поворот, палитра.
-    void forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>& fn);
+    /// Цветовая правка идёт и по цветам векторных фигур, и по тайлам наборов;
+    /// геометрическая двигает точки фигур через shapeFn, а без него — и
+    /// всегда у тайлкарты, чья сетка после неё не совпадёт, — переводит
+    /// слой в растр.
+    void forEachCel(const std::function<void(Grid<Color>&, Grid<PalIndex>&)>& fn,
+                    int what = CEL_COLOR, const std::function<void(VecShape&)>& shapeFn = {});
     /// Пройти по картинкам всех ячеек, ничего не меняя.
     void forEachCelConst(const std::function<void(const Grid<Color>&)>& fn) const;
     /// Видимые слои кадра f, сведённые с учётом непрозрачности слоя.
     Grid<Color> compositeFrame(int f) const;
     Color compositeAt(int f, int x, int y) const;
+    /// Сведение слоёв from..to кадра f с группами (этап 6).
+    Color compositeLayers(int f, int from, int to, int x, int y) const;
     /// То, что видно на холсте в точке: сведение и «луковая кожа», без шахматки.
     Color viewColorAt(int x, int y) const;
     int addLayer();
@@ -535,6 +629,51 @@ public:
     /// Документ из кадров анимации (APNG, GIF): один слой, кадры с их
     /// длительностями. Размер — по первому кадру.
     void setAnimation(const std::vector<AnimFrame>& frames, const std::string& fileName);
+    // --- этап 6: группы, вектор, тайлкарта (model_layers.cpp) ---
+    int activeKind() const;
+    /// Группа, в которой лежит слой, или -1.
+    int layerParent(int l) const;
+    /// Нижний слой поддерева группы; у прочих слоёв — сам слой.
+    int subtreeStart(int l) const;
+    /// Слой и все его группы видны / слой или одна из его групп заперты.
+    bool layerShownDeep(int l) const;
+    bool layerLockedDeep(int l) const;
+    /// Строка слоя видна на ленте: ни одна его группа не свёрнута.
+    bool layerRowVisible(int l) const;
+    void setLayerCollapsed(int l, bool c);
+    /// Сгруппировать активный слой с поддеревом; возвращает группу.
+    int groupLayer();
+    bool ungroupLayer();
+    /// В соседнюю группу над слоем верхним ребёнком / из своей группы.
+    bool indentLayer();
+    bool outdentLayer();
+    /// Группа → один растровый слой с её видом.
+    bool flattenGroup();
+    int addVectorLayer();
+    /// Векторный слой или тайлкарта становятся растровым слоем.
+    bool rasterizeLayer();
+    /// Фигура на векторный слой — правимой, на растровый — точками.
+    /// Возвращает номер фигуры или -1.
+    int addVectorShape(const VecShape& s);
+    /// Заменить фигуру без шага истории (его кладут в начале протяжки).
+    void setVectorShape(int i, const VecShape& s);
+    bool deleteVectorShape(int i);
+    void rerenderActiveVector();
+    int addTilemapLayer(int tw, int th);
+    /// Растровый слой → тайлкарта: одинаковые клетки — один тайл.
+    bool convertLayerToTilemap(int tw, int th);
+    void rerenderTileset(int t);
+    /// Правка тайлкарты точками уходит в набор (зовётся перед показом).
+    void syncActiveTilemap();
+    const Tileset* activeTileset() const;
+    int addTileToActiveSet(const Grid<Color>& g);
+    /// Тайлы разом, одним шагом истории; повторы не добавляются.
+    int addTilesToActiveSet(const std::vector<Grid<Color>>& tiles);
+    bool deleteTileFromActiveSet(int i);
+    int tileIndexAt(int x, int y) const;
+    void setTileCell(int cx, int cy, int v);
+    void stampTileAt(int x, int y);
+    void fillTilesAt(int x, int y);
     /// Следующий кадр проигрывания внутри метки tag (-1 — все кадры).
     /// pingDir — направление для «туда-обратно», меняется на краях.
     int nextPlayFrame(int f, int tag, int& pingDir) const;
@@ -542,6 +681,9 @@ public:
     // --- симметрия ---
     int mirrorX(int x) const;
     int mirrorY(int y) const;
+    /// Точка и все её отражения и повороты по включённой симметрии, в том
+    /// порядке, в каком их рисовал оригинал; повороты — после.
+    void forEachSymmetric(int x, int y, const std::function<void(int, int)>& fn) const;
     /// Ось там, где её рисовать на холсте, в половинах точки.
     int axisX2() const { return symAxisX2 < 0 ? docW() : symAxisX2; }
     int axisY2() const { return symAxisY2 < 0 ? docH() : symAxisY2; }
@@ -590,13 +732,42 @@ public:
     /// Масштаб ближайшим соседом в num/den: содержимого выделения от его
     /// левого верхнего угла или всей картинки. false — размер вне пределов.
     bool scaleBy(int num, int den);
-    bool scaleImageTo(int nw, int nh);
+    /// Масштаб всех ячеек до nw x nh; smooth — плавно, не пиксель-арт
+    /// (этап 8).
+    bool scaleImageTo(int nw, int nh, bool smooth = false);
     bool cropToSelection();
     bool cropToContent();
     bool resizeCanvas(int nw, int nh, int anchorX, int anchorY);
     void offsetImage(int dx, int dy);
-    int outlineImage(Color c, bool eightWay, bool outside);
+    int outlineImage(Color c, bool eightWay, bool outside, int thickness = 1);
     int removeIsolatedPixels();
+    /// Нарастить или срезать край непрозрачного на точку (этап 5).
+    int growImageEdge(bool eightWay);
+    int shrinkImageEdge(bool eightWay);
+    /// Поворот на любой угол (img::ROT_*): выделенного или всех ячеек.
+    /// false — повёрнутое не помещается в MAX_TILE.
+    bool rotateImageBy(double degrees, int method, bool expand);
+    /// Свести цвета выделенного или всего тайла к n медианным разрезом.
+    int reduceImageColors(int n);
+
+    // --- вне пиксель-арта (этап 8) ---
+    /// Фильтр над активной ячейкой. При выделении меняются только его
+    /// точки; boxed — фильтр видит лишь рамку выделения, как отдельную
+    /// картинку (наклон, перспектива). Число изменённых точек.
+    int applyFilter(const std::function<Grid<Color>(const Grid<Color>&)>& f, bool boxed);
+    /// Что applyFilter положит в ячейку, без записи — для предпросмотра.
+    /// Пустая картинка — фильтр к этому слою неприменим.
+    Grid<Color> filterResult(const std::function<Grid<Color>(const Grid<Color>&)>& f,
+                             bool boxed) const;
+    /// Итог фильтра или сглаживания в строгом индексном режиме: точка,
+    /// прозрачная больше чем наполовину, становится прозрачной (прозрачная
+    /// и раньше — остаётся как была), прочие — ближайший цвет палитры.
+    void snapStrict(Grid<Color>& next, const Grid<Color>& before) const;
+    /// Мазок аэрографа: отпечатки через четверть диаметра вдоль пути.
+    void airbrushBegin(int x, int y);
+    void airbrushTo(int x, int y);
+    void airbrushEnd();
+    void airbrushDab(int cx, int cy);
 
     // --- карта и набор тайлов ---
     /// Файл тайла, которым нарисована клетка карты, без расширения.

@@ -1,0 +1,63 @@
+# Этап 5 RoadToProLevel: линейки и направляющие, крупная сетка,
+# многоугольное выделение, поворот RotSprite, контур в две точки, запись
+# BMP и TIFF и открытие TIFF. Ответы диалогам файлов — prec5.dialogs.
+# С линейками холст с (20, 20): тайл 64x64 по 8 точек — с (54, 34).
+key Escape
+sleep 0.4
+key ctrl+r                 # линейки
+sleep 0.2
+click 310 10               # вертикальная направляющая на x = 32
+click 10 162               # горизонтальная на y = 16
+key ctrl+g                 # сетка и направляющие
+sleep 0.3
+click 160 373              # крупная сетка 16x16
+click 205 159              # через середину документа
+key Escape
+move 700 300
+sleep 0.2
+shot 01_guides
+key o                      # параметры: многоугольник
+sleep 0.3
+click 692 125
+key Escape
+key 9
+click 100 100              # вершины многоугольника
+click 300 120
+click 250 300
+click 100 100              # щелчок по первой замыкает
+sleep 0.2
+key Delete                 # стереть выделенное
+key ctrl+d
+move 700 300
+sleep 0.2
+shot 02_polygon
+key k
+sleep 0.3
+click 390 247              # повернуть на любой угол
+sleep 0.2
+key Return                 # 15°, RotSprite, холст растёт
+move 700 300
+sleep 0.2
+shot 03_rotated
+key k
+sleep 0.3
+click 390 402              # контур первым цветом
+sleep 0.2
+click 463 237              # толщина 2
+key Return
+move 700 300
+sleep 0.2
+shot 04_outline
+key Escape
+sleep 0.3
+click 390 296              # сохранить как BMP
+sleep 0.3
+key Escape
+sleep 0.3
+click 390 296              # сохранить как TIFF
+sleep 0.3
+key l                      # открыть TIFF
+sleep 0.3
+move 700 300
+sleep 0.2
+shot 05_tiff

@@ -169,6 +169,9 @@ std::vector<std::uint8_t> gifLzwEncode(const std::vector<std::uint8_t>& indices,
         prefix = k;
     }
     bw.put(prefix, size);
+    // Прочитав последний код, читающий добавит запись — и, если словарь
+    // дорос до новой ширины, код конца он ждёт уже шире.
+    if (next == (1 << size) && size < 12) ++size;
     bw.put(eoi, size);
     bw.flush();
     return out;

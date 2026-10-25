@@ -1,6 +1,7 @@
 #include "core/project.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <memory>
 
@@ -102,7 +103,30 @@ struct Parsed {
     int onionNext = 1;
     Color first;
     Color second;
+    bool haveGuides = false;
+    unsigned guideFlags = 0;
+    int majorW = 0, majorH = 0;
+    int originX = 0, originY = 0;
+    std::vector<int> guidesX2, guidesY2;
+    int radial = 0;
+    int opacity = 255;
+    std::vector<std::pair<std::string, std::string>> meta;
+    // Этап 6: вид и глубина слоёв, наборы тайлов, фигуры и сетки ячеек.
+    struct LayerX {
+        int kind = LK_RASTER;
+        int depth = 0;
+        bool collapsed = false;
+        int tileset = -1;
+    };
+    std::vector<LayerX> layx;
+    std::vector<std::pair<std::pair<int, int>, std::vector<VecShape>>> shapes;
+    std::vector<std::pair<std::pair<int, int>, Grid<int>>> tilemaps;
 };
+
+/// Точка фигуры — в 1/256 точки: точнее, чем нужно мыши, и целым числом.
+int fixed(double v) {
+    return static_cast<int>(std::lround(v * 256.0));
+}
 
 bool parseBody(const std::vector<std::uint8_t>& body, Parsed& out, std::string& error) {
     Reader r{body.data(), body.size()};
@@ -189,7 +213,7 @@ bool parseBody(const std::vector<std::uint8_t>& body, Parsed& out, std::string& 
                 const int l = static_cast<int>(s.u32());
                 const int f = static_cast<int>(s.u32());
                 if (!s.need(px * 6)) break;
-                Cel c{Grid<Color>(out.w, out.h), Grid<PalIndex>(out.w, out.h, IDX_NONE)};
+                Cel c{Grid<Color>(out.w, out.h), Grid<PalIndex>(out.w, out.h, IDX_NONE), {}, {}};
                 for (std::size_t q = 0; q < px; ++q) {
                     const std::uint8_t* d = s.p + s.pos + q * 4;
                     c.img.d[q] = argb(d[3], d[0], d[1], d[2]);
@@ -223,6 +247,110 @@ bool parseBody(const std::vector<std::uint8_t>& body, Parsed& out, std::string& 
             out.first = Color::fromArgb(s.u32());
             out.second = Color::fromArgb(s.u32());
             out.haveView = !s.bad;
+        } else if (tag == "GUID") {
+            out.guideFlags = static_cast<unsigned>(s.u8());
+            out.majorW = static_cast<int>(s.u32());
+            out.majorH = static_cast<int>(s.u32());
+            out.originX = s.i32();
+            out.originY = s.i32();
+            for (auto* list : {&out.guidesX2, &out.guidesY2}) {
+                const std::uint32_t n = s.u32();
+                for (std::uint32_t k = 0; k < n && k < 4096 && !s.bad; ++k)
+                    list->push_back(s.i32());
+            }
+            out.radial = s.u8();
+            out.opacity = std::max(1, s.u8());
+            out.haveGuides = !s.bad;
+        } else if (tag == "LAYX") {
+            const std::uint32_t n = s.u32();
+            for (std::uint32_t k = 0; k < n && k < kMaxLayers && !s.bad; ++k) {
+                Parsed::LayerX x;
+                x.kind = s.u8();
+                x.depth = std::min(s.u8(), 64);
+                x.collapsed = s.u8() != 0;
+                x.tileset = s.i32();
+                out.layx.push_back(x);
+            }
+        } else if (tag == "TSET") {
+            const std::uint32_t n = s.u32();
+            for (std::uint32_t k = 0; k < n && k < 1024 && !s.bad; ++k) {
+                Tileset ts;
+                ts.name = s.str();
+                ts.tw = static_cast<int>(s.u32());
+                ts.th = static_cast<int>(s.u32());
+                const std::uint32_t count = s.u32();
+                if (ts.tw < 1 || ts.th < 1 || ts.tw > MAX_TILE || ts.th > MAX_TILE ||
+                    count > 65536) {
+                    error = "набор тайлов испорчен";
+                    return false;
+                }
+                const auto px = static_cast<std::size_t>(ts.tw) * static_cast<std::size_t>(ts.th);
+                for (std::uint32_t t = 0; t < count && !s.bad; ++t) {
+                    if (!s.need(px * 4)) break;
+                    Grid<Color> g(ts.tw, ts.th);
+                    for (std::size_t q = 0; q < px; ++q) {
+                        const std::uint8_t* d = s.p + s.pos + q * 4;
+                        g.d[q] = argb(d[3], d[0], d[1], d[2]);
+                    }
+                    s.pos += px * 4;
+                    ts.tiles.push_back(std::move(g));
+                }
+                out.doc.tilesets.push_back(std::make_shared<const Tileset>(std::move(ts)));
+            }
+            if (s.bad) {
+                error = "набор тайлов обрезан";
+                return false;
+            }
+        } else if (tag == "VECS") {
+            const std::uint32_t n = s.u32();
+            for (std::uint32_t k = 0; k < n && !s.bad; ++k) {
+                const int l = static_cast<int>(s.u32());
+                const int f = static_cast<int>(s.u32());
+                const std::uint32_t count = s.u32();
+                std::vector<VecShape> list;
+                for (std::uint32_t i = 0; i < count && i < 65536 && !s.bad; ++i) {
+                    VecShape v;
+                    v.type = std::clamp(s.u8(), 0, VS_COUNT - 1);
+                    v.stroke = Color::fromArgb(s.u32());
+                    v.fill = Color::fromArgb(s.u32());
+                    v.width = std::max(1, s.u8());
+                    v.starPoints = std::clamp(s.u8(), 3, 32);
+                    v.innerPct = std::clamp(s.u8(), 5, 100);
+                    v.smooth = s.u8() != 0;
+                    const std::uint32_t np = s.u32();
+                    for (std::uint32_t q = 0; q < np && q < 65536 && !s.bad; ++q) {
+                        const double x = s.i32() / 256.0;
+                        const double y = s.i32() / 256.0;
+                        v.pts.push_back({x, y});
+                    }
+                    list.push_back(std::move(v));
+                }
+                out.shapes.emplace_back(std::make_pair(l, f), std::move(list));
+            }
+        } else if (tag == "TMAP") {
+            const std::uint32_t n = s.u32();
+            for (std::uint32_t k = 0; k < n && !s.bad; ++k) {
+                const int l = static_cast<int>(s.u32());
+                const int f = static_cast<int>(s.u32());
+                const int nc = static_cast<int>(s.u32());
+                const int nr = static_cast<int>(s.u32());
+                if (nc < 0 || nr < 0 || nc > MAX_TILE || nr > MAX_TILE) {
+                    error = "сетка тайлов испорчена";
+                    return false;
+                }
+                Grid<int> g(nc, nr, 0);
+                for (int& v : g.d)
+                    v = static_cast<int>(s.u32());
+                out.tilemaps.emplace_back(std::make_pair(l, f), std::move(g));
+            }
+        } else if (tag == "META") {
+            const std::uint32_t n = s.u32();
+            for (std::uint32_t k = 0; k < n && k < 4096 && !s.bad; ++k) {
+                std::string key = s.str();
+                std::string value = s.str();
+                // Имя программы пишется заново при каждом сохранении.
+                if (!s.bad && key != "app") out.meta.emplace_back(std::move(key), std::move(value));
+            }
         }
         // Незнакомый раздел пропускается целиком: длина его известна.
     }
@@ -237,6 +365,38 @@ bool parseBody(const std::vector<std::uint8_t>& body, Parsed& out, std::string& 
     if (out.palette.empty()) {
         error = "в проекте нет палитры";
         return false;
+    }
+    // Вид и глубина слоёв: у проекта версии 1.0 их нет, и все слои —
+    // растровые на одном уровне.
+    for (std::size_t l = 0; l < out.layx.size() && l < out.doc.layers.size(); ++l) {
+        Layer& layer = out.doc.layers[l];
+        const Parsed::LayerX& x = out.layx[l];
+        layer.kind = x.kind >= LK_RASTER && x.kind <= LK_TILEMAP ? x.kind : LK_RASTER;
+        layer.depth = x.depth;
+        layer.collapsed = x.collapsed;
+        layer.tileset = x.tileset >= 0 && x.tileset < static_cast<int>(out.doc.tilesets.size())
+                            ? x.tileset
+                            : -1;
+        if (layer.kind == LK_TILEMAP && layer.tileset < 0) layer.kind = LK_RASTER;
+    }
+    // Фигуры и сетки — к ячейкам того же слоя и кадра; ячейка без картинки
+    // заводится пустой.
+    auto celFor = [&](int l, int f) -> Cel* {
+        for (auto& [lf, c] : cels) {
+            if (lf.first == l && lf.second == f) return &c;
+        }
+        if (l < 0 || f < 0) return nullptr;
+        cels.emplace_back(std::make_pair(l, f), Cel{Grid<Color>(out.w, out.h, argb(0, 0, 0, 0)),
+                                                    Grid<PalIndex>(out.w, out.h, IDX_NONE),
+                                                    {},
+                                                    {}});
+        return &cels.back().second;
+    };
+    for (auto& [lf, list] : out.shapes) {
+        if (Cel* c = celFor(lf.first, lf.second)) c->shapes = std::move(list);
+    }
+    for (auto& [lf, g] : out.tilemaps) {
+        if (Cel* c = celFor(lf.first, lf.second)) c->tiles = std::move(g);
     }
     out.doc.cels.assign(out.doc.layers.size(), std::vector<CelPtr>(out.doc.frames.size()));
     for (auto& [lf, c] : cels) {
@@ -365,10 +525,116 @@ std::vector<std::uint8_t> projectEncode(Model& m) {
     view.u32(m.secondColor.argb());
     all.section("VIEW", view);
 
+    // Этап 6: вид и глубина слоёв, наборы тайлов, фигуры и сетки ячеек —
+    // отдельными разделами. Картинки ячеек уже в CELS, и старая версия
+    // откроет проект сведёнными слоями.
+    Writer layx;
+    layx.u32(static_cast<std::uint32_t>(m.doc.layerCount()));
+    for (const Layer& l : m.doc.layers) {
+        layx.u8(l.kind);
+        layx.u8(std::clamp(l.depth, 0, 64));
+        layx.u8(l.collapsed ? 1 : 0);
+        layx.i32(l.tileset);
+    }
+    all.section("LAYX", layx);
+    if (!m.doc.tilesets.empty()) {
+        Writer tset;
+        tset.u32(static_cast<std::uint32_t>(m.doc.tilesets.size()));
+        for (const TilesetPtr& t : m.doc.tilesets) {
+            tset.str(t->name);
+            tset.u32(static_cast<std::uint32_t>(t->tw));
+            tset.u32(static_cast<std::uint32_t>(t->th));
+            tset.u32(static_cast<std::uint32_t>(t->tiles.size()));
+            for (const Grid<Color>& g : t->tiles) {
+                for (int y = 0; y < t->th; ++y) {
+                    for (int x = 0; x < t->tw; ++x) {
+                        const Color px = g.inside(x, y) ? g.at(x, y) : argb(0, 0, 0, 0);
+                        tset.u8(px.r);
+                        tset.u8(px.g);
+                        tset.u8(px.b);
+                        tset.u8(px.a);
+                    }
+                }
+            }
+        }
+        all.section("TSET", tset);
+    }
+    Writer vecs;
+    Writer tmaps;
+    std::uint32_t nv = 0;
+    std::uint32_t nt = 0;
+    for (int l = 0; l < m.doc.layerCount(); ++l) {
+        for (int f = 0; f < m.doc.frameCount(); ++f) {
+            const CelPtr c = m.doc.cel(l, f);
+            if (!c) continue;
+            if (!c->shapes.empty()) ++nv;
+            if (!c->tiles.empty()) ++nt;
+        }
+    }
+    vecs.u32(nv);
+    tmaps.u32(nt);
+    for (int l = 0; l < m.doc.layerCount(); ++l) {
+        for (int f = 0; f < m.doc.frameCount(); ++f) {
+            const CelPtr c = m.doc.cel(l, f);
+            if (!c) continue;
+            if (!c->shapes.empty()) {
+                vecs.u32(static_cast<std::uint32_t>(l));
+                vecs.u32(static_cast<std::uint32_t>(f));
+                vecs.u32(static_cast<std::uint32_t>(c->shapes.size()));
+                for (const VecShape& v : c->shapes) {
+                    vecs.u8(v.type);
+                    vecs.u32(v.stroke.argb());
+                    vecs.u32(v.fill.argb());
+                    vecs.u8(std::clamp(v.width, 1, 255));
+                    vecs.u8(v.starPoints);
+                    vecs.u8(v.innerPct);
+                    vecs.u8(v.smooth ? 1 : 0);
+                    vecs.u32(static_cast<std::uint32_t>(v.pts.size()));
+                    for (const VecPoint& p : v.pts) {
+                        vecs.i32(fixed(p.x));
+                        vecs.i32(fixed(p.y));
+                    }
+                }
+            }
+            if (!c->tiles.empty()) {
+                tmaps.u32(static_cast<std::uint32_t>(l));
+                tmaps.u32(static_cast<std::uint32_t>(f));
+                tmaps.u32(static_cast<std::uint32_t>(c->tiles.w));
+                tmaps.u32(static_cast<std::uint32_t>(c->tiles.h));
+                for (const int v : c->tiles.d)
+                    tmaps.u32(static_cast<std::uint32_t>(v));
+            }
+        }
+    }
+    if (nv > 0) all.section("VECS", vecs);
+    if (nt > 0) all.section("TMAP", tmaps);
+
+    // Направляющие, сетка, начало координат, лучи и сила кисти (этап 5) —
+    // отдельным разделом: версия 1.0 его пропустит, не потеряв остального.
+    Writer guid;
+    guid.u8((m.guidesOn ? 1 : 0) | (m.guideCenter ? 2 : 0) | (m.guideCellCenters ? 4 : 0) |
+            (m.rulersOn ? 8 : 0));
+    guid.u32(static_cast<std::uint32_t>(std::max(0, m.majorGridW)));
+    guid.u32(static_cast<std::uint32_t>(std::max(0, m.majorGridH)));
+    guid.i32(m.originX);
+    guid.i32(m.originY);
+    for (const auto* list : {&m.guidesX2, &m.guidesY2}) {
+        guid.u32(static_cast<std::uint32_t>(list->size()));
+        for (const int v : *list)
+            guid.i32(v);
+    }
+    guid.u8(std::clamp(m.symRadial, 0, 255));
+    guid.u8(std::clamp(m.brushOpacity, 1, 255));
+    all.section("GUID", guid);
+
     Writer meta;
-    meta.u32(1);
+    meta.u32(static_cast<std::uint32_t>(1 + m.docMeta.size()));
     meta.str("app");
     meta.str(std::string(kAppTitle) + " " + kAppVersion);
+    for (const auto& [k, v] : m.docMeta) {
+        meta.str(k);
+        meta.str(v);
+    }
     all.section("META", meta);
 
     // Картинка файла — сведённый первый кадр: так проект узнают в
@@ -420,13 +686,30 @@ bool projectDecode(const std::vector<std::uint8_t>& file, Model& m, std::string&
         m.symAxisY2 = p.axisY2;
         m.ditherPattern = p.dither;
         m.onionSkin = p.onion;
-        m.onionPrev = std::clamp(p.onionPrev, 1, 8);
+        m.onionPrev = std::clamp(p.onionPrev, 0, 8);
         m.onionNext = std::clamp(p.onionNext, 0, 8);
         m.firstColor = p.first;
         m.secondColor = p.second;
         m.firstIdx = m.indexOfColor(m.firstColor);
         m.secondIdx = m.indexOfColor(m.secondColor);
         m.syncHSVFromColor();
+    }
+    // Направляющие и метаданные — свои у документа: у проекта без раздела
+    // GUID их просто нет.
+    m.guidesX2 = p.guidesX2;
+    m.guidesY2 = p.guidesY2;
+    m.originX = p.originX;
+    m.originY = p.originY;
+    m.docMeta = p.meta;
+    if (p.haveGuides) {
+        m.guidesOn = (p.guideFlags & 1U) != 0;
+        m.guideCenter = (p.guideFlags & 2U) != 0;
+        m.guideCellCenters = (p.guideFlags & 4U) != 0;
+        m.rulersOn = (p.guideFlags & 8U) != 0;
+        m.majorGridW = std::clamp(p.majorW, 0, MAX_TILE);
+        m.majorGridH = std::clamp(p.majorH, 0, MAX_TILE);
+        m.symRadial = std::clamp(p.radial, 0, 32);
+        m.brushOpacity = std::clamp(p.opacity, 1, 255);
     }
     m.clearTileHistory();
     m.tileModified = false;

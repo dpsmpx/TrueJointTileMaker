@@ -20,6 +20,10 @@ rm -rf "$WORK"
 mkdir -p "$WORK/base" "$WORK/shots"
 cp "$ROOT/Config.txt" "$WORK/base"/
 cp -r "$ROOT/Resources" "$ROOT/Картинки" "$WORK/base"/
+# Свои файлы сценария (набор тайлов, карта), как в тесте.
+if [ -d "$ROOT/tests/screens/$SC.files" ]; then
+    cp -r "$ROOT/tests/screens/$SC.files/." "$WORK/base"/
+fi
 # Ответы диалогам файлов, как в тесте: @BASE@ — каталог прогона.
 DIALOGS=""
 if [ -f "$ROOT/tests/screens/$SC.dialogs" ]; then

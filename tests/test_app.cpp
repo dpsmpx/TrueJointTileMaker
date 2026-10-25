@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -16,10 +17,12 @@
 #include <vector>
 
 #include "core/anim.h"
+#include "core/gameset.h"
 #include "core/gif.h"
 #include "core/model.h"
 #include "core/png.h"
 #include "core/project.h"
+#include "core/rasterfmt.h"
 
 namespace fs = std::filesystem;
 
@@ -46,7 +49,7 @@ std::vector<Region> readRegions() {
 
 /// Свежий каталог программы: настройки, ресурсы и картинки из репозитория.
 /// Программа пишет в Config.txt, и прогоны не должны влиять друг на друга.
-fs::path makeBase(const std::string& name) {
+fs::path makeBase(const std::string& name, const std::string& scenario = {}) {
     const fs::path src(TJTM_SOURCE_DIR);
     const fs::path base = fs::temp_directory_path() / ("tjtm_app_test_" + name);
     fs::remove_all(base);
@@ -55,6 +58,10 @@ fs::path makeBase(const std::string& name) {
     fs::copy(src / "Resources", base / "Resources", fs::copy_options::recursive);
     fs::copy(src / fs::path(u8"Картинки"), base / fs::path(u8"Картинки"),
              fs::copy_options::recursive);
+    // Свои файлы сценария (набор тайлов, карта) — tests/screens/ИМЯ.files.
+    const fs::path extra =
+        src / "tests" / "screens" / ((scenario.empty() ? name : scenario) + ".files");
+    if (fs::exists(extra)) fs::copy(extra, base, fs::copy_options::recursive);
     return base;
 }
 
@@ -160,7 +167,7 @@ TEST_P(AppScreens, MatchOriginal) {
 
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
-                                           "anim4"));
+                                           "anim4", "prec5", "layers6", "game7", "fx8"));
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.
@@ -251,6 +258,115 @@ TEST(AppScreens, AnimationExports) {
     // Второй слой есть только в третьем кадре.
     EXPECT_EQ(m.doc.cel(1, 0), nullptr);
     EXPECT_NE(m.doc.cel(1, 2), nullptr);
+    fs::remove_all(base);
+}
+
+/// Этап 5: «Сохранить как» с расширениями .bmp и .tif пишет эти форматы,
+/// а TIFF открывается обратно своим чтением.
+TEST(AppScreens, BmpAndTiffSaved) {
+    const fs::path base = makeBase("prec5x");
+    ASSERT_TRUE(runScenario("prec5", base));
+    auto bytesOf = [](const fs::path& p) {
+        std::ifstream in(p, std::ios::binary);
+        return std::vector<std::uint8_t>((std::istreambuf_iterator<char>(in)),
+                                         std::istreambuf_iterator<char>());
+    };
+    const auto bmp = bytesOf(base / "out.bmp");
+    ASSERT_GE(bmp.size(), 54U);
+    EXPECT_EQ(bmp[0], 'B');
+    EXPECT_EQ(bmp[18], 79);  // ширина после поворота на 15°
+    std::vector<tjtm::Grid<tjtm::Color>> pages;
+    std::string err;
+    ASSERT_TRUE(tjtm::tiffDecode(bytesOf(base / "out.tif"), pages, err)) << err;
+    ASSERT_EQ(pages.size(), 1U);
+    EXPECT_EQ(pages[0].w, 79);
+    EXPECT_EQ(pages[0].h, 79);
+    fs::remove_all(base);
+}
+
+/// Этап 6: проект сценария layers6 хранит группу, векторный слой с
+/// фигурами и тайлкарту с набором.
+TEST(AppScreens, LayersProjectSaved) {
+    const fs::path base = makeBase("layers6x");
+    ASSERT_TRUE(runScenario("layers6", base));
+    std::vector<std::uint8_t> bytes;
+    {
+        std::ifstream in(base / "layers.tjt", std::ios::binary);
+        bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    tjtm::Model m;
+    std::string err;
+    ASSERT_TRUE(tjtm::projectDecode(bytes, m, err)) << err;
+    ASSERT_EQ(m.doc.layerCount(), 4);
+    EXPECT_EQ(m.doc.layers[1].kind, tjtm::LK_VECTOR);
+    EXPECT_EQ(m.doc.layers[2].kind, tjtm::LK_GROUP);
+    EXPECT_TRUE(m.doc.layers[2].collapsed);
+    EXPECT_EQ(m.doc.layers[3].kind, tjtm::LK_TILEMAP);
+    ASSERT_TRUE(m.doc.cel(1, 0));
+    EXPECT_EQ(m.doc.cel(1, 0)->shapes.size(), 3U);
+    ASSERT_TRUE(m.doc.cel(3, 0));
+    for (const int v : m.doc.cel(3, 0)->tiles.d)
+        EXPECT_EQ(v, 2);
+    fs::remove_all(base);
+}
+
+/// Этап 7: лист 8x8 и атлас выгружены из набора, варианты стыков
+/// разрезаны из заготовки, уже нарисованный вариант сохранился.
+TEST(AppScreens, GameSetExported) {
+    const fs::path base = makeBase("game7x", "game7");
+    ASSERT_TRUE(runScenario("game7", base));
+    const fs::path fixture =
+        fs::path(TJTM_SOURCE_DIR) / "tests" / "screens" / "game7.files" / "tiles";
+    std::string err;
+    auto load = [&](const fs::path& p) {
+        tjtm::Grid<tjtm::Color> g;
+        EXPECT_TRUE(tjtm::pngLoad(p.string(), g, err)) << p.string() << ": " << err;
+        return g;
+    };
+
+    std::vector<tjtm::Grid<tjtm::Color>> slots;
+    ASSERT_TRUE(tjtm::game::sliceSheet(load(base / "sheet.png"), slots, err)) << err;
+    for (int i = 0; i < tjtm::TSET_BASE_COUNT; ++i) {
+        const fs::path src = fixture / (tjtm::tsetBaseFile(i) + ".png");
+        const auto& got = slots[static_cast<std::size_t>(i)];
+        if (fs::exists(src)) {
+            EXPECT_EQ(got.d, load(src).d) << tjtm::tsetBaseFile(i);
+        } else {
+            EXPECT_TRUE(got.empty()) << tjtm::tsetBaseFile(i);
+        }
+    }
+
+    const tjtm::Grid<tjtm::Color> atlas = load(base / "atlas.png");
+    // Поток закрыт сразу: в Windows открытый файл не даёт убрать каталог.
+    const std::string json = [&] {
+        std::ifstream jin(base / "atlas.json", std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(jin)), std::istreambuf_iterator<char>());
+    }();
+    int frames = 0;
+    for (const auto& e : fs::directory_iterator(fixture)) {
+        const std::string name = e.path().filename().string();
+        const std::size_t at = json.find("\"" + name + "\": {");
+        ASSERT_NE(at, std::string::npos) << name;
+        int x = 0;
+        int y = 0;
+        ASSERT_EQ(std::sscanf(json.c_str() + json.find("\"frame\"", at),
+                              "\"frame\": { \"x\": %d, \"y\": %d", &x, &y),
+                  2);
+        const auto img = load(e.path());
+        for (int yy = 0; yy < img.h; ++yy) {
+            for (int xx = 0; xx < img.w; ++xx)
+                ASSERT_EQ(atlas.at(x + xx, y + yy).argb(), img.at(xx, yy).argb()) << name;
+        }
+        ++frames;
+    }
+    EXPECT_EQ(frames, 12);
+
+    const auto wall = load(fixture / "wall.png");
+    for (int k = 0; k < 16; ++k)
+        EXPECT_TRUE(fs::exists(base / "tiles" / ("wall_" + std::to_string(k) + ".png"))) << k;
+    EXPECT_EQ(load(base / "tiles" / "wall_0.png").d, wall.d);
+    EXPECT_EQ(load(base / "tiles" / "wall_10.png").d, load(fixture / "wall_10.png").d);
+    EXPECT_NE(load(base / "tiles" / "wall_5.png").d, wall.d);
     fs::remove_all(base);
 }
 

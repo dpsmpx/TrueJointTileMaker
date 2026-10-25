@@ -239,12 +239,15 @@ int Model::gridGap() const {
 void Model::clampView() {
     const int fullW = docW() * pixelSize;
     const int fullH = docH() * pixelSize;
-    viewX = fullW <= W ? (W - fullW) / 2 : clampI(viewX, W - fullW, 0);
-    viewY = fullH <= H ? (H - fullH) / 2 : clampI(viewY, H - fullH, 0);
+    // Холст — от (X0, Y0) до (W, H): слева и сверху могут стоять линейки.
+    const int cw = W - X0;
+    const int ch = H - Y0;
+    viewX = fullW <= cw ? X0 + (cw - fullW) / 2 : clampI(viewX, W - fullW, X0);
+    viewY = fullH <= ch ? Y0 + (ch - fullH) / 2 : clampI(viewY, H - fullH, Y0);
 }
 
 void Model::fitScale() {
-    pixelSize = std::min(W / std::max(1, docW()), H / std::max(1, docH()));
+    pixelSize = std::min((W - X0) / std::max(1, docW()), (H - Y0) / std::max(1, docH()));
     pixelSize = clampI(pixelSize, MIN_ZOOM, MAX_ZOOM);
     clampView();
 }
@@ -392,8 +395,8 @@ void Model::pushUndo() {
         // Снимок берётся перед изменением, поэтому пометка здесь накрывает
         // любую отменяемую правку тайла разом.
         tileBmpDirty = true;
-        undoStack.push_back(
-            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
+        undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
+                                         activeFrame, tileShapes, tileMap});
         while (undoStack.size() > limit)
             undoStack.erase(undoStack.begin());
         redoStack.clear();
@@ -410,8 +413,8 @@ void Model::doUndo() {
     } else {
         if (undoStack.empty()) return;
         ensureTileIdx();
-        redoStack.push_back(
-            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
+        redoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
+                                         activeFrame, tileShapes, tileMap});
         TileSnapshot s = std::move(undoStack.back());
         undoStack.pop_back();
         tile = std::move(s.tile);
@@ -421,6 +424,8 @@ void Model::doUndo() {
         doc = std::move(s.doc);
         activeLayer = s.layer;
         activeFrame = s.frame;
+        tileShapes = std::move(s.shapes);
+        tileMap = std::move(s.tileMap);
         ensureTileIdx();
     }
     resetSelection();
@@ -439,8 +444,8 @@ void Model::doRedo() {
     } else {
         if (redoStack.empty()) return;
         ensureTileIdx();
-        undoStack.push_back(
-            TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer, activeFrame});
+        undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
+                                         activeFrame, tileShapes, tileMap});
         TileSnapshot s = std::move(redoStack.back());
         redoStack.pop_back();
         tile = std::move(s.tile);
@@ -450,6 +455,8 @@ void Model::doRedo() {
         doc = std::move(s.doc);
         activeLayer = s.layer;
         activeFrame = s.frame;
+        tileShapes = std::move(s.shapes);
+        tileMap = std::move(s.tileMap);
         ensureTileIdx();
     }
     resetSelection();
@@ -464,6 +471,13 @@ void Model::doRedo() {
 void Model::setTile(Grid<Color> newTile, const std::string& fileName) {
     tile = std::move(newTile);
     resetDoc();
+    // Направляющие, начало координат и метаданные — свои у каждого
+    // документа; сетка и прочий вид остаются привычкой работающего.
+    guidesX2.clear();
+    guidesY2.clear();
+    originX = 0;
+    originY = 0;
+    docMeta.clear();
     tileBmpDirty = true;
     // Открытый файл ничего не знает о палитре, поэтому привязки выводятся
     // из его же цветов: совпал с ячейкой — значит, ею и управляется.
@@ -476,6 +490,23 @@ void Model::setTile(Grid<Color> newTile, const std::string& fileName) {
     overDirty = true;
     fitScale();
     needRepaint = true;
+}
+
+std::string Model::metaValue(const std::string& key) const {
+    for (const auto& [k, v] : docMeta) {
+        if (k == key) return v;
+    }
+    return {};
+}
+
+void Model::setMeta(const std::string& key, const std::string& value) {
+    for (auto& [k, v] : docMeta) {
+        if (k == key) {
+            v = value;
+            return;
+        }
+    }
+    docMeta.emplace_back(key, value);
 }
 
 void Model::newTileOfSize(int nw, int nh) {
@@ -562,12 +593,33 @@ void Model::paintOne(int x, int y) {
     // Скрытый или запертый слой не правится: рисунок на невидимом слое —
     // всегда ошибка.
     if (!activeLayerEditable()) return;
+    // Тайлкарта, которую правят тайлами: кисть кладёт тайл в клетку под
+    // точкой, ластик опустошает клетку (этап 6).
+    if (activeKind() == LK_TILEMAP && !tilemapPixels) {
+        stampTileAt(x, y);
+        return;
+    }
     if (strokeMask.sameSize(tile.w, tile.h)) {
         if (strokeMask.at(x, y) != 0) return;
         strokeMask.at(x, y) = 1;
     }
     tileBmpDirty = true;
     const Color c = brushColorAt(x, y);
+    // Неполная непрозрачность кисти — всегда смешивание: заменить точку
+    // полупрозрачным цветом значило бы стереть то, что под ней. В строгом
+    // индексном режиме смеси нет, и сила кисти не действует.
+    if (brushOpacity < 255 && !strictIndexedOn()) {
+        const int op = clampI(brushOpacity, 1, 255);
+        Color& dst = tile.at(x, y);
+        if (toolTile == T_ERASER) {
+            dst = argb(static_cast<std::uint8_t>(dst.a * (255 - op) / 255), dst.r, dst.g, dst.b);
+        } else {
+            dst = blendOver(argb(static_cast<std::uint8_t>(c.a * op / 255), c.r, c.g, c.b), dst);
+        }
+        setIdx(x, y, indexOfColor(dst));
+        if (liveDraw && drawTilePixel) drawTilePixel(x, y);
+        return;
+    }
     if (brushReplaces()) {
         tile.at(x, y) = c;
         setIdx(x, y, brushIndexAt(x, y));
@@ -581,10 +633,7 @@ void Model::paintOne(int x, int y) {
 }
 
 void Model::paintPixel(int x, int y) {
-    paintOne(x, y);
-    if (symX) paintOne(mirrorX(x), y);
-    if (symY) paintOne(x, mirrorY(y));
-    if (symX && symY) paintOne(mirrorX(x), mirrorY(y));
+    forEachSymmetric(x, y, [this](int px, int py) { paintOne(px, py); });
 }
 
 void Model::putMapOne(int x, int y) {
@@ -597,10 +646,7 @@ void Model::putMapOne(int x, int y) {
 }
 
 void Model::putMapCell(int x, int y) {
-    putMapOne(x, y);
-    if (symX) putMapOne(mirrorX(x), y);
-    if (symY) putMapOne(x, mirrorY(y));
-    if (symX && symY) putMapOne(mirrorX(x), mirrorY(y));
+    forEachSymmetric(x, y, [this](int px, int py) { putMapOne(px, py); });
 }
 
 void Model::emitPixel(int x, int y) {
@@ -608,10 +654,7 @@ void Model::emitPixel(int x, int y) {
     // shapePreview.
     if (shapePreview) {
         if (!drawPreviewPixel) return;
-        drawPreviewPixel(x, y);
-        if (symX) drawPreviewPixel(mirrorX(x), y);
-        if (symY) drawPreviewPixel(x, mirrorY(y));
-        if (symX && symY) drawPreviewPixel(mirrorX(x), mirrorY(y));
+        forEachSymmetric(x, y, [this](int px, int py) { drawPreviewPixel(px, py); });
     } else if (docMode == DOC_MAP) {
         putMapCell(x, y);
     } else if (strokeActive && pixelPerfect &&
@@ -1139,8 +1182,8 @@ void Model::overviewCenterOn(int px, int py) {
     // Центр холста — на клетку документа, отвечающую точке обзора.
     const double docX = static_cast<double>((px - overOriginX()) * docW()) / overPixW();
     const double docY = static_cast<double>((py - overOriginY()) * docH()) / overPixH();
-    viewX = pround(W / 2.0 - docX * pixelSize);
-    viewY = pround(H / 2.0 - docY * pixelSize);
+    viewX = pround((X0 + W) / 2.0 - docX * pixelSize);
+    viewY = pround((Y0 + H) / 2.0 - docY * pixelSize);
     clampView();
     needRepaint = true;
 }
@@ -1176,8 +1219,8 @@ bool Model::overviewViewport(int& vx0, int& vy0, int& vx1, int& vy1) const {
     const int oy = overOriginY();
     const int pw = overPixW();
     const int ph = overPixH();
-    vx0 = ox + pround((static_cast<double>(-viewX) / pixelSize) * pw / docW());
-    vy0 = oy + pround((static_cast<double>(-viewY) / pixelSize) * ph / docH());
+    vx0 = ox + pround((static_cast<double>(X0 - viewX) / pixelSize) * pw / docW());
+    vy0 = oy + pround((static_cast<double>(Y0 - viewY) / pixelSize) * ph / docH());
     vx1 = ox + pround((static_cast<double>(-viewX + W) / pixelSize) * pw / docW());
     vy1 = oy + pround((static_cast<double>(-viewY + H) / pixelSize) * ph / docH());
     vx0 = clampI(vx0, ox, ox + pw);

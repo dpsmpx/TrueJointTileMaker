@@ -114,6 +114,8 @@ bool Editor::appInit(int argc, char** argv) {
     m.clipToSelection = true;
     // Этап 2: индексный режим — настоящий: точка хранит номер ячейки.
     m.strictIndexed = true;
+    // Этап 7: карта картинками набора подбирает варианты стыков.
+    m.mapAutotile = true;
     m.syncHSVFromColor();
     m.setDefaultPalette();
     m.buffer.clear();
@@ -207,6 +209,8 @@ void Editor::appStep() {
         frameClick_ = false;
         if (frameClickX_ < m.W && timelineShown() && frameClickY_ >= m.H) {
             handleTimelineClick();
+        } else if (frameClickX_ < m.W && (frameClickX_ < m.X0 || frameClickY_ < m.Y0)) {
+            handleRulerPress();
         } else if (frameClickX_ < m.W) {
             // Рисовать по бегущим кадрам нельзя: щелчок по холсту
             // останавливает проигрывание.
@@ -225,6 +229,8 @@ void Editor::appStep() {
         lastStatY_ = ty;
         if (!m.needRepaint) {
             drawInfoSection();
+            // Метка курсора на линейках идёт за мышью.
+            drawRulers();
             redraw();
         }
     }
