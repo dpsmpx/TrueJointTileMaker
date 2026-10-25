@@ -10,6 +10,7 @@
 #include <numbers>
 #include <set>
 
+#include "core/filters.h"
 #include "core/imageops.h"
 #include "core/model.h"
 #include "core/pmath.h"
@@ -324,6 +325,15 @@ void Model::placeFloating(const Grid<Color>& content, const Grid<std::uint8_t>& 
     floatSel = selectionMask();
 }
 
+/// Плавное преобразование (этап 8) дало новые цвета: номера палитры — по
+/// итогу, в строгом индексном режиме итог сводится к палитре.
+static void smoothIndices(const Model& m, Grid<Color>& img, Grid<PalIndex>& idx) {
+    if (m.strictIndexedOn()) m.snapStrict(img, Grid<Color>(img.w, img.h, argb(0, 0, 0, 0)));
+    idx.resize(img.w, img.h, IDX_NONE);
+    for (std::size_t k = 0; k < img.d.size(); ++k)
+        idx.d[k] = img.d[k].a == 0 ? IDX_NONE : m.indexOfColor(img.d[k]);
+}
+
 /// После смены размеров картинки: выделение и штрих относились к старой.
 static void afterResize(Model& m) {
     m.resetSelection();
@@ -376,14 +386,19 @@ void Model::transformImage(int op) {
     afterResize(*this);
 }
 
-bool Model::scaleImageTo(int nw, int nh) {
+bool Model::scaleImageTo(int nw, int nh, bool smooth) {
     if (docMode != DOC_TILE || tile.empty()) return false;
     if (nw < 1 || nh < 1 || nw > MAX_TILE || nh > MAX_TILE) return false;
     pushUndo();
     const double sx = static_cast<double>(nw) / tile.w;
     const double sy = static_cast<double>(nh) / tile.h;
     forEachCel(
-        [nw, nh](Grid<Color>& img, Grid<PalIndex>& idx) {
+        [this, nw, nh, smooth](Grid<Color>& img, Grid<PalIndex>& idx) {
+            if (smooth) {
+                img = fx::scaleSmooth(img, nw, nh);
+                smoothIndices(*this, img, idx);
+                return;
+            }
             img = img::scaleNearest(img, nw, nh);
             idx = img::scaleNearest(idx, nw, nh);
         },
@@ -563,6 +578,21 @@ bool Model::rotateImageBy(double degrees, int method, bool expand) {
     };
     const std::uint64_t clear = IDX_NONE;  // прозрачный цвет и «без номера»
     ensureTileIdx();
+    const bool smooth = method == img::ROT_SMOOTH;
+    if (hasSelection && smooth) {
+        pushUndo();
+        Grid<Color> content;
+        Grid<std::uint8_t> mask;
+        liftSelection(true, content, mask);
+        content = fx::rotateSmooth(content, degrees, true);
+        if (strictIndexedOn())
+            snapStrict(content, Grid<Color>(content.w, content.h, argb(0, 0, 0, 0)));
+        // Мягкий край — тоже часть куска: маска — всё, что не прозрачно.
+        mask = img::maskOpaque(content);
+        placeFloating(content, mask, selX + (selW - content.w) / 2, selY + (selH - content.h) / 2);
+        needRepaint = true;
+        return true;
+    }
     if (hasSelection) {
         pushUndo();
         Grid<Color> content;
@@ -592,6 +622,11 @@ bool Model::rotateImageBy(double degrees, int method, bool expand) {
     const double dcy = nh / 2.0;
     forEachCel(
         [&](Grid<Color>& img, Grid<PalIndex>& idx) {
+            if (smooth) {
+                img = fx::rotateSmooth(img, degrees, expand);
+                smoothIndices(*this, img, idx);
+                return;
+            }
             unpack(img::rotateAny(pack(img, idx), degrees, method, expand, clear), img, idx);
         },
         CEL_GEOMETRY,

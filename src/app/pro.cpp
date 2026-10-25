@@ -414,7 +414,15 @@ bool Editor::handleProKey(int key) {
             m.needRepaint = true;
             return true;
         case KEY_O: showToolOptions(); return true;
-        case KEY_K: showImageScreen(); return true;
+        case KEY_K:
+            // Shift+K — фильтры (этап 8): рядом с экраном изображения, но
+            // отдельно от пиксельных операций.
+            if (shift) {
+                showFiltersScreen();
+            } else {
+                showImageScreen();
+            }
+            return true;
         case KEY_U: showPaletteScreen(); return true;
         case KEY_LBRACKET:
         case KEY_RBRACKET: {
@@ -627,7 +635,7 @@ void Editor::showRotateDialog() {
         textCentered(0, 30, WIN_W, 66, "Поворот на любой угол", cText);
         uiLabel(0, 70, WIN_W, 26,
                 std::string("По часовой стрелке, ") + (sel ? "выделенное" : "все слои и кадры") +
-                    "; новых цветов не появляется",
+                    (rotateMethod_ == img::ROT_SMOOTH ? "" : "; новых цветов не появляется"),
                 cTextDim);
         uiLabel(40, 120, 180, 34, "Угол, градусы", cText);
         if (uiButton(230, 120, 46, 34, "−15", deg > -180)) deg = std::max(-180, deg - 15);
@@ -638,15 +646,18 @@ void Editor::showRotateDialog() {
         if (uiButton(492, 120, 46, 34, "+15", deg < 180)) deg = std::min(180, deg + 15);
         if (uiButton(548, 120, 46, 34, "0", deg != 0)) deg = 0;
         uiLabel(40, 170, 180, 34, "Способ", cText);
-        if (uiToggle(230, 170, 200, 34, "RotSprite", rotateMethod_ == img::ROT_SPRITE))
+        if (uiToggle(230, 170, 160, 34, "RotSprite", rotateMethod_ == img::ROT_SPRITE))
             rotateMethod_ = img::ROT_SPRITE;
-        if (uiToggle(436, 170, 200, 34, "Ближайший сосед", rotateMethod_ == img::ROT_NEAREST))
+        if (uiToggle(396, 170, 180, 34, "Ближайший сосед", rotateMethod_ == img::ROT_NEAREST))
             rotateMethod_ = img::ROT_NEAREST;
-        uiLabel(0, 210, WIN_W, 22,
-                rotateMethod_ == img::ROT_SPRITE
-                    ? "RotSprite держит линии и контур целыми — для спрайтов"
-                    : "Ближайший сосед быстрее и честнее к точкам, но рвёт тонкие линии",
-                cTextDim);
+        if (uiToggle(582, 170, 160, 34, "Плавно", rotateMethod_ == img::ROT_SMOOTH))
+            rotateMethod_ = img::ROT_SMOOTH;
+        const char* how = "Ближайший сосед быстрее и честнее к точкам, но рвёт тонкие линии";
+        if (rotateMethod_ == img::ROT_SPRITE)
+            how = "RotSprite держит линии и контур целыми — для спрайтов";
+        if (rotateMethod_ == img::ROT_SMOOTH)
+            how = "Плавно — не пиксель-арт: билинейно, с новыми цветами и мягким краем";
+        uiLabel(0, 210, WIN_W, 22, how, rotateMethod_ == img::ROT_SMOOTH ? cWarn : cTextDim);
         if (!sel) {
             uiLabel(40, 250, 180, 34, "Холст", cText);
             if (uiToggle(230, 250, 200, 34, "Вырастить", rotateExpand_)) rotateExpand_ = true;
@@ -888,6 +899,16 @@ void Editor::showImageScreen() {
         // --- край и цвета ---
         if (act(c1, 447, "Нарастить край", tile)) m.growImageEdge(outlineEight_);
         if (act(c1, 478, "Срезать край", tile)) m.shrinkImageEdge(outlineEight_);
+        if (act(c2, 478, "Фильтры и эффекты…   Shift+K", tile)) showFiltersScreen();
+        if (act(c3, 447, "Плавный масштаб…", tile)) {
+            int nw = m.tile.w;
+            int nh = m.tile.h;
+            if (askTwoNumbers("Плавный масштаб",
+                              "Не пиксель-арт: усреднение и билинейная выборка дают новые цвета",
+                              "Ширина", nw, 1, MAX_TILE, "Высота", nh, 1, MAX_TILE, "Применить",
+                              nullptr))
+                m.scaleImageTo(nw, nh, true);
+        }
         if (act(c2, 447, "Сократить цвета…", tile)) {
             int n = 16;
             if (askNumbers("Сократить цвета",

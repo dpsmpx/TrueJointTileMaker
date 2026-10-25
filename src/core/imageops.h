@@ -147,7 +147,9 @@ Grid<T> scaleNearest(const Grid<T>& g, int nw, int nh) {
 /// Scale2x, поворот ближайшим соседом и обратное уменьшение. RotSprite
 /// держит линии пиксель-арта целыми, но, как и ближайший, не вводит ни
 /// одного нового цвета.
-inline constexpr int ROT_NEAREST = 0, ROT_SPRITE = 1;
+/// ROT_SMOOTH — билинейно (этап 8, не пиксель-арт): новые цвета и мягкий
+/// край; поворачивает его fx::rotateSmooth, а не rotateAny.
+inline constexpr int ROT_NEAREST = 0, ROT_SPRITE = 1, ROT_SMOOTH = 2;
 
 namespace detail {
 

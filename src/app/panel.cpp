@@ -54,7 +54,7 @@ std::string Editor::toolLabel(int i) const {
         }
     }
     switch (i) {
-        case T_PEN: return "Кар";
+        case T_PEN: return m.airbrush ? "Аэр" : "Кар";
         case T_ERASER: return "Ласт";
         case T_FILL: return "Зал";
         case T_PICK: return "Пип";
@@ -83,7 +83,9 @@ void Editor::drawToolsSection() {
         // Нарисованный значок заменяет подпись, ненарисованный — нет: набор
         // делается по одному, и пока значка нет, кнопка выглядит как раньше.
         const int ic = m.docMode == DOC_MAP ? T_TILE_COUNT + i : i;
-        if (ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
+        // Аэрограф — подписью: значок карандаша соврал бы, что кисть точная.
+        const bool airLabel = m.docMode == DOC_TILE && i == T_PEN && m.airbrush;
+        if (!airLabel && ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
             !iconBmp_[static_cast<std::size_t>(ic)].empty()) {
             fb_.drawImage(iconBmp_[static_cast<std::size_t>(ic)], x0 + (TOOL_CW - 2 - ICON_PX) / 2,
                           y0 + (TOOL_CH - 2 - ICON_PX) / 2);

@@ -227,6 +227,8 @@ bool Model::rasterizeLayer() {
 
 void Model::rerenderActiveVector() {
     tile = vec::rasterizeAll(tileShapes, tile.w, tile.h);
+    // Сглаженный край (этап 8) в строгом индексном режиме — точками палитры.
+    if (strictIndexedOn()) snapStrict(tile, Grid<Color>(tile.w, tile.h, argb(0, 0, 0, 0)));
     ensureTileIdx();
     for (std::size_t k = 0; k < tile.d.size(); ++k)
         tileIdx.d[k] = indexOfColor(tile.d[k]);
@@ -247,6 +249,7 @@ int Model::addVectorShape(const VecShape& s) {
     // как любой рисунок.
     Grid<Color> drawn = tile;
     vec::rasterize(s, drawn);
+    if (strictIndexedOn()) snapStrict(drawn, tile);
     ensureTileIdx();
     for (std::size_t k = 0; k < drawn.d.size(); ++k) {
         if (drawn.d[k] == tile.d[k]) continue;

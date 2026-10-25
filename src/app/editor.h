@@ -8,6 +8,7 @@
 // исходником.
 #pragma once
 
+#include <array>
 #include <map>
 #include <string>
 #include <vector>
@@ -285,6 +286,45 @@ private:
     int rotateDeg_ = 15;
     int rotateMethod_ = 1;
     bool rotateExpand_ = true;
+
+    // --- этап 8: вне пиксель-арта (filters_ui.cpp) ---
+    /// Параметры экрана «Фильтры и эффекты»: помнятся до конца сеанса,
+    /// чтобы фильтр можно было повторить на другом кадре.
+    struct FxParams {
+        int kind = 0;
+        bool wrap = false;
+        int blurRadius = 2;
+        int sharpAmount = 100;
+        int sharpRadius = 2;
+        int noiseAmount = 16;
+        bool noiseMono = false;
+        int noiseSeed = 1;
+        int brightness = 0;
+        int contrast = 0;
+        int saturation = 0;
+        int inLo = 0;
+        int inHi = 255;
+        int gammaPct = 100;
+        int outLo = 0;
+        int outHi = 255;
+        /// Кривые: общая и по каналам, точки (вход, выход).
+        std::array<std::vector<std::pair<int, int>>, 4> curves;
+        int curveChannel = 0;
+        int skewX = 15;
+        int skewY = 0;
+        /// Углы перспективы в долях рамки (0..1), по часовой с левого
+        /// верхнего: так они не зависят от размера картинки.
+        std::array<double, 8> quad{0, 0, 1, 0, 1, 1, 0, 1};
+        bool operator==(const FxParams&) const = default;
+    };
+    FxParams fx_;
+    void showFiltersScreen();
+    /// Фильтр с параметрами экрана; boxed — он видит рамку выделения.
+    Grid<Color> runFilter(const Grid<Color>& g) const;
+    bool filterBoxed() const;
+    void showBrushOptions();
+    void doAirbrushStroke(int startX, int startY);
+    void drawChecker(int x0, int y0, int x1, int y1);
 
     // --- этап 7: связь с игрой (gameset_ui.cpp) ---
     /// Картинки тайлов набора игры по имени файла без расширения; пустая —

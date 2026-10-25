@@ -204,6 +204,9 @@ void rasterizeEllipse(const VecShape& s, Grid<Color>& img) {
     }
 }
 
+void rasterizeSmooth(const VecShape& s, Grid<Color>& img);
+void rasterizePixels(const VecShape& s, Grid<Color>& img);
+
 }  // namespace
 
 std::vector<VecPoint> shapePath(const VecShape& s, bool& closed) {
@@ -258,6 +261,17 @@ void rasterize(const VecShape& s, Grid<Color>& img) {
     if (s.pts.empty()) return;
     const bool twoPoint = s.type == VS_RECT || s.type == VS_ELLIPSE || s.type == VS_STAR;
     if (twoPoint && s.pts.size() < 2) return;
+    if (s.smooth) {
+        rasterizeSmooth(s, img);
+    } else {
+        rasterizePixels(s, img);
+    }
+}
+
+namespace {
+
+/// Фигура чистыми точками; её же в мелкой сетке зовёт rasterizeSmooth.
+void rasterizePixels(const VecShape& s, Grid<Color>& img) {
     if (s.type == VS_ELLIPSE) {
         rasterizeEllipse(s, img);
         return;
@@ -275,6 +289,81 @@ void rasterize(const VecShape& s, Grid<Color>& img) {
     const bool curve = s.type == VS_CURVE || s.type == VS_CLOSED_CURVE;
     stroke(pixelPath(path, closed, curve && width == 1), width, c, img);
 }
+
+/// Сглаживание (этап 8): фигура ложится тем же растром в учетверённом
+/// разрешении, и каждая точка — среднее своих шестнадцати. Так край
+/// получает долю покрытия при любом виде фигуры, без отдельного
+/// растеризатора для каждой.
+void rasterizeSmooth(const VecShape& s, Grid<Color>& img) {
+    constexpr int S = 4;
+    bool closed = false;
+    const std::vector<VecPoint> path = shapePath(s, closed);
+    if (path.empty() || img.empty()) return;
+    double minX = path[0].x;
+    double maxX = minX;
+    double minY = path[0].y;
+    double maxY = minY;
+    for (const VecPoint& p : path) {
+        minX = std::min(minX, p.x);
+        maxX = std::max(maxX, p.x);
+        minY = std::min(minY, p.y);
+        maxY = std::max(maxY, p.y);
+    }
+    const int margin = std::max(1, s.width) + 2;
+    const int bx0 = std::max(0, static_cast<int>(std::floor(minX)) - margin);
+    const int by0 = std::max(0, static_cast<int>(std::floor(minY)) - margin);
+    const int bx1 = std::min(img.w - 1, static_cast<int>(std::ceil(maxX)) + margin);
+    const int by1 = std::min(img.h - 1, static_cast<int>(std::ceil(maxY)) + margin);
+    if (bx1 < bx0 || by1 < by0) return;
+    VecShape big = s;
+    big.smooth = false;
+    big.width = std::max(1, s.width) * S;
+    if (s.type == VS_ELLIPSE) {
+        // Овал вписан в рамку точек: в мелкой сетке — ровно в те же точки.
+        int x0 = 0;
+        int y0 = 0;
+        int x1 = 0;
+        int y1 = 0;
+        ellipseBox(s, x0, y0, x1, y1);
+        big.pts = {{(x0 - bx0) * S + 0.5, (y0 - by0) * S + 0.5},
+                   {(x1 - bx0) * S + S - 0.5, (y1 - by0) * S + S - 0.5}};
+    } else {
+        // Сдвиг на полточки мелкой сетки: перо чётной ширины встаёт ровно
+        // на свои точки, и горизонтальная линия остаётся чёткой.
+        for (VecPoint& p : big.pts)
+            p = {(p.x - bx0) * S - 0.5, (p.y - by0) * S - 0.5};
+    }
+    const int bw = bx1 - bx0 + 1;
+    const int bh = by1 - by0 + 1;
+    Grid<Color> hi(bw * S, bh * S, argb(0, 0, 0, 0));
+    rasterizePixels(big, hi);
+    for (int y = 0; y < bh; ++y) {
+        for (int x = 0; x < bw; ++x) {
+            double r = 0;
+            double g = 0;
+            double b = 0;
+            double a = 0;
+            for (int j = 0; j < S; ++j) {
+                for (int i = 0; i < S; ++i) {
+                    const Color c = hi.at(x * S + i, y * S + j);
+                    r += c.r * c.a;
+                    g += c.g * c.a;
+                    b += c.b * c.a;
+                    a += c.a;
+                }
+            }
+            if (a <= 0) continue;
+            const auto byteOf = [](double v) {
+                return static_cast<std::uint8_t>(std::clamp(std::lround(v), 0L, 255L));
+            };
+            const Color c(byteOf(a / (S * S)), byteOf(r / a), byteOf(g / a), byteOf(b / a));
+            Color& d = img.at(bx0 + x, by0 + y);
+            d = blendOver(c, d);
+        }
+    }
+}
+
+}  // namespace
 
 Grid<Color> rasterizeAll(const std::vector<VecShape>& shapes, int w, int h) {
     Grid<Color> g(w, h, argb(0, 0, 0, 0));

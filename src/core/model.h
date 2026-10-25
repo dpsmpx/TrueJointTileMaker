@@ -31,7 +31,7 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.3.0";
+inline constexpr const char* kAppVersion = "1.4.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -257,6 +257,25 @@ public:
     /// Непрозрачность кисти, 1..255. Точка мазка ложится один раз, поэтому
     /// повторный проход по ней в том же мазке не сгущает цвет.
     int brushOpacity = 255;
+
+    // --- этап 8: вне пиксель-арта ---
+
+    /// Сглаживание линии, прямоугольника, овала и фигур: край — долями
+    /// покрытия. Новые цвета, поэтому выключено и у окна.
+    bool antialias = false;
+    /// Карандаш — аэрограф: мягкий круглый отпечаток диаметром airSize,
+    /// с жёсткостью airHardness и напором airFlow (проценты). Напор копится
+    /// за мазок до полной непрозрачности.
+    bool airbrush = false;
+    int airSize = 8;
+    int airHardness = 30;
+    int airFlow = 25;
+    /// Накопленная за мазок непрозрачность аэрографа и непройденный остаток
+    /// шага между отпечатками.
+    Grid<float> airAcc;
+    double airCarry = 0;
+    int airLastX = 0, airLastY = 0;
+
     /// Начало холста в окне: справа и снизу его край — W и H, слева и
     /// сверху — линейки, когда они видны.
     int X0 = 0, Y0 = 0;
@@ -713,7 +732,9 @@ public:
     /// Масштаб ближайшим соседом в num/den: содержимого выделения от его
     /// левого верхнего угла или всей картинки. false — размер вне пределов.
     bool scaleBy(int num, int den);
-    bool scaleImageTo(int nw, int nh);
+    /// Масштаб всех ячеек до nw x nh; smooth — плавно, не пиксель-арт
+    /// (этап 8).
+    bool scaleImageTo(int nw, int nh, bool smooth = false);
     bool cropToSelection();
     bool cropToContent();
     bool resizeCanvas(int nw, int nh, int anchorX, int anchorY);
@@ -728,6 +749,25 @@ public:
     bool rotateImageBy(double degrees, int method, bool expand);
     /// Свести цвета выделенного или всего тайла к n медианным разрезом.
     int reduceImageColors(int n);
+
+    // --- вне пиксель-арта (этап 8) ---
+    /// Фильтр над активной ячейкой. При выделении меняются только его
+    /// точки; boxed — фильтр видит лишь рамку выделения, как отдельную
+    /// картинку (наклон, перспектива). Число изменённых точек.
+    int applyFilter(const std::function<Grid<Color>(const Grid<Color>&)>& f, bool boxed);
+    /// Что applyFilter положит в ячейку, без записи — для предпросмотра.
+    /// Пустая картинка — фильтр к этому слою неприменим.
+    Grid<Color> filterResult(const std::function<Grid<Color>(const Grid<Color>&)>& f,
+                             bool boxed) const;
+    /// Итог фильтра или сглаживания в строгом индексном режиме: точка,
+    /// прозрачная больше чем наполовину, становится прозрачной (прозрачная
+    /// и раньше — остаётся как была), прочие — ближайший цвет палитры.
+    void snapStrict(Grid<Color>& next, const Grid<Color>& before) const;
+    /// Мазок аэрографа: отпечатки через четверть диаметра вдоль пути.
+    void airbrushBegin(int x, int y);
+    void airbrushTo(int x, int y);
+    void airbrushEnd();
+    void airbrushDab(int cx, int cy);
 
     // --- карта и набор тайлов ---
     /// Файл тайла, которым нарисована клетка карты, без расширения.

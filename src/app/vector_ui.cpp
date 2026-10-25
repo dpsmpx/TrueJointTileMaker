@@ -51,6 +51,7 @@ VecShape Editor::styledShape(int type) const {
     s.width = m.shapeWidth;
     s.starPoints = m.starPoints;
     s.innerPct = m.starInner;
+    s.smooth = m.antialias;
     return s;
 }
 
@@ -297,6 +298,12 @@ void Editor::showShapeOptions() {
         uiLabelLeft(LX, 312, 24, "протяжка за вершину двигает её, с Ctrl — всю фигуру,", cTextDim);
         uiLabelLeft(LX, 334, 24, "Delete удаляет последнюю тронутую. На растровом слое", cTextDim);
         uiLabelLeft(LX, 356, 24, "фигура сразу ложится точками.", cTextDim);
+        if (uiToggle(LX, 396, 460, 30, "Сглаживание края — не пиксель-арт", m.antialias))
+            m.antialias = !m.antialias;
+        uiLabelLeft(LX, 430, 24,
+                    "Край — долями покрытия: новые цвета и полупрозрачность. В строгом "
+                    "индексном режиме итог сводится к палитре.",
+                    cWarn);
         if (uiButton(WIN_W / 2 - 90, WIN_H - 52, 180, 36, "Закрыть", true)) done = true;
         redraw();
         const int key = takeKey();

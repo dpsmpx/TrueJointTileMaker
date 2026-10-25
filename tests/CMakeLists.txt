@@ -22,6 +22,7 @@ add_executable(tjtm_core_tests
     test_color.cpp
     test_config.cpp
     test_doc.cpp
+    test_filters.cpp
     test_formats.cpp
     test_gameset.cpp
     test_imageops.cpp

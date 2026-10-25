@@ -1,0 +1,73 @@
+# Этап 8 RoadToProLevel: вне пиксель-арта — экран «Фильтры и эффекты»
+# (размытие, кривые, перспектива), аэрограф, сглаженная линия, плавный
+# поворот.
+key Escape
+sleep 0.4
+key shift+k                # фильтры и эффекты
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 01_blur
+click 106 410              # кривые
+sleep 0.2
+click 324 277              # точка (64, 128): тени светлее
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 02_curves
+click 302 528              # применить
+sleep 0.3
+move 700 300
+sleep 0.2
+shot 03_applied
+key shift+k
+sleep 0.3
+click 106 474              # перспектива
+sleep 0.2
+drag 745 298 712 330       # правый верхний угол внутрь
+drag 745 426 712 394       # правый нижний — тоже
+move 770 550
+sleep 0.2
+shot 04_perspective
+key Return                 # применить
+sleep 0.3
+click 622 20 3             # правая кнопка по карандашу: аэрограф
+sleep 0.3
+click 550 87               # аэрограф
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 05_brush
+key Escape
+sleep 0.2
+click 682 125 3            # красный из палитры
+drag 80 300 520 300        # мазок аэрографа поперёк
+move 700 300
+sleep 0.2
+shot 06_airbrush
+click 622 57 3             # правая кнопка по линии: параметры фигур
+sleep 0.3
+click 270 411              # сглаживание края
+sleep 0.2
+key Escape
+sleep 0.2
+key 5
+click 650 125 3            # синий из палитры
+drag 80 60 520 220         # сглаженная линия
+move 700 300
+sleep 0.2
+shot 07_smooth_line
+key k
+sleep 0.3
+click 390 247              # повернуть на любой угол
+sleep 0.3
+click 662 187              # плавно
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 08_rotate_dialog
+click 295 339              # повернуть
+sleep 0.3
+move 700 300
+sleep 0.2
+shot 09_rotated

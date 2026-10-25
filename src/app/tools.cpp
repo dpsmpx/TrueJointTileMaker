@@ -382,7 +382,15 @@ void Editor::handleCanvasClick() {
     switch (m.toolTile) {
         case T_PEN:
         case T_ERASER:
-        case T_DITHER: doPaintStroke(mx, my); break;
+        case T_DITHER:
+            // Аэрограф — вид карандаша (этап 8); тайлкарту тайлами он не
+            // штампует — там карандаш кладёт тайл.
+            if (m.toolTile == T_PEN && m.airbrush && !tileStamp) {
+                doAirbrushStroke(mx, my);
+            } else {
+                doPaintStroke(mx, my);
+            }
+            break;
         case T_FILL:
             if (tileStamp) {
                 m.fillTilesAt(mx, my);
@@ -398,7 +406,9 @@ void Editor::handleCanvasClick() {
         case T_ELLIPSE:
             // Фигуры векторного слоя и линии особых видов — векторным
             // инструментом; прямая и фигуры растра — как в оригинале.
-            if (kind == LK_VECTOR || (m.toolTile == T_LINE && m.lineKind != LINE_STRAIGHT)) {
+            // Сглаженные (этап 8) — тоже фигурой: её растр умеет край долями.
+            if (kind == LK_VECTOR || m.antialias ||
+                (m.toolTile == T_LINE && m.lineKind != LINE_STRAIGHT)) {
                 doVectorTool(mx, my);
             } else {
                 doShapeTool(mx, my);
@@ -511,6 +521,8 @@ void Editor::handlePanelClick() {
             if (m.docMode == DOC_TILE && frameClickButton_ == MB_RIGHT) {
                 if (idx == T_LINE || idx == T_RECT || idx == T_ELLIPSE) {
                     showShapeOptions();
+                } else if (idx == T_PEN) {
+                    showBrushOptions();
                 } else {
                     showToolOptions();
                 }

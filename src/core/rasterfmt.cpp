@@ -477,11 +477,13 @@ bool tiffDecode(const std::vector<std::uint8_t>& f, std::vector<Grid<Color>>& pa
                             } else {
                                 const std::size_t step = static_cast<std::size_t>(sppChunk) * 2;
                                 for (std::size_t k = step; k + 1 < rowBytes; k += 2) {
-                                    const std::uint32_t a = r.be ? (row[k] << 8 | row[k + 1])
-                                                                 : (row[k + 1] << 8 | row[k]);
-                                    const std::uint32_t b =
-                                        r.be ? (row[k - step] << 8 | row[k - step + 1])
-                                             : (row[k - step + 1] << 8 | row[k - step]);
+                                    auto word = [&](std::size_t i) {
+                                        const std::uint32_t hi = row[r.be ? i : i + 1];
+                                        const std::uint32_t lo = row[r.be ? i + 1 : i];
+                                        return hi << 8 | lo;
+                                    };
+                                    const std::uint32_t a = word(k);
+                                    const std::uint32_t b = word(k - step);
                                     const std::uint32_t v = (a + b) & 0xFFFF;
                                     row[k] = static_cast<std::uint8_t>(r.be ? v >> 8 : v & 0xFF);
                                     row[k + 1] =
