@@ -363,52 +363,56 @@ void Editor::drawSelectionMask() {
 // Клавиши
 // ---------------------------------------------------------------------------
 
-bool Editor::handleProKey(int key) {
+void Editor::pasteBufferHere() {
+    if (!m.bufferFilled()) return;
+    int tx = m.screenToTileX(mouseX());
+    int ty = m.screenToTileY(mouseY());
+    // Курсор над панелью — вставка в начало картинки, а не за край.
+    if (!m.inDoc(tx, ty)) {
+        tx = 0;
+        ty = 0;
+    }
+    m.pasteAsSelection(tx, ty);
+}
+
+bool Editor::handleProCtrlKey(int key) {
     if (m.docMode != DOC_TILE) return false;
     // Модификаторы — того мига, когда клавишу нажали, а не нынешние.
-    const bool ctrl = lastKey_.ctrl;
     const bool shift = lastKey_.shift;
-    auto pasteHere = [&]() {
-        if (!m.bufferFilled()) return;
-        int tx = m.screenToTileX(mouseX());
-        int ty = m.screenToTileY(mouseY());
-        // Курсор над панелью — вставка в начало картинки, а не за край.
-        if (!m.inDoc(tx, ty)) {
-            tx = 0;
-            ty = 0;
-        }
-        m.pasteAsSelection(tx, ty);
-    };
-    if (ctrl) {
-        switch (key) {
-            case KEY_T: showTilePickerScreen(); return true;
-            case KEY_E:
-                // Кисть из выделения (этап 9): сразу карандашом этого вида.
-                if (m.brushFromSelection()) {
-                    m.setTool(T_PEN);
-                    m.needRepaint = true;
-                } else {
-                    showMessage("Кисть из выделения",
-                                "Выделите кусок активного слоя — он станет кистью карандаша.");
-                }
-                return true;
-            case KEY_A: m.selectAll(); return true;
-            case KEY_D:
-                if (shift) {
-                    m.reselect();
-                } else {
-                    m.deselect();
-                }
-                return true;
-            case KEY_I: m.invertSelection(); return true;
-            case KEY_C: m.copySelection(); return true;
-            case KEY_X: m.cutSelection(); return true;
-            case KEY_V: pasteHere(); return true;
-            default: break;
-        }
-    }
     switch (key) {
-        case KEY_V: pasteHere(); return true;
+        case KEY_T: showTilePickerScreen(); return true;
+        case KEY_E:
+            // Кисть из выделения (этап 9): сразу карандашом этого вида.
+            if (m.brushFromSelection()) {
+                m.setTool(T_PEN);
+                m.needRepaint = true;
+            } else {
+                showMessage("Кисть из выделения",
+                            "Выделите кусок активного слоя — он станет кистью карандаша.");
+            }
+            return true;
+        case KEY_A: m.selectAll(); return true;
+        case KEY_D:
+            if (shift) {
+                m.reselect();
+            } else {
+                m.deselect();
+            }
+            return true;
+        case KEY_I: m.invertSelection(); return true;
+        case KEY_C: m.copySelection(); return true;
+        case KEY_X: m.cutSelection(); return true;
+        case KEY_V: pasteBufferHere(); return true;
+        default: return false;
+    }
+}
+
+bool Editor::handleProKey(int key) {
+    if (m.docMode != DOC_TILE) return false;
+    if (lastKey_.ctrl && handleProCtrlKey(key)) return true;
+    const bool shift = lastKey_.shift;
+    switch (key) {
+        case KEY_V: pasteBufferHere(); return true;
         case KEY_DELETE:
             // На векторном слое Delete убирает последнюю тронутую фигуру.
             if (m.activeKind() == LK_VECTOR) {
@@ -842,6 +846,10 @@ void Editor::showImageScreen() {
             m.scaleBy(1, 2);
         y += ST;
         if (act(c2, y, "Контур первым цветом…", tile)) showOutlineDialog();
+        y += ST;
+        // Была только клавиша R: промахнуться по ней легко, а заливает она
+        // весь тайл (UX-17).
+        if (act(c2, y, "Случайные цвета на весь тайл", tile)) m.randomizeTile();
 
         // --- холст ---
         y = 78;

@@ -594,6 +594,7 @@ bool Editor::loadMapFrom(const std::string& path, bool quiet, bool remember) {
     m.mapModified = false;
     m.docMode = DOC_MAP;
     m.resetSelection();
+    m.forgetSelection(DOC_MAP);
     m.clearMapHistory();
     m.overDirty = true;
     m.fitScale();
@@ -653,14 +654,39 @@ bool Editor::commandSave() {
     return m.currentFile.empty() ? commandSaveAs() : saveTileTo(m.currentFile);
 }
 
+std::string Editor::docName(int mode) const {
+    const bool map = mode == DOC_MAP;
+    const std::string& file = map ? m.currentMapFile : m.currentFile;
+    if (file.empty()) return map ? "новая карта" : "новый тайл";
+    return "«" + fileNameOnly(file) + "» (" + (map ? "карта" : "тайл") + ")";
+}
+
+std::string Editor::unsavedText(int mode) const {
+    // У оригинала было «в документе», и при выходе с тайлом и картой вопрос
+    // звучал дважды одними словами (UX-22).
+    if (classicUi_) return "В документе есть изменения, которых нет в файле.";
+    const bool map = mode == DOC_MAP;
+    const std::string& file = map ? m.currentMapFile : m.currentFile;
+    const std::string where =
+        file.empty() ? (map ? "новой карте" : "новом тайле") : docName(mode);
+    return "В " + where + " есть изменения, которых нет в файле.";
+}
+
 /// Вопрос о несохранённых изменениях. false — операцию нужно отменить.
 bool Editor::confirmDiscard(const std::string& what) {
     if (!m.isModified()) return true;
-    const int answer =
-        ask3("Несохранённые изменения", "В документе есть изменения, которых нет в файле. " + what,
-             "Сохранить", "Не сохранять", "Отмена");
+    const int answer = ask3("Несохранённые изменения", unsavedText(m.docMode) + " " + what,
+                            "Сохранить", "Не сохранять", "Отмена");
     if (answer == 1) return commandSave();
     return answer == 0;
+}
+
+bool Editor::saveDocument(int mode) {
+    const int was = m.docMode;
+    m.docMode = mode;
+    const bool ok = commandSave();
+    m.docMode = was;
+    return ok;
 }
 
 void Editor::commandNew() {
@@ -732,6 +758,29 @@ void Editor::quitApp() {
 
 void Editor::commandExit() {
     if (quitNow_) return;
+    if (!classicUi_) {
+        // Один вопрос на все несохранённые документы, с их именами.
+        std::vector<int> dirty;
+        if (m.tileModified) dirty.push_back(DOC_TILE);
+        if (m.mapModified) dirty.push_back(DOC_MAP);
+        if (!dirty.empty()) {
+            const bool one = dirty.size() == 1;
+            const std::string text =
+                one ? unsavedText(dirty[0]) + " Выйти из программы?"
+                    : "Изменения, которых нет в файлах, есть в двух документах: " +
+                          docName(DOC_TILE) + " и " + docName(DOC_MAP) + ". Выйти из программы?";
+            const int answer = ask3("Несохранённые изменения", text,
+                                    one ? "Сохранить" : "Сохранить всё", "Не сохранять", "Отмена");
+            if (answer < 0) return;
+            if (answer == 1) {
+                for (const int d : dirty) {
+                    if (!saveDocument(d)) return;
+                }
+            }
+        }
+        quitApp();
+        return;
+    }
     if (!confirmDiscard("Выйти из программы?")) return;
     // Второй документ тоже мог остаться несохранённым — спрашиваем о нём.
     const int mode = m.docMode;

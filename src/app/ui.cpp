@@ -161,7 +161,9 @@ bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption
     if (enabled && frameClick_ && frameClickX_ >= x && frameClickX_ < x + bw && frameClickY_ >= y &&
         frameClickY_ < y + bh) {
         frameClick_ = false;
-        return true;
+        // Нажимает только левая кнопка мыши: правый щелчок по «Выход» у
+        // оригинала тоже выходил, а его ждут как контекстное меню (UX-15).
+        return classicUi_ || frameClickButton_ == MB_LEFT;
     }
     return false;
 }

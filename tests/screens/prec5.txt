@@ -56,7 +56,7 @@ key Escape
 sleep 0.3
 click 390 296              # сохранить как TIFF
 sleep 0.3
-key l                      # открыть TIFF
+key ctrl+o                 # открыть TIFF
 sleep 0.3
 move 700 300
 sleep 0.2

@@ -5,7 +5,7 @@ key Escape
 sleep 0.4
 key Tab
 sleep 0.3
-key l
+key ctrl+o
 sleep 0.3
 key 4                      # инструмент объектов
 click 195 364 2            # средняя кнопка по жителю: форма
@@ -53,5 +53,5 @@ sleep 0.3
 move 770 550
 sleep 0.2
 shot 06_jump
-key s                      # сохранить карту
+key ctrl+s                 # сохранить карту
 sleep 0.3

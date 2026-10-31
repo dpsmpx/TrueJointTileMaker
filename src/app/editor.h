@@ -46,6 +46,10 @@ private:
     bool quitNow_ = false;
     /// Режим без окна для тестов: --frames N.
     int framesLeft_ = -1;
+    /// Интерфейс 1.6 и оригинала: щелчки, клавиши, вид. Окно включает
+    /// правила плана «Интерфейс» (docs/roadmap.md), а сценарии оригинала
+    /// идут с --classic: они сверяются с эталоном 0.6.0 и его жестами.
+    bool classicUi_ = true;
     std::string screenshotPath_;
 
     // --- ввод на кадр ---
@@ -193,6 +197,12 @@ private:
     bool commandSaveAs();
     bool commandSave();
     bool confirmDiscard(const std::string& what);
+    /// Имя документа для вопросов: «bridge.map» (карта) или «новый тайл».
+    std::string docName(int mode) const;
+    /// Первая фраза вопроса о несохранённом: какой документ изменён.
+    std::string unsavedText(int mode) const;
+    /// Сохранить документ режима mode, не меняя режим на экране.
+    bool saveDocument(int mode);
     void commandNew();
     void commandOpen();
     void commandOpenLast();
@@ -250,6 +260,13 @@ private:
     void moveSelectionPro(int mx, int my, bool copy);
     void drawSelectionMask();
     bool handleProKey(int key);
+    /// Сочетания с Ctrl режима тайла: выделение, буфер, кисть из выделения.
+    bool handleProCtrlKey(int key);
+    /// Вставка буфера плавающим выделением под курсором.
+    void pasteBufferHere();
+    /// Клавиша с Ctrl или Alt в интерфейсе 1.7: только сочетания из таблицы,
+    /// буква без своего сочетания ничего не делает (UX-16).
+    void handleModifiedKey(int key);
     void showToolOptions();
     void showImageScreen();
     void showRotateDialog();

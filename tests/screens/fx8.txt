@@ -40,7 +40,7 @@ sleep 0.2
 shot 05_brush
 key Escape
 sleep 0.2
-click 682 125 3            # красный из палитры
+click 682 125              # красный из палитры
 drag 80 300 520 300        # мазок аэрографа поперёк
 move 700 300
 sleep 0.2
@@ -52,7 +52,7 @@ sleep 0.2
 key Escape
 sleep 0.2
 key 5
-click 650 125 3            # синий из палитры
+click 650 125              # синий из палитры
 drag 80 60 520 220         # сглаженная линия
 move 700 300
 sleep 0.2

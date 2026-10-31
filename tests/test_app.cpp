@@ -94,6 +94,13 @@ std::string prepareDialogs(const std::string& scenario, const fs::path& base) {
     return answers.string();
 }
 
+/// Сценарии оригинала: их эталон снят с 0.6.0, и перенос идёт с жестами и
+/// видом оригинала (--classic), а не с правилами плана «Интерфейс».
+bool isOriginalScenario(const std::string& scenario) {
+    return scenario == "tile" || scenario == "map" || scenario == "draw" ||
+           scenario == "mapedit" || scenario == "menu";
+}
+
 /// Пройти сценарий; снимки — в base/shots.
 bool runScenario(const std::string& scenario, const fs::path& base) {
     const fs::path shots = base / "shots";
@@ -105,7 +112,8 @@ bool runScenario(const std::string& scenario, const fs::path& base) {
     setEnv("SDL_FRAMEBUFFER_ACCELERATION", "0");
     setEnv("TJTM_TEST_DIALOGS", prepareDialogs(scenario, base));
     const std::string cmd = "\"" + std::string(TJTM_APP_EXE) + "\" --base \"" + base.string() +
-                            "\" --script \"" + script + "\" --shots \"" + shots.string() + "\"";
+                            "\" --script \"" + script + "\" --shots \"" + shots.string() + "\"" +
+                            (isOriginalScenario(scenario) ? " --classic" : "");
 #ifdef _WIN32
     // cmd /c срезает первую и последнюю кавычку строки: без внешней пары
     // от пути к программе осталась бы половина.

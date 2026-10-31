@@ -63,7 +63,7 @@ click 485 425
 sleep 0.3
 click 636 333              # проект .tjt…
 sleep 0.3
-key l                      # открыть выгруженный GIF
+key ctrl+o                 # открыть выгруженный GIF
 sleep 0.3
 move 700 300
 sleep 0.2

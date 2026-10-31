@@ -236,6 +236,19 @@ public:
     /// Кисть, фигуры и заливка не выходят за выделение. В оригинале
     /// выделение рисование не ограничивало.
     bool clipToSelection = false;
+    /// Выделение остаётся за своим документом при смене режима (UX-17): у
+    /// оригинала Tab снимал выделение, и вернуться к нему было нельзя.
+    bool keepSelectionPerDoc = false;
+    /// Выделение документа, который сейчас не на экране; номер — DOC_TILE
+    /// или DOC_MAP. Пустое (on = false) — нечего возвращать.
+    struct SavedSelection {
+        int x = 0, y = 0, w = 0, h = 0;
+        bool on = false;
+        Grid<std::uint8_t> mask;
+    };
+    std::array<SavedSelection, 2> savedSel;
+    /// Документ заменён: прежнее его выделение возвращать нельзя.
+    void forgetSelection(int which) { savedSel[static_cast<std::size_t>(which)] = {}; }
     /// «Новый» и «Очистить» дают прозрачный холст, а не белый.
     bool transparentBlank = false;
     /// Мазок без углов «Г»: карандаш, ластик и узор.
@@ -518,6 +531,8 @@ public:
     void syncHSVFromColor();
     void applyHSVToColor();
     void pickColor(Color c);
+    /// Второй рабочий цвет — из ячейки idx палитры, с точной привязкой.
+    void pickSecondFromPalette(PalIndex idx);
     void pickColorFromTile(int x, int y);
     void swapColors();
 

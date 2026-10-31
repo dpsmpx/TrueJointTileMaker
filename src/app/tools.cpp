@@ -289,6 +289,14 @@ void Editor::handleMapCanvas(int mx, int my) {
     if (twice) {
         // Пара засчитана: следующий щелчок начинает новую.
         lastClickCX_ = -100000;
+        // Инструментом объектов двойной щелчок открывает форму объекта: у
+        // оригинала она была только на средней кнопке, а у трекпада и пера
+        // её нет (UX-10). Тайл клетки открывают инструменты местности.
+        const int obj = m.toolMap == M_OBJ ? m.map.objectAt(mx, my) : -1;
+        if (!classicUi_ && obj >= 0) {
+            showObjectForm(obj);
+            return;
+        }
         if (openTileOfMapCell(mx, my)) return;
         m.needRepaint = true;
         return;
@@ -489,18 +497,30 @@ void Editor::handlePaletteClick() {
     }
     const auto idx = static_cast<PalIndex>(cell);
     const Color palCell = m.palette[idx];
-    if (frameClickButton_ == MB_RIGHT) {
-        m.pickColor(m.effectiveColor(idx));
-        // Цвет взят из конкретной ячейки: привязка точная, а не выведенная
-        // по цвету, — когда цвет стоит в палитре дважды, важно, из какой.
-        m.firstIdx = idx;
+    // У оригинала левая кнопка записывала в ячейку первый цвет, а брала
+    // цвет правая. Во всех прочих редакторах щелчок по образцу цвет
+    // выбирает, и новичок первым же движением портил палитру (UX-20).
+    // Теперь левая берёт цвет первым, правая — вторым, а запись — только
+    // Ctrl+щелчок.
+    const bool write = frameClickButton_ == MB_LEFT && (classicUi_ || isKeyPressed(KEY_CTRL));
+    if (!write) {
+        if (classicUi_ || frameClickButton_ == MB_LEFT) {
+            m.pickColor(m.effectiveColor(idx));
+            // Цвет взят из конкретной ячейки: привязка точная, а не выведенная
+            // по цвету, — когда цвет стоит в палитре дважды, важно, из какой.
+            m.firstIdx = idx;
+        } else {
+            m.pickSecondFromPalette(idx);
+        }
         return;
     }
     const Color oldC = palCell;
     if (sameColor(oldC, m.firstColor)) return;
+    // Запись в ячейку отменяется всегда: у оригинала вне индексного
+    // режима она шла мимо истории (docs/fixes.md).
+    m.pushUndo();
     if (m.indexedOn && m.docMode == DOC_TILE) {
         // Пиксели и сама ячейка меняются одной операцией и одной же отменяются.
-        m.pushUndo();
         m.palette[idx] = m.firstColor;
         m.recolorPaletteEntry(idx, oldC, m.firstColor);
         m.enforceIndexed();
@@ -562,7 +582,7 @@ void Editor::handlePanelClick() {
             m.overviewCenterOn(frameClickX_, frameClickY_);
         }
     } else if (py >= MENU_Y0 && py < MENU_Y1) {
-        showMainMenu();
+        if (classicUi_ || frameClickButton_ == MB_LEFT) showMainMenu();
     } else if (m.docMode == DOC_MAP) {
         if (py >= SLOT1_Y0 && py < SLOT1_Y1) {
             if (Model::terrHit(frameClickX_, frameClickY_, idx)) {
@@ -601,7 +621,50 @@ void Editor::handlePanelClick() {
 // Клавиатура
 // ---------------------------------------------------------------------------
 
+void Editor::handleModifiedKey(int key) {
+    const bool tile = m.docMode == DOC_TILE;
+    if (!lastKey_.ctrl || lastKey_.alt) return;
+    // Файл, отмена и поиск — по общим правилам настольных программ.
+    switch (key) {
+        case KEY_N: commandNew(); return;
+        case KEY_O: commandOpen(); return;
+        case KEY_S:
+            if (lastKey_.shift) {
+                commandSaveAs();
+            } else {
+                commandSave();
+            }
+            return;
+        case KEY_Z:
+            if (lastKey_.shift) {
+                m.doRedo();
+            } else {
+                m.doUndo();
+            }
+            return;
+        case KEY_Y: m.doRedo(); return;
+        case KEY_F:
+            if (!tile) showMapFindScreen();
+            return;
+        case KEY_B:
+            // К следующему месту местности тайла на карте (этап 7).
+            ++mapCtxIndex_;
+            m.needRepaint = true;
+            return;
+        default: break;
+    }
+    if (handleGuideKey(key)) return;
+    handleProCtrlKey(key);
+}
+
 void Editor::handleEditorKey(int key) {
+    // У оригинала Ctrl с буквой разбирался как сама буква: Ctrl+O открывал
+    // параметры, Ctrl+Shift+Z был ещё одной отменой, Ctrl+F на тайле
+    // включал ось симметрии (UX-16). Теперь у Ctrl и Alt — своя таблица.
+    if (!classicUi_ && (lastKey_.ctrl || lastKey_.alt)) {
+        handleModifiedKey(key);
+        return;
+    }
     if (handleGuideKey(key)) return;
     if (handleProKey(key)) return;
     if (handleTimelineKey(key)) return;
@@ -611,13 +674,23 @@ void Editor::handleEditorKey(int key) {
         showMapFindScreen();
         return;
     }
+    // Однобуквенные команды, которые пишут файл или меняют всю картинку,
+    // в интерфейсе 1.7 — только с Ctrl или на экране «Изображение»: промах
+    // по клавише инструмента не должен перезаписать файл (UX-17).
+    const bool letters = classicUi_;
     switch (key) {
         case KEY_ESC:
         case KEY_M: showMainMenu(); break;
         case KEY_H: showHelpScreen(); break;
-        case KEY_N: commandNew(); break;
-        case KEY_L: commandOpen(); break;
-        case KEY_S: commandSave(); break;
+        case KEY_N:
+            if (letters) commandNew();
+            break;
+        case KEY_L:
+            if (letters) commandOpen();
+            break;
+        case KEY_S:
+            if (letters) commandSave();
+            break;
         case KEY_A: commandSaveSelection(); break;
         case KEY_P:
             if (tile) showColorScreen();
@@ -626,12 +699,24 @@ void Editor::handleEditorKey(int key) {
         case KEY_Y: m.doRedo(); break;
         case KEY_X: m.swapColors(); break;
         case KEY_R:
-            if (tile) m.randomizeTile();
+            if (tile && letters) m.randomizeTile();
             break;
         case KEY_DELETE:
-            if (tile) m.clearTile();
+            // Delete с выделением разобран выше; без выделения у оригинала
+            // он очищал весь тайл.
+            if (tile && letters) m.clearTile();
             break;
         case KEY_TAB: m.switchMode(tile ? DOC_MAP : DOC_TILE); break;
+        case KEY_ENTER:
+            // Enter над объектом карты — его форма (UX-10); в режиме тайла
+            // Enter разобран лентой кадров.
+            if (!tile && !classicUi_) {
+                const int mx = m.screenToTileX(mouseX());
+                const int my = m.screenToTileY(mouseY());
+                const int obj = m.inDoc(mx, my) ? m.map.objectAt(mx, my) : -1;
+                if (obj >= 0) showObjectForm(obj);
+            }
+            break;
         case KEY_V:
             if (m.bufferFilled()) {
                 m.pushUndo();

@@ -76,7 +76,11 @@ launch() {
             cp "$ROOT/Config.txt" "$STATE/base"/
             cp -r "$ROOT/Resources" "$ROOT/Картинки" "$STATE/base"/
             # Программный кадровый буфер: Xvfb всё равно рисует без GPU.
-            (cd "$STATE/base" && SDL_FRAMEBUFFER_ACCELERATION=0 exec "$PORT_BIN" --base "$STATE/base") ;;
+            # TJTM_PORT_ARGS — ключи переноса, например --classic у сверки
+            # с оригиналом (tools/screens.sh).
+            # shellcheck disable=SC2086
+            (cd "$STATE/base" && SDL_FRAMEBUFFER_ACCELERATION=0 exec "$PORT_BIN" --base "$STATE/base" \
+                ${TJTM_PORT_ARGS:-}) ;;
     esac
 }
 

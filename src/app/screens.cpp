@@ -100,9 +100,17 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
             res = -1;
             done = true;
         }
+        // Главная кнопка — первая: Enter её нажимает (UX-19).
+        if (!classicUi_)
+            textCentered(0, H / 2 + 72, WIN_W, H / 2 + 92,
+                         "Enter — «" + yes + "»,   Escape — «" + cancel + "»", cTextDim);
         redraw();
-        if (takeKey() == KEY_ESC) {
+        const int key = takeKey();
+        if (key == KEY_ESC) {
             res = -1;
+            done = true;
+        } else if (key == KEY_ENTER && !classicUi_) {
+            res = 1;
             done = true;
         }
         idle();
@@ -133,9 +141,16 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
             res = false;
             done = true;
         }
+        if (!classicUi_)
+            textCentered(0, H / 2 + 72, WIN_W, H / 2 + 92,
+                         "Enter — «" + yes + "»,   Escape — «" + no + "»", cTextDim);
         redraw();
-        if (takeKey() == KEY_ESC) {
+        const int key = takeKey();
+        if (key == KEY_ESC) {
             res = false;
+            done = true;
+        } else if (key == KEY_ENTER && !classicUi_) {
+            res = true;
             done = true;
         }
         idle();

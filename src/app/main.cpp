@@ -1,7 +1,7 @@
 // Запуск и главный цикл (TJTM.pas: «Запуск»).
 //
 //   tjtm [файл.png | карта.map] [--base КАТАЛОГ] [--frames N] [--screenshot кадр.png]
-//        [--script СЦЕНАРИЙ [--shots КАТАЛОГ]]
+//        [--script СЦЕНАРИЙ [--shots КАТАЛОГ]] [--classic]
 //
 // --base     где искать Config.txt, Resources/ и Картинки/ вместо каталога
 //            программы;
@@ -11,7 +11,9 @@
 // --screenshot  сохранить последний кадр в PNG;
 // --script   вести программу по сценарию tests/screens/*.txt (см.
 //            platform/script.h) и закрыться в его конце; снимки «shot» —
-//            в каталог --shots.
+//            в каталог --shots;
+// --classic  интерфейс 1.6 — жесты и вид оригинала: так идут сценарии,
+//            которые сверяются с эталоном 0.6.0 (tools/screens.sh, тесты).
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -51,6 +53,7 @@ bool Editor::appInit(int argc, char** argv) {
     std::string base;
     std::string script;
     std::string shots;
+    bool classic = false;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         const bool hasValue = i + 1 < argc;
@@ -64,6 +67,8 @@ bool Editor::appInit(int argc, char** argv) {
             script = argv[++i];
         } else if (a == "--shots" && hasValue) {
             shots = argv[++i];
+        } else if (a == "--classic") {
+            classic = true;
         } else if (!a.empty() && a[0] != '-') {
             openPath = a;
         }
@@ -119,6 +124,9 @@ bool Editor::appInit(int argc, char** argv) {
     // карта картинками — сразу, как в игре (без папки набора — цветами).
     m.mapAutotile = true;
     m.mapTiles = true;
+    // Интерфейс 1.7 и дальше (docs/roadmap.md, «Интерфейс — план»).
+    classicUi_ = classic;
+    m.keepSelectionPerDoc = !classic;
     m.syncHSVFromColor();
     m.setDefaultPalette();
     m.buffer.clear();
