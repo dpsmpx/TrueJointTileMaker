@@ -233,6 +233,16 @@ private:
     [[nodiscard]] bool overCanvas(int x, int y) const {
         return x >= m.X0 && x < m.W && y >= m.Y0 && y < m.H;
     }
+    /// Ручки осей симметрии на холсте (C2, UX-40): у 1.6 ось двигали
+    /// только числом на экране параметров.
+    struct AxisHandles {
+        int vx = 0, vy = 0;  // вертикальной оси
+        int hx = 0, hy = 0;  // горизонтальной
+    };
+    [[nodiscard]] AxisHandles axisHandles() const;
+    /// 1 — ручка вертикальной оси, 2 — горизонтальной, 0 — ни одной.
+    [[nodiscard]] int axisHandleAt(int x, int y) const;
+    bool dragAxisHandle();
     void drawTilePixel(int x, int y);
     void drawPreviewPixel(int x, int y);
     void ensureTileBmp();

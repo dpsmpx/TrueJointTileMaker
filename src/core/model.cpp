@@ -234,7 +234,8 @@ bool Model::inDoc(int x, int y) const {
 }
 
 int Model::gridGap() const {
-    return (gridOn && pixelSize >= 4) ? 1 : 0;
+    const bool on = gridOn || (gridAutoZoom > 0 && zoomOut == 1 && pixelSize >= gridAutoZoom);
+    return (on && pixelSize >= 4) ? 1 : 0;
 }
 
 void Model::clampView() {

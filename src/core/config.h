@@ -59,6 +59,8 @@ struct Config {
     bool windowMaximized = false;
     /// Масштаб интерфейса в процентах: 100, 125, 150, 200; 0 — по экрану.
     int uiScale = 0;
+    /// Сетка точек сама с этого масштаба (во сколько раз); 0 — только по G.
+    int gridAutoZoom = 12;
     /// Недавние файлы, последний — первым; не больше kRecentMax (UX-24).
     std::vector<std::string> recentFiles;
     static constexpr std::size_t kRecentMax = 10;

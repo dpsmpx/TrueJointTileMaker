@@ -30,3 +30,21 @@ sleep 0.3
 move 770 550
 sleep 0.2
 shot 05_back
+# C2: строка меню — список «Вид», галочки у включённого.
+click 420 13
+sleep 0.3
+move 470 200
+sleep 0.2
+shot 06_menu_view
+key Escape
+sleep 0.2
+# C2: оси симметрии двойной линией, ручку оси тянут мышью.
+key f
+move 770 550
+sleep 0.2
+shot 07_axis
+drag 299 81 355 81          # ручка оси — на 4 точки вправо
+move 770 550
+sleep 0.2
+shot 08_axis_moved
+key f

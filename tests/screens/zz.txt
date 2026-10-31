@@ -1,0 +1,8 @@
+key Escape
+sleep 0.2
+window 1000 700
+sleep 0.3
+key f d
+move 900 650
+sleep 0.2
+shot a_axes

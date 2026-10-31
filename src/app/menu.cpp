@@ -492,6 +492,10 @@ void Editor::showSettingsScreen() {
             sizeRow(y, "Новая карта", v.defaultMapWidth, v.defaultMapHeight, kMapMinSide,
                     kMapMaxSide);
             y += 36;
+            // Сетка точек сама на крупном масштабе (UX-40).
+            bool autoGrid = v.gridAutoZoom > 0;
+            uiSwitch(30, y, 450, "Сетка точек сама с масштаба 1200 %", autoGrid);
+            v.gridAutoZoom = autoGrid ? (v.gridAutoZoom > 0 ? v.gridAutoZoom : 12) : 0;
         } else {
             stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
             y += 36;
@@ -534,7 +538,10 @@ void Editor::showSettingsScreen() {
             v.windowMaximized = cfg.windowMaximized;
             cfg = v;
             applyTheme();
-            if (!classicUi_) pf_.setUiScale(cfg.uiScale);
+            if (!classicUi_) {
+                pf_.setUiScale(cfg.uiScale);
+                m.gridAutoZoom = cfg.gridAutoZoom;
+            }
             m.gridOn = v.showGrid;
             m.checkerOn = v.showChecker;
             m.seamlessOn = v.showSeamless;

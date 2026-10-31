@@ -165,6 +165,7 @@ bool Editor::appInit(int argc, char** argv) {
     classicUi_ = classic;
     m.keepSelectionPerDoc = !classic;
     m.zoomSteps = !classic;
+    m.gridAutoZoom = classic ? 0 : cfg.gridAutoZoom;
     pf_.input().fineWheel = !classic;
     // Окно растягивается, разворачивается и бывает во весь экран (C1,
     // dpsmpx/TrueJointTileMaker#13); «Классика» — окно 780×560 оригинала.

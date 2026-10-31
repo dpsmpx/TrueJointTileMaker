@@ -414,6 +414,9 @@ void Editor::handleMapCanvas(int mx, int my) {
 }
 
 void Editor::handleCanvasClick() {
+    // Ручка оси симметрии (C2) — раньше инструмента: щелчок по ней не
+    // рисует.
+    if (dragAxisHandle()) return;
     const int mx = m.screenToTileX(frameClickX_);
     const int my = m.screenToTileY(frameClickY_);
 

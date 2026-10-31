@@ -90,6 +90,8 @@ int Config::applyLines(const std::vector<std::string>& lines) {
                 windowW = parseInt(val.substr(0, x), 0, 0, 16384);
                 windowH = parseInt(val.substr(x + 1), 0, 0, 16384);
             }
+        } else if (key == "gridautozoom") {
+            gridAutoZoom = parseInt(val, gridAutoZoom, 0, 64);
         } else if (key == "windowmaximized") {
             windowMaximized = parseBool(val, windowMaximized);
         } else if (key == "uiscale") {
@@ -224,6 +226,11 @@ std::string Config::serialize() const {
     if (cellFrame != def.cellFrame) {
         add("# Рамка клетки под курсором на холсте.");
         add(std::string("CellFrame = ") + ruBool(cellFrame));
+        add("");
+    }
+    if (gridAutoZoom != def.gridAutoZoom) {
+        add("# Сетка точек сама с этого масштаба (во сколько раз); 0 — только по G.");
+        add("GridAutoZoom = " + std::to_string(gridAutoZoom));
         add("");
     }
     if (uiScale != def.uiScale) {

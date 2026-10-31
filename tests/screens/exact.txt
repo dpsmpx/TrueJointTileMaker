@@ -163,3 +163,6 @@ uic        02_resized       0    0  1100  700
 uic        03_card_centered 0    0  1100  700
 uic        04_timeline      0    0  1100  700
 uic        05_back          0    0  780  560
+uic        06_menu_view     0    0  780  560
+uic        07_axis          0    0  780  560
+uic        08_axis_moved    0    0  780  560
