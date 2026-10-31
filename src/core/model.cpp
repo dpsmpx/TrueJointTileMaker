@@ -1201,6 +1201,15 @@ void Model::swapColors() {
     needRepaint = true;
 }
 
+void Model::resetColors() {
+    firstColor = argb(255, 0, 0, 0);
+    secondColor = argb(255, 255, 255, 255);
+    firstIdx = indexOfColor(firstColor);
+    secondIdx = indexOfColor(secondColor);
+    syncHSVFromColor();
+    needRepaint = true;
+}
+
 // --- геометрия панели -------------------------------------------------------
 
 int Model::toolCount() const {

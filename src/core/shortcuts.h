@@ -73,6 +73,7 @@ enum class Cmd {
     ToolOptions,
     // Цвет и картинка
     SwapColors,
+    ResetColors,
     ColorPicker,
     PaletteScreen,
     Indexed,

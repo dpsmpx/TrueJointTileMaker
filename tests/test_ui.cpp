@@ -505,5 +505,14 @@ TEST(UiNudge, MapMovesFrameOnly) {
     EXPECT_EQ(m.map.at(1, 1), before);
 }
 
+TEST(UiColors, ResetToBlackAndWhite) {
+    Model m = tileModel();
+    m.firstColor = argb(255, 10, 20, 30);
+    m.secondColor = argb(128, 1, 2, 3);
+    m.resetColors();
+    EXPECT_EQ(m.firstColor, kBlack);
+    EXPECT_EQ(m.secondColor, kWhite);
+}
+
 }  // namespace
 }  // namespace tjtm

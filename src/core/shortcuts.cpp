@@ -106,6 +106,7 @@ constexpr std::array kTable = {
     Shortcut{KEY_O, 0, kTile, ToolOptions, 0, kTools, "Параметры инструментов"},
     // Цвет и картинка
     Shortcut{KEY_X, 0, kBoth, SwapColors, 0, kColor, "Поменять цвета местами"},
+    Shortcut{KEY_X, kShift, kTile, ResetColors, 0, kColor, "Чёрный и белый"},
     Shortcut{KEY_P, 0, kTile, ColorPicker, 0, kColor, "Выбор цвета"},
     Shortcut{KEY_U, 0, kTile, PaletteScreen, 0, kColor, "Палитра"},
     Shortcut{KEY_I, 0, kTile, Indexed, 0, kColor, "Индексная палитра"},

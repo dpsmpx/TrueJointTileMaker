@@ -190,7 +190,7 @@ TEST_P(AppScreens, MatchOriginal) {
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
                                            "anim4", "prec5", "layers6", "game7", "fx8", "art9",
-                                           "map10", "uia"));
+                                           "map10", "uia", "uib"));
 
 /// Настройки выпуска (Config.txt в корне): при запуске — сразу редактор с
 /// последним файлом, без меню во всё окно (план «Интерфейс», A9).

@@ -294,6 +294,7 @@ void Editor::runCommand(Cmd c, int arg) {
         case Cmd::SymY: flip(m.symY); break;
         case Cmd::ToolOptions: showToolOptions(); break;
         case Cmd::SwapColors: m.swapColors(); break;
+        case Cmd::ResetColors: m.resetColors(); break;
         case Cmd::ColorPicker: showColorScreen(); break;
         case Cmd::PaletteScreen: showPaletteScreen(); break;
         case Cmd::Indexed: toggleIndexed(); break;
