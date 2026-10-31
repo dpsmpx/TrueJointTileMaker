@@ -387,6 +387,11 @@ std::string Platform::saveFileDialog(const std::string& title,
     return runDialog(SDL_FILEDIALOG_SAVEFILE, title, filters, loc);
 }
 
+std::string Platform::openFolderDialog(const std::string& title, const std::string& folder) {
+    return runDialog(SDL_FILEDIALOG_OPENFOLDER, title, {},
+                     dirExists(folder) ? folder : std::string());
+}
+
 std::string Platform::clipboardText() const {
     char* t = SDL_GetClipboardText();
     std::string s = t != nullptr ? t : "";

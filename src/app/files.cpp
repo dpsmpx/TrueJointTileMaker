@@ -67,6 +67,17 @@ std::string Editor::askOpenFile(const std::string& title) {
     return r;
 }
 
+std::string Editor::askFolder(const std::string& title, const std::string& current) {
+    const std::string start = resolvePath(current.empty() ? cfg.lastFolder : current);
+    std::string r = pf_.openFolderDialog(title, start);
+    waitMouseRelease();
+    m.needRepaint = true;
+    // Ответ-файл — его папка: так отвечают диалоги сценариев 1.6, где папку
+    // выбирали через любой файл в ней.
+    if (!r.empty() && !dirExists(r) && fileExists(r)) r = pathDirName(r);
+    return r;
+}
+
 std::string Editor::askSaveFile(const std::string& title, const std::string& suggested) {
     const std::string r =
         pf_.saveFileDialog(title, kPngFilter, resolvePath(cfg.lastFolder), suggested);

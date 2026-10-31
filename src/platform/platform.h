@@ -194,6 +194,8 @@ public:
                                const std::string& folder);
     std::string saveFileDialog(const std::string& title, const std::vector<FileFilter>& filters,
                                const std::string& folder, const std::string& suggested);
+    /// Выбор папки системным диалогом; folder — с какой начать.
+    std::string openFolderDialog(const std::string& title, const std::string& folder);
 
     std::string clipboardText() const;
     void setClipboardText(const std::string& s);

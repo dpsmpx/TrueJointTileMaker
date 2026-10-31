@@ -181,6 +181,9 @@ private:
 
     // --- файлы ---
     std::string askOpenFile(const std::string& title);
+    /// Папка системным выбором папки (UX-49): пустую папку для нового
+    /// набора иначе было не выбрать.
+    std::string askFolder(const std::string& title, const std::string& current);
     std::string askSaveFile(const std::string& title, const std::string& suggested);
     std::string askOpenMap(const std::string& title);
     std::string askSaveMap(const std::string& title, const std::string& suggested);

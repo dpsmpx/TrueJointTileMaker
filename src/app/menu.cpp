@@ -472,13 +472,16 @@ void Editor::showSettingsScreen() {
         y += 32;
         pathRow(y, "Файл палитры", v.paletteFile, [&] { return askOpenFile("Файл палитры"); });
         y += 32;
-        // Папка выбирается через любой файл в ней — так было в оригинале.
+        // У оригинала папку выбирали через любой файл в ней, и пустую
+        // папку выбрать было нельзя (UX-49).
         pathRow(y, "Папка карт локаций", v.mapsFolder, [&] {
+            if (!classicUi_) return askFolder("Папка карт локаций", v.mapsFolder);
             const std::string path = askOpenMap("Выберите любую карту в нужной папке");
             return path.empty() ? std::string() : pathDirName(path);
         });
         y += 32;
         pathRow(y, "Папка набора тайлов", v.tilesFolder, [&] {
+            if (!classicUi_) return askFolder("Папка набора тайлов", v.tilesFolder);
             const std::string path = askOpenFile("Выберите любой тайл в нужной папке");
             return path.empty() ? std::string() : pathDirName(path);
         });
@@ -845,13 +848,20 @@ bool Editor::showTilesetScreen() {
             }
         }
         if (uiButton(WIN_W / 2 - 110, 456, 220, 32, "Папка набора…", true)) {
-            const std::string path = askOpenFile("Выберите любой тайл в нужной папке");
-            if (!path.empty()) {
+            const std::string& cur = tsetKind_ == TS_ICON ? cfg.iconsFolder : cfg.tilesFolder;
+            std::string picked;
+            if (classicUi_) {
+                const std::string path = askOpenFile("Выберите любой тайл в нужной папке");
+                if (!path.empty()) picked = pathDirName(path);
+            } else {
+                picked = askFolder(tsetKind_ == TS_ICON ? "Папка значков" : "Папка набора тайлов", cur);
+            }
+            if (!picked.empty()) {
                 if (tsetKind_ == TS_ICON) {
-                    cfg.iconsFolder = pathDirName(path);
+                    cfg.iconsFolder = picked;
                     iconsDirty_ = true;
                 } else {
-                    cfg.tilesFolder = pathDirName(path);
+                    cfg.tilesFolder = picked;
                 }
                 note.clear();
                 saveConfig();
