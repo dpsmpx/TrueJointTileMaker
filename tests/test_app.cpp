@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -189,6 +190,43 @@ INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
                                            "anim4", "prec5", "layers6", "game7", "fx8", "art9",
                                            "map10"));
+
+/// Настройки выпуска (Config.txt в корне): при запуске — сразу редактор с
+/// последним файлом, без меню во всё окно (план «Интерфейс», A9).
+TEST(AppScreens, ReleaseConfigOpensLastFile) {
+    const fs::path base = makeBase("start");
+    fs::copy_file(fs::path(TJTM_SOURCE_DIR) / "Config.txt", base / "Config.txt",
+                  fs::copy_options::overwrite_existing);
+    {
+        std::ofstream add(base / "Config.txt", std::ios::binary | std::ios::app);
+        add << "LastFile = " << reinterpret_cast<const char*>(u8"Картинки/debug.png") << "\r\n";
+    }
+    ASSERT_TRUE(runScenario("start", base));
+    std::string err;
+    tjtm::Grid<tjtm::Color> shot;
+    ASSERT_TRUE(tjtm::pngLoad((base / "shots" / "01_start.png").string(), shot, err)) << err;
+    tjtm::Grid<tjtm::Color> img;
+    ASSERT_TRUE(tjtm::pngLoad((base / fs::path(u8"Картинки") / "debug.png").string(), img, err))
+        << err;
+    // Картинка вписана в холст: её середина — посреди холста. Меню на её
+    // месте рисовало бы кнопки.
+    const int ps = std::min(tjtm::CANVAS_W / img.w, tjtm::CANVAS_H / img.h);
+    const int ox = (tjtm::CANVAS_W - img.w * ps) / 2;
+    const int oy = (tjtm::CANVAS_H - img.h * ps) / 2;
+    int same = 0;
+    for (int y = 0; y < img.h; ++y) {
+        for (int x = 0; x < img.w; ++x) {
+            const tjtm::Color c = img.at(x, y);
+            if (c.a == 255 && shot.at(ox + x * ps + ps / 2, oy + y * ps + ps / 2).argb() == c.argb())
+                ++same;
+        }
+    }
+    int opaque = 0;
+    for (const tjtm::Color c : img.d)
+        opaque += c.a == 255 ? 1 : 0;
+    EXPECT_EQ(same, opaque) << "на холсте — последний файл, а не меню";
+    fs::remove_all(base);
+}
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.
