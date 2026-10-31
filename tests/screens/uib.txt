@@ -133,3 +133,19 @@ sleep 0.2
 shot 17_edge_scroll
 key ctrl+d ctrl+0
 sleep 0.2
+# B14: Tab по элементам карточки — рамка фокуса; стрелки в меню.
+key ctrl+n
+sleep 0.3
+key Tab Tab Tab
+move 700 558
+sleep 0.2
+shot 18_focus_tab
+key Escape
+sleep 0.2
+key Escape
+sleep 0.3
+key Down Down
+sleep 0.2
+shot 19_menu_arrows
+key Escape
+sleep 0.2

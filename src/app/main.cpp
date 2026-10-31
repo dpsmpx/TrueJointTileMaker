@@ -223,7 +223,7 @@ bool Editor::appInit(int argc, char** argv) {
 void Editor::appStep() {
     // Снимок ввода — первым делом, до перерисовки: перерисовка бывает
     // долгой, и щелчок во время неё не должен пропасть.
-    beginFrameInput();
+    beginFrameInput(false);
     editorTipFrame();
     if (!classicUi_ && pf_.milliseconds() - autosaveMs_ >= kAutosaveMs) autosave();
     if (!pf_.input().drops.empty()) {

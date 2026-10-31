@@ -556,6 +556,7 @@ void Editor::showMainMenu() {
 
     while (!done && !quitNow_) {
         beginFrameInput();
+        focusArrows_ = true;  // меню: стрелки ходят по пунктам (UX-19)
         const bool isMap = m.docMode == DOC_MAP;
         std::string lastPath;
         std::string curName;

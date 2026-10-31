@@ -105,8 +105,33 @@ private:
 
     // --- утилиты (TJTM.pas: «Мелкие утилиты», «Ввод») ---
     void idle();
-    void beginFrameInput();
+    /// screen = false — кадр главного окна: там Tab переключает режим, а
+    /// не фокус.
+    void beginFrameInput(bool screen = true);
     void dropInput();
+
+    // --- фокус с клавиатуры (план «Интерфейс», B14, UX-19) ---
+    // У 1.6 диалоги разбирали только Escape: ни Tab по кнопкам, ни рамки
+    // фокуса. Кнопки, вкладки, тумблеры и поля встают в очередь фокуса в
+    // порядке вызова за кадр (immediate mode: другого порядка нет), Tab и
+    // Shift+Tab ходят по ней, Enter и пробел нажимают элемент в фокусе.
+    // Рамка видна после клавиатуры и прячется от щелчка мышью.
+    /// Разбор Tab, стрелок меню, Enter и пробела в начале кадра.
+    void focusFrame(bool screen);
+    void focusStep(int d);
+    /// Элемент встал в очередь; true — он в фокусе (рамка нарисована).
+    bool focusSlot(int x, int y, int w, int h);
+    /// Элемент в фокусе нажат с клавиатуры (Enter, пробел).
+    bool focusPressed(bool focused);
+    bool focusOn_ = false;
+    bool focusShown_ = false;
+    bool focusPress_ = false;
+    bool focusMoved_ = false;  // фокус пришёл в этом кадре: поле — сразу набор
+    /// Стрелки ходят, как Tab: меню и списки ставят на каждый кадр.
+    bool focusArrows_ = false;
+    int focusIdx_ = -1;
+    int focusCount_ = 0;
+    int focusSeen_ = 0;
     int takeKey();
     int takeWheel();
     /// Целые шаги прокрутки вбок: +1 вправо.

@@ -35,6 +35,7 @@ int Editor::askChoice(const std::string& title, const std::string& hint,
     const int pages = std::max(1, (static_cast<int>(items.size()) + ROWS - 1) / ROWS);
     while (!done && !quitNow_) {
         beginFrameInput();
+        focusArrows_ = true;  // список: стрелки ходят по строкам (UX-19)
         fb_.clear(cWindow);
         textCentered(0, 8, WIN_W, 36, title, cText);
         uiLabel(0, 36, WIN_W, 20, hint, cTextDim);
@@ -115,7 +116,9 @@ void Editor::showObjectForm(int idx) {
     };
 
     while (!done && !quitNow_) {
-        beginFrameInput();
+        // Поля формы ходят по Tab сами, со своей кареткой: общий фокус
+        // кнопок им бы мешал.
+        beginFrameInput(false);
         Input& in = pf_.input();
         auto setFocus = [&](std::size_t k) {
             focus = k;
