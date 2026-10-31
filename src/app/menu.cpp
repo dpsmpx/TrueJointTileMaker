@@ -6,6 +6,7 @@
 #include "app/editor.h"
 #include "core/fsutil.h"
 #include "core/pmath.h"
+#include "core/text.h"
 #include "core/theme.h"
 
 namespace tjtm {
@@ -320,30 +321,29 @@ void Editor::showHelpScreen() {
     par("сглаживание края линии, прямоугольника, овала и фигур векторного слоя.");
     par("Поворот на любой угол умеет «Плавно», экран изображения — плавный масштаб.");
     add("");
-    add("Escape — главное меню. H — эта справка.");
-    add("Ctrl+N создать, Ctrl+O открыть, Ctrl+S сохранить, Ctrl+Shift+S сохранить как.");
-    add("A сохранить выделение отдельным файлом.");
-    add("Z или Ctrl+Z отменить; Y, Ctrl+Y или Ctrl+Shift+Z повторить.");
-    add("V вставить буфер в позицию курсора.");
-    add("Q пиксель-перфект, O параметры инструментов, K изображение, U палитра.");
-    add("[ и ] листают узоры. Ctrl с A, D, I, C, X, V — команды выделения.");
-    add("X поменять местами цвета. P точный выбор цвета по каналам ARGB.");
-    add("G сетка, C шахматка, B бесшовность, W заворот, F и D оси симметрии.");
-    add("E смешивание вместо замены.");
-    add("I индексная палитра. T наборы тайлов.");
-    add("J лента кадров, Enter проиграть, запятая и точка — кадр назад и вперёд.");
-    add("Home и End — первый и последний кадр, PgUp и PgDn — слой выше и ниже.");
-    add("F3 луковая кожа.");
-    add("Ctrl+R линейки, Ctrl+; направляющие, Ctrl+G сетка и направляющие.");
-    add("Ctrl+T тайлы слоя-тайлкарты.");
-    add("Shift+B картинки набора на карте и тайл в окружении карты, Ctrl+B дальше.");
-    add("Shift+K фильтры и эффекты (не пиксель-арт). Ctrl+E кисть из выделения.");
-    add("Ctrl+F на карте — найти и заменить.");
-    add("Delete стирает выделенное; весь тайл — экран изображения (K).");
-    add("Tab переключает режим тайла и карты, выделение остаётся за документом.");
-    add("Цифры от 1 выбирают инструмент. Плюс и минус — масштаб.");
-    add("Стрелки двигают изображение. Пробел с протяжкой — рука, короткое нажатие");
-    add("пробела или Ctrl+0 вписывает картинку. Shift с роликом — вбок.");
+    // Клавиши — из той же таблицы, что их разбирает (UX-09, UX-18): список
+    // от руки отставал от кода.
+    add("КЛАВИШИ");
+    add("F1 или ? — шпаргалка поверх холста, с поиском.");
+    {
+        const std::span<const Shortcut> all = shortcuts();
+        const char* group = nullptr;
+        for (std::size_t i = 0; i < all.size(); ++i) {
+            const Shortcut& s = all[i];
+            if (s.text == nullptr) continue;
+            if (group == nullptr || std::string_view(group) != s.group) {
+                group = s.group;
+                add("");
+                add(std::string(s.group) + ":");
+            }
+            const char* where = s.where == KeyWhere::Tile  ? " (тайл)"
+                                : s.where == KeyWhere::Map ? " (карта)"
+                                                           : "";
+            add(shortcutKeys(all, i) + " — " + netToLower(s.text) + where);
+        }
+    }
+    add("");
+    add("Shift с роликом — прокрутка вбок, пробел с протяжкой — рука.");
     add("Alt, зажатый над холстом, временно включает пипетку (кроме выделения).");
     add("");
     add("РЕДАКТОР КАРТ");
@@ -405,9 +405,22 @@ void Editor::showSettingsScreen() {
     dropInput();
     pf_.input().keys.clear();
 
-    auto toggleRow = [&](int x, int ry, const std::string& caption, bool value) {
+    // Логическая настройка: в новых темах — тумблер (UX-28), у «Классики» —
+    // кнопка «да/нет», как в 1.6.
+    auto toggleRow = [&](int x, int ry, const std::string& caption, bool& value) {
+        if (active.modern) {
+            uiSwitch(x, ry, 340, caption, value);
+            return;
+        }
         uiLabelLeft(x, ry, 30, caption, cText);
-        return uiButton(x + 250, ry, 90, 30, ruBool(value), true);
+        if (uiButton(x + 250, ry, 90, 30, ruBool(value), true)) value = !value;
+    };
+    // Размер «ширина × высота» полями числа (UX-26).
+    auto sizeRow = [&](int ry, const std::string& caption, int& w, int& h, int lo, int hi) {
+        uiLabelLeft(30, ry, 30, caption, cText);
+        uiNumber(230, ry, 110, 30, w, lo, hi, 1, 8);
+        uiLabel(340, ry, 30, 30, "×", cTextDim);
+        uiNumber(370, ry, 110, 30, h, lo, hi, 1, 8);
     };
     auto stepRow = [&](int ry, const std::string& caption, int& value, int lo, int hi) {
         uiLabelLeft(60, ry, 30, caption, cText);
@@ -436,35 +449,47 @@ void Editor::showSettingsScreen() {
         uiLabel(0, 46, WIN_W, 20, "Сохраняются в Config.txt рядом с программой", cTextDim);
 
         int y = 76;
-        if (toggleRow(30, y, "Справка при запуске", v.showHelpOnStart))
-            v.showHelpOnStart = !v.showHelpOnStart;
-        if (toggleRow(410, y, "Меню при запуске", v.showMenuOnStart))
-            v.showMenuOnStart = !v.showMenuOnStart;
+        toggleRow(30, y, "Справка при запуске", v.showHelpOnStart);
+        toggleRow(410, y, "Меню при запуске", v.showMenuOnStart);
         y += 36;
-        if (toggleRow(30, y, "Сетка между пикселями", v.showGrid)) v.showGrid = !v.showGrid;
-        if (toggleRow(410, y, "Шахматка прозрачности", v.showChecker))
-            v.showChecker = !v.showChecker;
+        toggleRow(30, y, "Сетка между пикселями", v.showGrid);
+        toggleRow(410, y, "Шахматка прозрачности", v.showChecker);
         y += 36;
-        if (toggleRow(30, y, "Бесшовный предпросмотр", v.showSeamless))
-            v.showSeamless = !v.showSeamless;
-        if (toggleRow(410, y, "Открывать последний файл", v.autoLoadLast))
-            v.autoLoadLast = !v.autoLoadLast;
+        toggleRow(30, y, "Бесшовный предпросмотр", v.showSeamless);
+        toggleRow(410, y, "Открывать последний файл", v.autoLoadLast);
         y += 36;
-        if (toggleRow(30, y, "Запускаться в режиме карты", v.startInMapMode))
-            v.startInMapMode = !v.startInMapMode;
+        toggleRow(30, y, "Запускаться в режиме карты", v.startInMapMode);
         // Облик 1.6 остаётся выбором: «Классика» — те же цвета точка в точку.
-        uiLabelLeft(410, y, 30, "Оформление", cText);
-        if (uiToggle(410 + 130, y, 96, 30, "Светлое", v.theme != "классика")) v.theme = "светлая";
-        if (uiToggle(410 + 232, y, 96, 30, "Классика", v.theme == "классика")) v.theme = "классика";
+        const int ox = active.modern ? 30 : 410;
+        if (active.modern) {
+            toggleRow(410, y, "Подсказки при наведении", v.tooltips);
+            y += 36;
+            toggleRow(410, y, "Рамка клетки под курсором", v.cellFrame);
+        }
+        uiLabelLeft(ox, y, 30, "Оформление", cText);
+        const bool dark = v.theme == "тёмная";
+        const bool classic = v.theme == "классика";
+        const int tx = active.modern ? 130 : 410 + 104;
+        if (uiToggle(tx, y, 80, 30, "Светлое", !dark && !classic)) v.theme = "светлая";
+        if (uiToggle(tx + 84, y, 80, 30, "Тёмное", dark)) v.theme = "тёмная";
+        if (uiToggle(tx + 168, y, 80, 30, "Классика", classic)) v.theme = "классика";
 
         y += 40;
-        stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
-        y += 36;
-        stepRow(y, "Высота нового тайла", v.defaultHeight, MIN_TILE, MAX_TILE);
-        y += 36;
-        stepRow(y, "Ширина новой карты", v.defaultMapWidth, kMapMinSide, kMapMaxSide);
-        y += 36;
-        stepRow(y, "Высота новой карты", v.defaultMapHeight, kMapMinSide, kMapMaxSide);
+        if (active.modern) {
+            sizeRow(y, "Новый тайл", v.defaultWidth, v.defaultHeight, MIN_TILE, MAX_TILE);
+            y += 36;
+            sizeRow(y, "Новая карта", v.defaultMapWidth, v.defaultMapHeight, kMapMinSide,
+                    kMapMaxSide);
+            y += 36;
+        } else {
+            stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
+            y += 36;
+            stepRow(y, "Высота нового тайла", v.defaultHeight, MIN_TILE, MAX_TILE);
+            y += 36;
+            stepRow(y, "Ширина новой карты", v.defaultMapWidth, kMapMinSide, kMapMaxSide);
+            y += 36;
+            stepRow(y, "Высота новой карты", v.defaultMapHeight, kMapMinSide, kMapMaxSide);
+        }
 
         y += 38;
         pathRow(y, "Стартовое изображение", v.startupImage,
@@ -486,7 +511,7 @@ void Editor::showSettingsScreen() {
             return path.empty() ? std::string() : pathDirName(path);
         });
 
-        if (uiButton(WIN_W / 2 - 190, WIN_H - 52, 180, 36, "Сохранить", true)) {
+        if (uiPrimary(WIN_W / 2 - 190, WIN_H - 52, 180, 36, "Сохранить", true)) {
             // Поля «заполняется программой» могли поменяться, пока экран был
             // открыт (выбор файла запоминает папку): берутся свежие.
             v.lastFile = cfg.lastFile;
@@ -531,6 +556,7 @@ void Editor::showMainMenu() {
 
     while (!done && !quitNow_) {
         beginFrameInput();
+        focusArrows_ = true;  // меню: стрелки ходят по пунктам (UX-19)
         const bool isMap = m.docMode == DOC_MAP;
         std::string lastPath;
         std::string curName;
@@ -564,7 +590,12 @@ void Editor::showMainMenu() {
         int y = 100;
         if (uiButton(bx, y, bw, bh, "Продолжить редактирование", true)) done = true;
         y += stp;
-        if (uiButton(bx, y, bw, bh, fitText(lastCaption, bw - 20), lastOk)) {
+        if (active.modern) {
+            // Список недавних вместо одного «последнего файла» (UX-24).
+            if (uiButton(bx, y, bw, bh, "Недавние файлы…", !cfg.recentFiles.empty()) &&
+                openRecentAsk())
+                done = true;
+        } else if (uiButton(bx, y, bw, bh, fitText(lastCaption, bw - 20), lastOk)) {
             commandOpenLast();
             done = true;
         }
@@ -676,7 +707,22 @@ void Editor::ensureIcons() {
             px = size <= ICON_MAX_PX ? size * (ICON_MAX_PX / size)
                                      : size / ((size + ICON_MAX_PX - 1) / ICON_MAX_PX);
         }
-        iconBmp_[static_cast<std::size_t>(i)] = gridFromBgra(makeThumbAlphaRaw(g, px), px);
+        Grid<Color> icon = gridFromBgra(makeThumbAlphaRaw(g, px), px);
+        // Значки нарисованы чёрным по светлому. В новых темах серые точки
+        // берут цвет текста темы, от светлых к фону панели, а цветные
+        // акценты остаются: в тёмной теме чёрные линии иначе не видны
+        // (docs/ui-design-system.md, «Значки»).
+        if (active.modern) {
+            for (Color& c : icon.d) {
+                if (c.a == 0) continue;
+                const int hi = std::max({c.r, c.g, c.b});
+                const int lo = std::min({c.r, c.g, c.b});
+                if (hi - lo > 48) continue;
+                const Color t = theme::mix(cText, cPanel, (c.r * 77 + c.g * 150 + c.b * 29) / 256);
+                c = argb(c.a, t.r, t.g, t.b);
+            }
+        }
+        iconBmp_[static_cast<std::size_t>(i)] = std::move(icon);
     }
     m.needRepaint = true;
 }
@@ -777,11 +823,9 @@ bool Editor::showTilesetScreen() {
         fb_.clear(cWindow);
         textCentered(0, 6, WIN_W, 40, "Наборы тайлов", cText);
 
-        // Переключатель наборов. Открытый помечен точкой: кнопка не умеет
-        // показывать нажатое состояние, а знать, где находишься, нужно.
+        // Переключатель наборов — вкладки: открытая видна сразу.
         for (int i = 0; i < TS_KINDS; ++i) {
-            const std::string cap = i == tsetKind_ ? "• " + tsetKindName(i) : tsetKindName(i);
-            if (uiButton(TSET_X0 + i * 192, 46, 184, 28, cap, i != tsetKind_)) {
+            if (uiTab(TSET_X0 + i * 192, 46, 184, 28, tsetKindName(i), i == tsetKind_)) {
                 tsetKind_ = i;
                 tsetPage_ = 0;
                 tsetBuild();

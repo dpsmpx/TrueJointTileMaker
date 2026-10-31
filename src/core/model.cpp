@@ -222,11 +222,11 @@ void Model::markModified() {
 }
 
 int Model::screenToTileX(int sx) const {
-    return floorDiv(sx - viewX, pixelSize);
+    return zoomOut > 1 ? (sx - viewX) * zoomOut : floorDiv(sx - viewX, pixelSize);
 }
 
 int Model::screenToTileY(int sy) const {
-    return floorDiv(sy - viewY, pixelSize);
+    return zoomOut > 1 ? (sy - viewY) * zoomOut : floorDiv(sy - viewY, pixelSize);
 }
 
 bool Model::inDoc(int x, int y) const {
@@ -238,8 +238,8 @@ int Model::gridGap() const {
 }
 
 void Model::clampView() {
-    const int fullW = docW() * pixelSize;
-    const int fullH = docH() * pixelSize;
+    const int fullW = scr(docW());
+    const int fullH = scr(docH());
     // Холст — от (X0, Y0) до (W, H): слева и сверху могут стоять линейки.
     const int cw = W - X0;
     const int ch = H - Y0;
@@ -250,10 +250,63 @@ void Model::clampView() {
 void Model::fitScale() {
     pixelSize = std::min((W - X0) / std::max(1, docW()), (H - Y0) / std::max(1, docH()));
     pixelSize = clampI(pixelSize, MIN_ZOOM, MAX_ZOOM);
+    zoomOut = 1;
+    // Лист больше холста — уменьшить, пока не влезет (не мельче 25 %).
+    if (zoomSteps && docMode == DOC_TILE) {
+        while (zoomOut < 4 && (scr(docW()) > W - X0 || scr(docH()) > H - Y0))
+            zoomOut *= 2;
+    }
     clampView();
 }
 
+namespace {
+
+/// Ступени масштаба: точек экрана на точку документа и уменьшение.
+struct ZoomStep {
+    int ps, out;
+};
+constexpr ZoomStep kZoomSteps[] = {{1, 4}, {1, 2},  {1, 1},  {2, 1},  {3, 1},  {4, 1},  {6, 1},
+                                   {8, 1}, {12, 1}, {16, 1}, {24, 1}, {32, 1}, {48, 1}, {64, 1}};
+
+}  // namespace
+
+void Model::setZoom(int ps, int out, int ax, int ay) {
+    ps = clampI(ps, MIN_ZOOM, MAX_ZOOM);
+    if (out < 1 || docMode != DOC_TILE) out = 1;
+    if (out > 1) ps = 1;
+    if (ps == pixelSize && out == zoomOut) return;
+    const double before = scale();
+    pixelSize = ps;
+    zoomOut = out;
+    const double k = scale() / before;
+    viewX = ax - pround((ax - viewX) * k);
+    viewY = ay - pround((ay - viewY) * k);
+    clampView();
+    needRepaint = true;
+}
+
 void Model::zoomAt(int dir, int ax, int ay) {
+    if (zoomSteps) {
+        // Следующая ступень от нынешнего масштаба; вписанный масштаб (5×)
+        // бывает и между ступенями.
+        const double now = scale();
+        const ZoomStep* pick = nullptr;
+        if (dir > 0) {
+            for (const ZoomStep& z : kZoomSteps) {
+                if (static_cast<double>(z.ps) / z.out > now) {
+                    pick = &z;
+                    break;
+                }
+            }
+        } else {
+            for (const ZoomStep& z : kZoomSteps) {
+                if (static_cast<double>(z.ps) / z.out >= now) break;
+                if (z.out == 1 || docMode == DOC_TILE) pick = &z;
+            }
+        }
+        if (pick != nullptr) setZoom(pick->ps, pick->out, ax, ay);
+        return;
+    }
     const int old = pixelSize;
     if (dir > 0) {
         if (pixelSize < MAX_ZOOM) pixelSize *= 2;
@@ -691,11 +744,34 @@ void Model::emitPixel(int x, int y) {
     } else if (strokeActive && toolTile == T_PEN && penMode == PEN_STAMP && !customBrush.empty()) {
         // Кисть из выделения (этап 9) ложится целиком в каждую точку пути.
         stampBrushAt(x, y);
+    } else if (strokeActive && brushSized()) {
+        forEachBrushCell(x, y, [this](int px, int py) { paintPixel(px, py); });
     } else if (strokeActive && pixelPerfect &&
                (toolTile == T_PEN || toolTile == T_ERASER || toolTile == T_DITHER)) {
         emitPixelPerfect(x, y);
     } else {
         paintPixel(x, y);
+    }
+}
+
+bool Model::brushSized() const {
+    if (docMode != DOC_TILE || brushSize <= 1) return false;
+    if (toolTile == T_ERASER || toolTile == T_DITHER) return true;
+    return toolTile == T_PEN && (penMode == PEN_PENCIL || penMode == PEN_SHADE);
+}
+
+void Model::forEachBrushCell(int x, int y, const std::function<void(int, int)>& fn) const {
+    const int n = std::max(1, brushSize);
+    const int o = (n - 1) / 2;
+    // Круг: клетки, чьи середины ближе n/2 − 1/4 к середине пятна, — у 3
+    // это «плюс», у 4 — квадрат без углов, как у кистей пиксель-арта.
+    const double c = (n - 1) / 2.0;
+    const double r = n / 2.0 - 0.25;
+    for (int j = 0; j < n; ++j) {
+        for (int i = 0; i < n; ++i) {
+            if (brushRound && n > 2 && (i - c) * (i - c) + (j - c) * (j - c) > r * r) continue;
+            fn(x - o + i, y - o + j);
+        }
     }
 }
 
@@ -1125,6 +1201,15 @@ void Model::swapColors() {
     needRepaint = true;
 }
 
+void Model::resetColors() {
+    firstColor = argb(255, 0, 0, 0);
+    secondColor = argb(255, 255, 255, 255);
+    firstIdx = indexOfColor(firstColor);
+    secondIdx = indexOfColor(secondColor);
+    syncHSVFromColor();
+    needRepaint = true;
+}
+
 // --- геометрия панели -------------------------------------------------------
 
 int Model::toolCount() const {
@@ -1228,8 +1313,8 @@ void Model::overviewCenterOn(int px, int py) {
     // Центр холста — на клетку документа, отвечающую точке обзора.
     const double docX = static_cast<double>((px - overOriginX()) * docW()) / overPixW();
     const double docY = static_cast<double>((py - overOriginY()) * docH()) / overPixH();
-    viewX = pround((X0 + W) / 2.0 - docX * pixelSize);
-    viewY = pround((Y0 + H) / 2.0 - docY * pixelSize);
+    viewX = pround((X0 + W) / 2.0 - docX * scale());
+    viewY = pround((Y0 + H) / 2.0 - docY * scale());
     clampView();
     needRepaint = true;
 }
@@ -1265,10 +1350,10 @@ bool Model::overviewViewport(int& vx0, int& vy0, int& vx1, int& vy1) const {
     const int oy = overOriginY();
     const int pw = overPixW();
     const int ph = overPixH();
-    vx0 = ox + pround((static_cast<double>(X0 - viewX) / pixelSize) * pw / docW());
-    vy0 = oy + pround((static_cast<double>(Y0 - viewY) / pixelSize) * ph / docH());
-    vx1 = ox + pround((static_cast<double>(-viewX + W) / pixelSize) * pw / docW());
-    vy1 = oy + pround((static_cast<double>(-viewY + H) / pixelSize) * ph / docH());
+    vx0 = ox + pround((static_cast<double>(X0 - viewX) / scale()) * pw / docW());
+    vy0 = oy + pround((static_cast<double>(Y0 - viewY) / scale()) * ph / docH());
+    vx1 = ox + pround((static_cast<double>(-viewX + W) / scale()) * pw / docW());
+    vy1 = oy + pround((static_cast<double>(-viewY + H) / scale()) * ph / docH());
     vx0 = clampI(vx0, ox, ox + pw);
     vy0 = clampI(vy0, oy, oy + ph);
     vx1 = clampI(vx1, ox, ox + pw);

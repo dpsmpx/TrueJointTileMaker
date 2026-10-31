@@ -720,6 +720,7 @@ bool projectDecode(const std::vector<std::uint8_t>& file, Model& m, std::string&
     m.needRepaint = true;
     if (p.haveView && p.pixelSize >= MIN_ZOOM && p.pixelSize <= MAX_ZOOM) {
         m.pixelSize = p.pixelSize;
+        m.zoomOut = 1;
         m.clampView();
     } else {
         m.fitScale();

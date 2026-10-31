@@ -8,9 +8,12 @@
 // этом режиме тоже идут по тикам — бег «муравьёв» и двойной щелчок от
 // скорости машины не зависят.
 //
+// «mousedown [КНОПКА]» и «mouseup [КНОПКА]» — кнопка, нажатая там, где
+// курсор, и отпущенная потом, как у xdotool.
+//
 // Сверх команд tools/gui.sh здесь есть «wheel DY [DX]» — прокрутка долями
-// щелчка, как у трекпада (у xdotool её нет: сценарии с ней — только для
-// переноса).
+// щелчка, как у трекпада, и «drop ПУТЬ» — файл, брошенный в окно (у xdotool
+// их нет: сценарии с ними — только для переноса).
 #pragma once
 
 #include <deque>
@@ -21,7 +24,7 @@ namespace tjtm {
 
 /// Событие сценария в координатах окна оригинала.
 struct ScriptEvent {
-    enum Kind { MOTION, BUTTON_DOWN, BUTTON_UP, WHEEL, KEY_DOWN, KEY_UP, TEXT };
+    enum Kind { MOTION, BUTTON_DOWN, BUTTON_UP, WHEEL, KEY_DOWN, KEY_UP, TEXT, DROP };
     Kind kind = MOTION;
     int x = 0, y = 0;
     int button = 0;  // 1 левая, 2 средняя, 3 правая — как у xdotool и SDL

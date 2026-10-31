@@ -22,6 +22,7 @@
 #include "core/color.h"
 #include "core/grid.h"
 #include "core/mapdoc.h"
+#include "core/pmath.h"
 #include "core/png.h"
 #include "core/sprite.h"
 #include "core/theme.h"
@@ -33,7 +34,7 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них, 1.7 и дальше — этапы плана
 // «Интерфейс» (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.7.0";
+inline constexpr const char* kAppVersion = "1.8.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -217,6 +218,14 @@ public:
 
     // Панорама и масштаб, общие для обоих режимов.
     int pixelSize = 8;
+    /// Масштаб ступенями 1, 2, 3, 4, 6, 8 … 64 и уменьшение до 50 и 25 %
+    /// (план «Интерфейс», B12, UX-03). У оригинала ролик только удваивал
+    /// и делил, и большой лист в окно не помещался; без флага — так же.
+    bool zoomSteps = false;
+    /// Уменьшение: на точке экрана zoomOut точек документа (2 — 50 %,
+    /// 4 — 25 %), pixelSize тогда 1. Только у тайла: клетка карты при
+    /// 100 % и так в одну точку.
+    int zoomOut = 1;
     int viewX = 0, viewY = 0;
     bool gridOn = false;
     bool checkerOn = true;
@@ -244,6 +253,16 @@ public:
     /// Кисть, фигуры и заливка не выходят за выделение. В оригинале
     /// выделение рисование не ограничивало.
     bool clipToSelection = false;
+    /// Размер и форма кисти карандаша, затенения, ластика и узора (UX-38):
+    /// у оригинала они ставили одну точку, и стереть область можно было
+    /// только множеством мазков. Пиксель-перфект — только при размере 1.
+    int brushSize = 1;
+    bool brushRound = true;
+    /// Инструмент кладёт пятно кисти, а не точку.
+    [[nodiscard]] bool brushSized() const;
+    /// Клетки пятна кисти с точкой пути (x, y): квадрат или круг размера
+    /// brushSize, серединой в точке (у чётного — сдвиг к левому верху).
+    void forEachBrushCell(int x, int y, const std::function<void(int, int)>& fn) const;
     /// Выделение остаётся за своим документом при смене режима (UX-17): у
     /// оригинала Tab снимал выделение, и вернуться к нему было нельзя.
     bool keepSelectionPerDoc = false;
@@ -442,8 +461,18 @@ public:
     int docH() const;
     bool isModified() const;
     void markModified();
-    int tileToScreenX(int tx) const { return viewX + tx * pixelSize; }
-    int tileToScreenY(int ty) const { return viewY + ty * pixelSize; }
+    int tileToScreenX(int tx) const { return viewX + scr(tx); }
+    int tileToScreenY(int ty) const { return viewY + scr(ty); }
+    /// Длина n точек документа на экране.
+    int scr(int n) const { return zoomOut > 1 ? floorDiv(n, zoomOut) : n * pixelSize; }
+    /// То же для координаты в половинах точки (оси, направляющие).
+    int scr2(int n2) const { return zoomOut > 1 ? floorDiv(n2, 2 * zoomOut) : n2 * pixelSize / 2; }
+    /// Сторона одной точки документа на экране, не меньше точки экрана.
+    int cellPx() const { return zoomOut > 1 ? 1 : pixelSize; }
+    /// Точек экрана на точку документа.
+    double scale() const { return static_cast<double>(pixelSize) / zoomOut; }
+    /// Масштаб в процентах: 800 — восемь точек экрана на точку.
+    int zoomPercent() const { return zoomOut > 1 ? 100 / zoomOut : pixelSize * 100; }
     int screenToTileX(int sx) const;
     int screenToTileY(int sy) const;
     /// Единственная проверка границ, которой пользуются все операции.
@@ -453,6 +482,8 @@ public:
     void fitScale();
     /// Масштаб вокруг точки экрана: клетка под курсором остаётся на месте.
     void zoomAt(int dir, int ax, int ay);
+    /// Задать масштаб вокруг точки экрана (out — zoomOut).
+    void setZoom(int ps, int out, int ax, int ay);
     void resetSelection();
 
     // --- палитра и привязка ---
@@ -551,6 +582,8 @@ public:
     void pickSecondFromPalette(PalIndex idx);
     void pickColorFromTile(int x, int y);
     void swapColors();
+    /// Рабочие цвета — чёрный и белый, как при запуске (UX-27).
+    void resetColors();
 
     // --- геометрия панели ---
     int toolCount() const;
@@ -776,6 +809,11 @@ public:
     /// Положить вынутое в (px, py) и выделить его. Прозрачное не затирает
     /// того, что под ним, — как вставка оригинала.
     void placeFloating(const Grid<Color>& content, const Grid<std::uint8_t>& mask, int px, int py);
+    /// Сдвинуть выделенное на (dx, dy) — стрелками (план «Интерфейс», B13).
+    /// У тайла едут точки, как при протяжке выделения; у карты — только
+    /// рамка: протяжка выделения карты копирует, а не переносит. Шаг
+    /// истории — на вызывающем.
+    void nudgeSelection(int dx, int dy);
     /// Залить выделение или, без выделения, всю картинку (с отменой).
     void fillSelectionOrAll(Color c);
     /// Цвет пустого холста: прозрачный или белый оригинала.

@@ -67,15 +67,25 @@ void Editor::drawToolChips() {
         // инструмент, но не залит им: это режим, а не инструмент.
         const bool on = (c == 0 && !m.brushReplace) || (c == 1 && m.pixelPerfect);
         const bool over = mouseX() >= x0 && mouseX() < x1 && mouseY() >= y0 && mouseY() < y1;
-        fb_.fillRoundRect(x0, y0, x1, y1, 5, 5, on ? cAccent : cBorder);
-        fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 5, 5, (on || over) ? cHover : cBack);
+        if (active.modern) {
+            const int r = active.radius * 2;
+            if (on) {
+                fb_.fillRoundRect(x0, y0, x1, y1, r, r, active.accentContainer);
+            } else if (over) {
+                fb_.fillRoundRect(x0, y0, x1, y1, r, r, cHover);
+            }
+            fb_.strokeRoundRect(x0, y0, x1, y1, r, r, cBorder);
+        } else {
+            fb_.fillRoundRect(x0, y0, x1, y1, 5, 5, on ? cAccent : cBorder);
+            fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 5, 5, (on || over) ? cHover : cBack);
+        }
         std::string label;
         switch (c) {
             case 0: label = m.brushReplace ? "Зам." : "Смесь"; break;
             case 1: label = "ПП"; break;
             default: label = "…"; break;
         }
-        textCentered(x0, y0, x1, y1, label, cText);
+        textCentered(x0, y0, x1, y1, label, on && active.modern ? active.onAccentContainer : cText);
     }
 }
 
@@ -170,7 +180,7 @@ void Editor::definePolygonSelection(int ax, int ay, int op) {
         const int fx = m.tileToScreenX(pts.front().first);
         const int fy = m.tileToScreenY(pts.front().second);
         fb_.setClip(canvasRect());
-        fb_.frameRect(fx - 3, fy - 3, fx + m.pixelSize + 3, fy + m.pixelSize + 3, cAccent);
+        fb_.frameRect(fx - 3, fy - 3, fx + m.cellPx() + 3, fy + m.cellPx() + 3, cAccent);
         fb_.resetClip();
         redraw();
         if (frameClick_) {
@@ -237,7 +247,9 @@ void Editor::defineSelectionPro(int ax, int ay, int op) {
         repaintCanvasOnly();
     };
     update();
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = clampI(m.screenToTileX(mouseX()), 0, m.docW() - 1);
         const int ny = clampI(m.screenToTileY(mouseY()), 0, m.docH() - 1);
         if (nx != bx || ny != by) {
@@ -246,6 +258,8 @@ void Editor::defineSelectionPro(int ax, int ay, int op) {
             moved = true;
             pts.emplace_back(nx, ny);
             update();
+        } else if (scrolled) {
+            redraw();
         }
         idle();
     }
@@ -285,10 +299,12 @@ void Editor::moveSelectionPro(int mx, int my, bool copy) {
     m.selMask.clear();
     m.draggingSelection = true;
     repaintCanvasOnly();
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = m.screenToTileX(mouseX()) - offX;
         const int ny = m.screenToTileY(mouseY()) - offY;
-        if (nx != m.selX || ny != m.selY) {
+        if (scrolled || nx != m.selX || ny != m.selY) {
             m.selX = nx;
             m.selY = ny;
             repaintCanvasOnly();
@@ -375,80 +391,6 @@ void Editor::pasteBufferHere() {
     m.pasteAsSelection(tx, ty);
 }
 
-bool Editor::handleProCtrlKey(int key) {
-    if (m.docMode != DOC_TILE) return false;
-    // Модификаторы — того мига, когда клавишу нажали, а не нынешние.
-    const bool shift = lastKey_.shift;
-    switch (key) {
-        case KEY_T: showTilePickerScreen(); return true;
-        case KEY_E:
-            // Кисть из выделения (этап 9): сразу карандашом этого вида.
-            if (m.brushFromSelection()) {
-                m.setTool(T_PEN);
-                m.needRepaint = true;
-            } else {
-                showMessage("Кисть из выделения",
-                            "Выделите кусок активного слоя — он станет кистью карандаша.");
-            }
-            return true;
-        case KEY_A: m.selectAll(); return true;
-        case KEY_D:
-            if (shift) {
-                m.reselect();
-            } else {
-                m.deselect();
-            }
-            return true;
-        case KEY_I: m.invertSelection(); return true;
-        case KEY_C: m.copySelection(); return true;
-        case KEY_X: m.cutSelection(); return true;
-        case KEY_V: pasteBufferHere(); return true;
-        default: return false;
-    }
-}
-
-bool Editor::handleProKey(int key) {
-    if (m.docMode != DOC_TILE) return false;
-    if (lastKey_.ctrl && handleProCtrlKey(key)) return true;
-    const bool shift = lastKey_.shift;
-    switch (key) {
-        case KEY_V: pasteBufferHere(); return true;
-        case KEY_DELETE:
-            // На векторном слое Delete убирает последнюю тронутую фигуру.
-            if (m.activeKind() == LK_VECTOR) {
-                if (vecSel_ >= 0 && m.deleteVectorShape(vecSel_)) vecSel_ = -1;
-                return true;
-            }
-            // С выделением Delete стирает выделенное; без него — весь тайл.
-            if (!m.hasSelection) return false;
-            m.eraseSelection();
-            return true;
-        case KEY_Q:
-            m.pixelPerfect = !m.pixelPerfect;
-            m.needRepaint = true;
-            return true;
-        case KEY_O: showToolOptions(); return true;
-        case KEY_K:
-            // Shift+K — фильтры (этап 8): рядом с экраном изображения, но
-            // отдельно от пиксельных операций.
-            if (shift) {
-                showFiltersScreen();
-            } else {
-                showImageScreen();
-            }
-            return true;
-        case KEY_U: showPaletteScreen(); return true;
-        case KEY_LBRACKET:
-        case KEY_RBRACKET: {
-            const int n = img::ditherPatternCount();
-            m.ditherPattern = (m.ditherPattern + (key == KEY_RBRACKET ? 1 : n - 1)) % n;
-            m.needRepaint = true;
-            return true;
-        }
-        default: return false;
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Параметры инструментов
 // ---------------------------------------------------------------------------
@@ -485,11 +427,25 @@ void Editor::showToolOptions() {
         }
 
         // --- узоры ---
-        uiLabelLeft(LX, 186, 24, "Узор инструмента «Узор»  ([ и ] — листать)", cTextDim);
+        // Размер кисти (UX-38): строкой над узорами, сетка узоров ниже.
+        int patY = 186;
+        int patRow = 38;
+        if (active.modern) {
+            uiLabelLeft(LX, 186, 30, "Размер  [ ]", cText);
+            uiNumber(LX + 90, 186, 70, 30, m.brushSize, 1, 64, 1, 4);
+            if (uiToggle(LX + 168, 186, 76, 30, "Круг", m.brushRound)) m.brushRound = true;
+            if (uiToggle(LX + 250, 186, 80, 30, "Квадрат", !m.brushRound)) m.brushRound = false;
+            patY = 224;
+            patRow = 36;
+        }
+        uiLabelLeft(LX, patY, 24,
+                    classicUi_ ? "Узор инструмента «Узор»  ([ и ] — листать)"
+                               : "Узор инструмента «Узор»  (Shift+[ и ] — листать)",
+                    cTextDim);
         const int n = img::ditherPatternCount();
         for (int p = 0; p < n; ++p) {
             const int cx = LX + (p % 2) * 170;
-            const int cy = 212 + (p / 2) * 38;
+            const int cy = patY + 26 + (p / 2) * patRow;
             if (uiToggle(cx, cy, 160, 34, "", m.ditherPattern == p)) m.ditherPattern = p;
             // Образец узора первым и вторым цветом, по две точки экрана на точку.
             for (int py = 0; py < 12; ++py) {

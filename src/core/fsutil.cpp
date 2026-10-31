@@ -69,6 +69,25 @@ bool makeDirs(const std::string& path) {
     return dirExists(path);
 }
 
+bool removeFile(const std::string& path) {
+    std::error_code ec;
+    fs::remove(toPath(path), ec);
+    return !fileExists(path);
+}
+
+bool fileWritable(const std::string& path) {
+    // Дописывание ничего не меняет в файле, но откажет там, где писать
+    // нельзя: Program Files, /usr/bin, файл только для чтения.
+    const bool existed = fileExists(path);
+    bool ok = false;
+    {
+        std::ofstream f(toPath(path), std::ios::binary | std::ios::app);
+        ok = f.good();
+    }
+    if (ok && !existed) removeFile(path);
+    return ok;
+}
+
 bool isPathRooted(const std::string& p) {
     if (p.empty()) return false;
     if (isSep(p[0])) return true;

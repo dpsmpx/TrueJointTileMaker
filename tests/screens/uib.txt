@@ -1,0 +1,151 @@
+# Этап B плана «Интерфейс» (docs/roadmap.md): основа удобства. Светлая тема
+# (uib.config); меню при запуске закрывается.
+key Escape
+sleep 0.4
+# B2: подсказка через полсекунды над значком инструмента и кнопкой ленты.
+move 622 22
+sleep 0.8
+shot 01_tip_tool
+key j
+move 384 434
+sleep 0.8
+shot 02_tip_timeline
+key j
+move 300 280
+sleep 0.3
+# B3: рамка клетки под курсором — светлая в тёмной, видна на любом цвете.
+move 302 282
+sleep 0.2
+shot 03_cell_frame
+# B4: вопрос — карточкой над притушенным окном, картинку видно.
+key 1
+drag 150 150 300 150
+key ctrl+n
+sleep 0.3
+shot 04_card
+key Escape
+sleep 0.2
+# B5: новый тайл 200×120 — числа набираются с клавиатуры, фон — вторым
+# цветом (у 1.6 это стоило бы около тридцати щелчков по «+8»).
+key ctrl+n
+sleep 0.3
+click 390 312               # «Не сохранять»
+sleep 0.3
+click 300 179               # ширина: набрать
+key 2 0 0 Tab
+click 300 221               # высота
+key 1 2 0 Tab
+click 550 358               # фон — второй цвет
+move 700 558
+sleep 0.2
+shot 05_new_size
+key Return
+move 700 558
+sleep 0.3
+shot 06_new_tile
+# B6: ластик размера 3 — ] дважды; под курсором контур пятна.
+key 2 bracketright bracketright
+drag 120 200 480 200
+move 300 300
+sleep 0.2
+shot 07_brush
+# B7: запрет — уведомлением внизу холста, а не страницей во всё окно.
+key ctrl+d ctrl+e
+move 700 558
+sleep 0.2
+shot 08_toast
+# B7: ошибка — объяснение и следующий шаг, подробности по кнопке.
+key ctrl+o
+sleep 0.3
+click 390 312               # «Не сохранять»
+sleep 0.4
+shot 09_error
+key Escape
+sleep 0.2
+# B9: файл, брошенный в окно, открывается — с вопросом о несохранённом.
+drop Картинки/debug.png
+sleep 0.3
+click 390 312               # «Не сохранять»
+move 700 558
+sleep 0.3
+shot 10_dropped
+# B10: выбор цвета — HEX набирается, было и стало рядом. Сперва даём
+# догореть уведомлению шага B7.
+sleep 3
+key p
+sleep 0.3
+click 450 281               # поле HEX
+key ctrl+a
+type 3A7BD5
+key Return
+move 700 558
+sleep 0.2
+shot 11_color
+key Return
+sleep 0.2
+# B11: шпаргалка по F1 — из той же таблицы, что разбирает клавиши; поиск
+# и по делу, и по клавише.
+key F1
+sleep 0.3
+move 700 558
+sleep 0.2
+shot 12_keys
+click 630 35                # поле поиска
+type слой
+sleep 0.2
+shot 13_keys_find
+key Escape
+key Escape
+sleep 0.2
+# B12: масштаб ступенями; Ctrl+1 — 100 %, ступень вниз — 50 %, в сведениях
+# — проценты.
+key ctrl+1 minus
+move 700 558
+sleep 0.2
+shot 14_zoom_out
+key ctrl+0
+sleep 0.2
+# B13: стрелки по правилу владельца. Зажатая Ctrl+стрелка плавно везёт
+# холст; с инструментом выделения и выделением стрелки двигают выделенное;
+# протяжка к краю холста его прокручивает.
+key plus plus               # 1600 %: картинка больше холста
+keydown ctrl Right
+sleep 0.6
+keyup Right ctrl
+move 700 558
+sleep 0.2
+shot 15_arrow_pan
+key 9                       # выделение
+drag 100 100 200 180
+key Right Right Right shift+Down
+move 700 558
+sleep 0.2
+shot 16_nudge
+key ctrl+d
+move 300 300
+mousedown
+move 330 330
+move 330 552                # у нижнего края холста
+sleep 0.5
+mouseup
+move 700 558
+sleep 0.2
+shot 17_edge_scroll
+key ctrl+d ctrl+0
+sleep 0.2
+# B14: Tab по элементам карточки — рамка фокуса; стрелки в меню.
+key ctrl+n
+sleep 0.3
+key Tab Tab Tab
+move 700 558
+sleep 0.2
+shot 18_focus_tab
+key Escape
+sleep 0.2
+key Escape
+sleep 0.3
+key Down Down
+sleep 0.2
+shot 19_menu_arrows
+key Escape
+sleep 0.2

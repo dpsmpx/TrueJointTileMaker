@@ -29,6 +29,13 @@
 
 namespace tjtm {
 
+namespace {
+
+/// Автосохранение несохранённого — раз в две минуты.
+constexpr int kAutosaveMs = 2 * 60 * 1000;
+
+}  // namespace
+
 Editor::Editor() {
     m.drawTilePixel = [this](int x, int y) { drawTilePixel(x, y); };
     m.drawPreviewPixel = [this](int x, int y) { drawPreviewPixel(x, y); };
@@ -36,13 +43,14 @@ Editor::Editor() {
 
 void Editor::applyTheme() {
     // Сценарии оригинала сверяются с обликом 1.6 — «Классикой».
-    theme::active =
-        classicUi_ || cfg.theme == "классика" ? theme::classicTheme() : theme::lightTheme();
+    theme::active = classicUi_ ? theme::classicTheme() : theme::themeByName(cfg.theme);
     m.checkerA = theme::active.checkA;
     m.checkerB = theme::active.checkB;
     m.tileBmpDirty = true;
     m.overDirty = true;
     m.needRepaint = true;
+    // Значки перекрашиваются под тему при загрузке.
+    iconsDirty_ = true;
 }
 
 void Editor::syncTitle() {
@@ -97,6 +105,19 @@ bool Editor::appInit(int argc, char** argv) {
         return false;
     }
     configPath_ = resolvePath("Config.txt");
+    // Настройки — рядом с программой, если туда можно писать (переносной
+    // режим, как у оригинала); иначе — в папке пользователя (UX-24): из
+    // Program Files или /usr/bin они молча не сохранялись бы.
+    if (!classic && base.empty() && !fileWritable(configPath_)) {
+        const std::string pref = Platform::prefDir();
+        if (!pref.empty()) {
+            const std::string user = pathCombine(pref, "Config.txt");
+            if (!fileExists(user)) {
+                if (const auto def = readFile(configPath_)) writeFile(user, *def);
+            }
+            configPath_ = user;
+        }
+    }
     fb_.resize(WIN_W, WIN_H, theme::cWindow);
 
     if (!TTF_Init()) {
@@ -138,6 +159,7 @@ bool Editor::appInit(int argc, char** argv) {
     // Интерфейс 1.7 и дальше (docs/roadmap.md, «Интерфейс — план»).
     classicUi_ = classic;
     m.keepSelectionPerDoc = !classic;
+    m.zoomSteps = !classic;
     pf_.input().fineWheel = !classic;
     if (!classic) {
         m.undoBudget = std::int64_t{256} * 1024 * 1024;
@@ -186,6 +208,10 @@ bool Editor::appInit(int argc, char** argv) {
     ensureIcons();
     syncTitle();
     repaint();
+    autosaveMs_ = pf_.milliseconds();
+    // Работа, оставшаяся после сбоя, — вернуть, пока ничего не открыто
+    // поверх.
+    if (!classic && framesLeft_ < 0) offerRestore();
     if (framesLeft_ < 0) {
         if (cfg.showHelpOnStart) showHelpScreen();
         if (cfg.showMenuOnStart) showMainMenu();
@@ -197,13 +223,27 @@ bool Editor::appInit(int argc, char** argv) {
 void Editor::appStep() {
     // Снимок ввода — первым делом, до перерисовки: перерисовка бывает
     // долгой, и щелчок во время неё не должен пропасть.
-    beginFrameInput();
+    beginFrameInput(false);
+    editorTipFrame();
+    if (!classicUi_ && pf_.milliseconds() - autosaveMs_ >= kAutosaveMs) autosave();
+    if (!pf_.input().drops.empty()) {
+        const std::vector<std::string> drops = std::move(pf_.input().drops);
+        pf_.input().drops.clear();
+        if (!classicUi_) openDropped(drops.front(), isKeyPressed(KEY_SHIFT));
+    }
+    // Уведомление отслужило — стереть его полной перерисовкой.
+    if (!toastText_.empty() && pf_.milliseconds() >= toastUntil_) {
+        toastText_.clear();
+        m.needRepaint = true;
+    }
+    pf_.setCursor(cursorWanted());
 
     // Значки перечитываются здесь, а не там, где их правят: правка приходит
     // из экрана наборов, а он в это время сам занимает окно.
     ensureIcons();
     applyLayout();
     stepPlayback();
+    stepArrowPan();
     if (m.needRepaint) repaint();
     syncTitle();
 
@@ -270,9 +310,12 @@ void Editor::appStep() {
         lastStatX_ = tx;
         lastStatY_ = ty;
         if (!m.needRepaint) {
-            // Кисть из выделения (этап 9) идёт за курсором по холсту.
-            if (brushGhostShown() || ghostShown_) drawCanvas();
+            // Кисть из выделения (этап 9) и рамка клетки идут за курсором
+            // по холсту.
+            const bool frame = cellFrameShown();
+            if (brushGhostShown() || ghostShown_ || frame || cellFrameWas_) drawCanvas();
             ghostShown_ = brushGhostShown();
+            cellFrameWas_ = frame;
             drawInfoSection();
             // Метка курсора на линейках идёт за мышью.
             drawRulers();

@@ -200,6 +200,79 @@ void Surface::fillRoundRect(int x1, int y1, int x2, int y2, int rw, int rh, Colo
     }
 }
 
+void Surface::strokeRoundRect(int x1, int y1, int x2, int y2, int rw, int rh, Color c, int width) {
+    if (x1 > x2) std::swap(x1, x2);
+    if (y1 > y2) std::swap(y1, y2);
+    // Контур — как у fillRoundRect; кольцо — точки внутри него и вне
+    // такого же контура, сжатого на width.
+    struct Shape {
+        double l, t, r, b, a, bb;
+        [[nodiscard]] bool inside(double px, double py) const {
+            if (px < l || px > r || py < t || py > b) return false;
+            if (a <= 0 || bb <= 0) return true;
+            double cx = 0;
+            double cy = 0;
+            if (px < l + a) {
+                cx = l + a;
+            } else if (px > r - a) {
+                cx = r - a;
+            } else {
+                return true;
+            }
+            if (py < t + bb) {
+                cy = t + bb;
+            } else if (py > b - bb) {
+                cy = b - bb;
+            } else {
+                return true;
+            }
+            const double dx = (px - cx) / a;
+            const double dy = (py - cy) / bb;
+            return dx * dx + dy * dy <= 1.0;
+        }
+    };
+    const double L = x1;
+    const double T = y1;
+    const double R = x2 - 1;
+    const double B = y2 - 1;
+    if (R <= L || B <= T || width < 1) return;
+    const double a = std::min(rw / 2.0, (R - L) / 2.0);
+    const double bb = std::min(rh / 2.0, (B - T) / 2.0);
+    const Shape outer{L, T, R, B, a, bb};
+    const Shape inner{L + width,
+                      T + width,
+                      R - width,
+                      B - width,
+                      std::max(0.0, a - width),
+                      std::max(0.0, bb - width)};
+    const Rect bnd = bounds();
+    const int ix0 = std::max(x1, bnd.x0);
+    const int iy0 = std::max(y1, bnd.y0);
+    const int ix1 = std::min(x2 - 1, bnd.x1);
+    const int iy1 = std::min(y2 - 1, bnd.y1);
+    constexpr int kSub = 8;
+    for (int y = iy0; y < iy1; ++y) {
+        for (int x = ix0; x < ix1; ++x) {
+            // Середина без углов целиком внутри внутреннего контура.
+            if (x >= inner.l + inner.a && x + 1 <= inner.r - inner.a && y >= inner.t &&
+                y + 1 <= inner.b)
+                continue;
+            if (y >= inner.t + inner.bb && y + 1 <= inner.b - inner.bb && x >= inner.l &&
+                x + 1 <= inner.r)
+                continue;
+            int hit = 0;
+            for (int sy = 0; sy < kSub; ++sy) {
+                for (int sx = 0; sx < kSub; ++sx) {
+                    const double px = x + (sx + 0.5) / kSub;
+                    const double py = y + (sy + 0.5) / kSub;
+                    if (outer.inside(px, py) && !inner.inside(px, py)) ++hit;
+                }
+            }
+            if (hit > 0) blendPixelCoverage(x, y, c, hit * 255 / (kSub * kSub));
+        }
+    }
+}
+
 void Surface::line(int x1, int y1, int x2, int y2, Color c) {
     if (x1 == x2) {
         fillRect(x1, std::min(y1, y2), x1 + 1, std::max(y1, y2) + 1, c);

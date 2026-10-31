@@ -190,7 +190,7 @@ TEST_P(AppScreens, MatchOriginal) {
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
                                            "anim4", "prec5", "layers6", "game7", "fx8", "art9",
-                                           "map10", "uia"));
+                                           "map10", "uia", "uib"));
 
 /// Настройки выпуска (Config.txt в корне): при запуске — сразу редактор с
 /// последним файлом, без меню во всё окно (план «Интерфейс», A9).
@@ -227,6 +227,29 @@ TEST(AppScreens, ReleaseConfigOpensLastFile) {
     for (const tjtm::Color c : img.d)
         opaque += c.a == 255 ? 1 : 0;
     EXPECT_EQ(same, opaque) << "на холсте — последний файл, а не меню";
+    fs::remove_all(base);
+}
+
+/// Автосохранение (план «Интерфейс», B8): работа, оставшаяся в autosave
+/// после сбоя, при запуске возвращается по вопросу «Восстановить».
+TEST(AppScreens, AutosaveRestored) {
+    const fs::path base = makeBase("restore");
+    const tjtm::Color fill = tjtm::argb(255, 12, 200, 34);
+    {
+        tjtm::Model m;
+        m.setTile(tjtm::Grid<tjtm::Color>(16, 16, fill), "");
+        fs::create_directories(base / "autosave");
+        std::string err;
+        ASSERT_TRUE(tjtm::projectSave((base / "autosave" / "tile.tjt").string(), m, err)) << err;
+        std::ofstream info(base / "autosave" / "info.txt", std::ios::binary);
+        info << "tile = " << (base / "restored.png").string() << "\nmap = \n";
+    }
+    ASSERT_TRUE(runScenario("restore", base));
+    std::string err;
+    tjtm::Grid<tjtm::Color> shot;
+    ASSERT_TRUE(tjtm::pngLoad((base / "shots" / "01_restored.png").string(), shot, err)) << err;
+    EXPECT_EQ(shot.at(tjtm::CANVAS_W / 2, tjtm::CANVAS_H / 2).argb(), fill.argb())
+        << "на холсте — восстановленная работа";
     fs::remove_all(base);
 }
 

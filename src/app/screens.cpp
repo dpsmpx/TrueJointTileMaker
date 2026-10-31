@@ -81,8 +81,238 @@ std::string Editor::keysHint(const std::string& enter, const std::string& escape
     return s;
 }
 
+std::optional<Editor::CardBack> Editor::cardBackdrop() {
+    if (!active.modern) return std::nullopt;
+    CardBack b{fb_, fb_};
+    b.dim.fillRect(0, 0, WIN_W, WIN_H, active.scrim);
+    return b;
+}
+
+void Editor::endCard(const std::optional<CardBack>& backdrop) {
+    if (backdrop) fb_ = backdrop->orig;
+}
+
+void Editor::dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0, int x1, int y1) {
+    if (!backdrop) {
+        fb_.clear(cWindow);
+        return;
+    }
+    fb_ = backdrop->dim;
+    const int r = active.radius * 4;
+    fb_.fillRoundRect(x0, y0, x1, y1, r, r, cBorder);
+    fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 2, r - 2, cFace);
+}
+
+void Editor::notify(const std::string& title, const std::string& text) {
+    if (!active.modern) {
+        showMessage(title, text);
+        return;
+    }
+    toastTitle_ = title;
+    toastText_ = text;
+    toastUntil_ = pf_.milliseconds() + 4000;
+    m.needRepaint = true;
+}
+
+void Editor::drawToast() {
+    if (toastText_.empty()) return;
+    const std::vector<std::string> lines = layoutText({toastText_}, 460);
+    int w = textWidth(toastTitle_);
+    for (const std::string& l : lines)
+        w = std::max(w, textWidth(l));
+    w += 28;
+    const int lh = textHeight() + 2;
+    const int h = (static_cast<int>(lines.size()) + 1) * lh + 18;
+    // Внизу холста, над лентой кадров: там, куда смотрят после действия,
+    // и не поверх панели с инструментами.
+    const int x = std::max(8, (m.W - w) / 2);
+    const int y = m.H - h - 14;
+    fb_.fillRoundRect(x, y, x + w, y + h, 12, 12, active.inverseSurface);
+    textOut(x + 14, y + 8, toastTitle_, active.inverseOnSurface);
+    for (std::size_t i = 0; i < lines.size(); ++i)
+        textOut(x + 14, y + 10 + static_cast<int>(i + 1) * lh, lines[i], active.inverseOnSurface);
+}
+
+void Editor::showError(const std::string& title, const std::string& human,
+                       const std::string& details) {
+    if (!active.modern) {
+        showMessage(title, details.empty() ? human : details);
+        return;
+    }
+    constexpr int kW = 600;
+    const auto backdrop = cardBackdrop();
+    const int lh = textHeight() + 2;
+    bool more = false;
+    bool done = false;
+    dropInput();
+    pf_.input().keys.clear();
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        std::vector<std::string> lines = layoutText({human}, kW - 48);
+        std::vector<std::string> extra;
+        if (more) extra = layoutText({details}, kW - 48);
+        const int h =
+            116 + static_cast<int>(lines.size() + extra.size()) * lh + (extra.empty() ? 0 : 10);
+        const int x0 = (WIN_W - kW) / 2;
+        const int y0 = std::max(8, (WIN_H - h) / 2);
+        dialogBack(backdrop, x0, y0, x0 + kW, y0 + h);
+        textCentered(x0, y0 + 12, x0 + kW, y0 + 40, title, cWarn);
+        int y = y0 + 48;
+        for (const std::string& l : lines) {
+            textOut(x0 + 24, y, l, cText);
+            y += lh;
+        }
+        if (!extra.empty()) {
+            y += 10;
+            for (const std::string& l : extra) {
+                textOut(x0 + 24, y, l, cTextDim);
+                y += lh;
+            }
+        }
+        if (!details.empty() &&
+            uiButton(x0 + 24, y0 + h - 52, 150, 34, more ? "Скрыть" : "Подробнее", true))
+            more = !more;
+        if (uiPrimary(x0 + kW - 174, y0 + h - 52, 150, 34, "Закрыть", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC || key == KEY_ENTER) done = true;
+        idle();
+    }
+    waitMouseRelease();
+    endCard(backdrop);
+    m.needRepaint = true;
+}
+
+void Editor::errorOpen(const std::string& title, const std::string& details) {
+    showError(title,
+              "Файл не открылся: его нет на прежнем месте, это не картинка, которую редактор "
+              "читает (PNG, GIF, APNG, BMP, TIFF, JPEG, проект .tjt, карта .map), или он "
+              "повреждён. Проверьте путь или откройте другой файл (Ctrl+O).",
+              details);
+}
+
+void Editor::errorSave(const std::string& title, const std::string& details) {
+    showError(title,
+              "Записать не удалось: папка защищена от записи, диск заполнен или файл занят "
+              "другой программой. Сохраните в другую папку через «Сохранить как» "
+              "(Ctrl+Shift+S).",
+              details);
+}
+
 void Editor::showMessage(const std::string& title, const std::string& text) {
-    showTextScreen(title, {text});
+    // Сообщение в несколько строк — карточкой над окном, как вопрос:
+    // страница во всё окно ради одной строки теряла картинку (UX-45).
+    constexpr int kW = 560;
+    const std::vector<std::string> lines = layoutText({text}, kW - 48);
+    if (!active.modern || lines.size() > 12) {
+        showTextScreen(title, {text});
+        return;
+    }
+    const auto backdrop = cardBackdrop();
+    const int lh = textHeight() + 2;
+    const int h = 112 + static_cast<int>(lines.size()) * lh;
+    const int x0 = (WIN_W - kW) / 2;
+    const int y0 = (WIN_H - h) / 2;
+    bool done = false;
+    dropInput();
+    pf_.input().keys.clear();
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        dialogBack(backdrop, x0, y0, x0 + kW, y0 + h);
+        textCentered(x0, y0 + 12, x0 + kW, y0 + 40, title, cText);
+        for (std::size_t i = 0; i < lines.size(); ++i)
+            textOut(x0 + 24, y0 + 48 + static_cast<int>(i) * lh, lines[i], cText);
+        if (uiPrimary(x0 + kW / 2 - 70, y0 + h - 50, 140, 34, "Закрыть", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC || key == KEY_ENTER || key == KEY_BACK) done = true;
+        idle();
+    }
+    waitMouseRelease();
+    endCard(backdrop);
+    m.needRepaint = true;
+}
+
+/// Новый документ карточкой (UX-26): у 1.6 число набиралось только кнопками
+/// ±1 и ±8 — тайл 200×120 из 32×32 стоил около тридцати щелчков, — размеры
+/// были только квадратными, а фон — только белым или прозрачным по
+/// настройке.
+bool Editor::askNewSizeCard(const std::string& title, int& nw, int& nh, int lo, int hi,
+                            int* background) {
+    static constexpr int kSizes[][2] = {{16, 16}, {16, 32},   {32, 32},  {48, 48},
+                                        {64, 64}, {128, 128}, {256, 256}};
+    static const char* const kBg[] = {"Прозрачный", "Белый", "Второй цвет"};
+    const auto backdrop = cardBackdrop();
+    const int h = background != nullptr ? 380 : 300;
+    const int x0 = (WIN_W - 600) / 2;
+    const int y0 = (WIN_H - h) / 2;
+    bool lock = false;
+    int ratioW = nw;
+    int ratioH = nh;
+    bool done = false;
+    bool ok = false;
+    dropInput();
+    pf_.input().keys.clear();
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        dialogBack(backdrop, x0, y0, x0 + 600, y0 + h);
+        textCentered(x0, y0 + 12, x0 + 600, y0 + 40, title, cText);
+        uiLabel(x0, y0 + 38, 600, 20,
+                "Размер от " + std::to_string(lo) + " до " + std::to_string(hi) + " точек",
+                cTextDim);
+        const int pw = nw;
+        const int ph = nh;
+        uiLabelLeft(x0 + 40, y0 + 72, 34, "Ширина", cText);
+        uiNumber(x0 + 140, y0 + 72, 140, 34, nw, lo, hi, 1, 8);
+        uiLabelLeft(x0 + 40, y0 + 114, 34, "Высота", cText);
+        uiNumber(x0 + 140, y0 + 114, 140, 34, nh, lo, hi, 1, 8);
+        // Замок пропорций: вторая сторона идёт за первой.
+        if (uiSwitch(x0 + 320, y0 + 92, 240, "Сохранять пропорции", lock) && lock) {
+            ratioW = nw;
+            ratioH = nh;
+        }
+        if (lock && nw != pw) nh = clampI((nw * ratioH + ratioW / 2) / ratioW, lo, hi);
+        if (lock && nh != ph && nw == pw) nw = clampI((nh * ratioW + ratioH / 2) / ratioH, lo, hi);
+
+        uiLabelLeft(x0 + 24, y0 + 158, 20, "Готовые размеры", cTextDim);
+        for (int i = 0; i < static_cast<int>(std::size(kSizes)); ++i) {
+            const int sw = kSizes[i][0];
+            const int sh = kSizes[i][1];
+            if (sw > hi || sh > hi) continue;
+            const bool cur = nw == sw && nh == sh;
+            if (uiToggle(x0 + 24 + i * 79, y0 + 182, 73, 30,
+                         std::to_string(sw) + "×" + std::to_string(sh), cur)) {
+                nw = sw;
+                nh = sh;
+                ratioW = sw;
+                ratioH = sh;
+            }
+        }
+        if (background != nullptr) {
+            uiLabelLeft(x0 + 24, y0 + 228, 20, "Фон", cTextDim);
+            for (int i = 0; i < 3; ++i) {
+                if (uiToggle(x0 + 24 + i * 186, y0 + 252, 180, 32, kBg[i], *background == i))
+                    *background = i;
+            }
+        }
+        if (uiPrimary(x0 + 300 - 180, y0 + h - 56, 170, 36, "Создать", true)) {
+            ok = true;
+            done = true;
+        }
+        if (uiButton(x0 + 310, y0 + h - 56, 170, 36, "Отмена", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC) done = true;
+        if (key == KEY_ENTER) {
+            ok = true;
+            done = true;
+        }
+        idle();
+    }
+    waitMouseRelease();
+    endCard(backdrop);
+    m.needRepaint = true;
+    return ok;
 }
 
 /// Вопрос с тремя вариантами: 1 — да, 0 — нет, -1 — отмена.
@@ -90,15 +320,18 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
                  const std::string& no, const std::string& cancel) {
     int res = -1;
     bool done = false;
+    const auto backdrop = cardBackdrop();
     dropInput();
     pf_.input().keys.clear();
     const int H = WIN_H;
+    // На карточке текст — в её ширину, на странице — почти во всё окно.
+    const int tx = backdrop ? WIN_W / 2 - 280 : 40;
     while (!done && !quitNow_) {
         beginFrameInput();
-        fb_.clear(cWindow);
+        dialogBack(backdrop, WIN_W / 2 - 300, H / 2 - 104, WIN_W / 2 + 300, H / 2 + 104);
         textCentered(0, H / 2 - 90, WIN_W, H / 2 - 50, title, cText);
-        textCentered(40, H / 2 - 46, WIN_W - 40, H / 2 + 10, text, cText);
-        if (uiButton(WIN_W / 2 - 270, H / 2 + 30, 170, 34, yes, true)) {
+        textCentered(tx, H / 2 - 46, WIN_W - tx, H / 2 + 10, text, cText);
+        if (uiPrimary(WIN_W / 2 - 270, H / 2 + 30, 170, 34, yes, true)) {
             res = 1;
             done = true;
         }
@@ -125,6 +358,7 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
         idle();
     }
     waitMouseRelease();
+    endCard(backdrop);
     m.needRepaint = true;
     return res;
 }
@@ -134,15 +368,17 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
                       const std::string& no) {
     bool res = false;
     bool done = false;
+    const auto backdrop = cardBackdrop();
     dropInput();
     pf_.input().keys.clear();
     const int H = WIN_H;
+    const int tx = backdrop ? WIN_W / 2 - 230 : 40;
     while (!done && !quitNow_) {
         beginFrameInput();
-        fb_.clear(cWindow);
+        dialogBack(backdrop, WIN_W / 2 - 250, H / 2 - 104, WIN_W / 2 + 250, H / 2 + 104);
         textCentered(0, H / 2 - 90, WIN_W, H / 2 - 50, title, cText);
-        textCentered(40, H / 2 - 46, WIN_W - 40, H / 2 + 10, text, cText);
-        if (uiButton(WIN_W / 2 - 180, H / 2 + 30, 170, 34, yes, true)) {
+        textCentered(tx, H / 2 - 46, WIN_W - tx, H / 2 + 10, text, cText);
+        if (uiPrimary(WIN_W / 2 - 180, H / 2 + 30, 170, 34, yes, true)) {
             res = true;
             done = true;
         }
@@ -164,6 +400,7 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
         idle();
     }
     waitMouseRelease();
+    endCard(backdrop);
     m.needRepaint = true;
     return res;
 }
@@ -171,12 +408,14 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
 /// Экран размера нового документа. Оригинал звал его и для карты — с
 /// заголовком «Создать новый тайл» и пределами тайла 4..512, хотя карта
 /// не бывает больше 256; здесь у каждого режима свои заголовок и пределы.
-bool Editor::askNewSize(const std::string& title, int& nw, int& nh, int lo, int hi) {
+bool Editor::askNewSize(const std::string& title, int& nw, int& nh, int lo, int hi,
+                        int* background) {
     static const int kPresets[] = {8, 16, 32, 64, 128, 256};
     nw = clampI(nw, lo, hi);
     nh = clampI(nh, lo, hi);
     bool done = false;
     bool ok = false;
+    if (active.modern) return askNewSizeCard(title, nw, nh, lo, hi, background);
     dropInput();
     pf_.input().keys.clear();
 
@@ -235,6 +474,10 @@ bool Editor::askNewSize(const std::string& title, int& nw, int& nh, int lo, int 
 /// Точная настройка цвета по каналам ARGB. Положение ползунка и разбор
 /// щелчка — одна пара формул: маркер встаёт ровно под курсор.
 void Editor::showColorScreen() {
+    if (active.modern) {
+        showColorPicker();
+        return;
+    }
     constexpr int SX0 = 70;
     constexpr int SX1 = WIN_W - 70;
     auto valueToX = [](int v) {
@@ -381,6 +624,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
                      const std::string& initial, std::string& value) {
     bool done = false;
     bool ok = false;
+    const auto backdrop = cardBackdrop();
     dropInput();
     pf_.input().keys.clear();
     pf_.input().presses.clear();
@@ -456,7 +700,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
         if (cx - tf.scroll > inner) tf.scroll = cx - inner;
         if (cx - tf.scroll < 0) tf.scroll = cx;
 
-        fb_.clear(cWindow);
+        dialogBack(backdrop, fx - 24, fy - 120, fx + fw + 24, fy + 110);
         textCentered(0, fy - 110, WIN_W, fy - 74, title, cText);
         uiLabel(0, fy - 70, WIN_W, 24, prompt, cTextDim);
         uiLabel(0, fy + 34, WIN_W, 20,
@@ -476,7 +720,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
             fb_.fillRect(tx + cx, ty, tx + cx + 1, ty + mono_.textHeight(), cText);
         fb_.resetClip();
 
-        if (uiButton(WIN_W / 2 - 180, fy + 60, 170, 36, "Готово", true)) {
+        if (uiPrimary(WIN_W / 2 - 180, fy + 60, 170, 36, "Готово", true)) {
             ok = true;
             done = true;
         }
@@ -487,6 +731,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
     pf_.stopTextInput();
     if (ok) value = u32ToUtf8(tf.text);
     waitMouseRelease();
+    endCard(backdrop);
     m.needRepaint = true;
     return ok;
 }
@@ -523,7 +768,7 @@ void Editor::showColorOpsScreen() {
             const int n = m.replaceColorEverywhere(m.secondColor, m.firstColor);
             m.needRepaint = true;
             done = true;
-            showMessage("Замена цвета", "Заменено пикселей: " + std::to_string(n) + ".");
+            notify("Замена цвета", "Заменено пикселей: " + std::to_string(n) + ".");
         }
         y += stp;
         if (uiButton(bx, y, bw, bh, "Свести тайл к цветам палитры", true)) {
@@ -643,20 +888,37 @@ void Editor::showMapPropertiesScreen() {
 
         int y = 110;
         uiLabelLeft(bx, y, 30, "Название", cText);
-        fb_.fillRoundRect(bx + 160, y, WIN_W - 220, y + 30, 4, 4, cFace);
-        uiLabelLeft(bx + 168, y, 30, fitText(m.map.name, WIN_W - 400), cText);
-        if (uiButton(WIN_W - 210, y, 150, 30, "Изменить", true)) {
+        if (active.modern) {
+            // Название правится на месте, а не отдельным экраном (UX-28).
             std::string nm = m.map.name;
-            if (askText("Название локации", "Строка name в файле карты", nm, nm)) {
+            if (uiTextLine(bx + 160, y, WIN_W - bx - 220, 30, nm)) {
                 m.pushUndo();
                 m.map.name = netTrim(nm);
+            }
+        } else {
+            fb_.fillRoundRect(bx + 160, y, WIN_W - 220, y + 30, 4, 4, cFace);
+            uiLabelLeft(bx + 168, y, 30, fitText(m.map.name, WIN_W - 400), cText);
+            if (uiButton(WIN_W - 210, y, 150, 30, "Изменить", true)) {
+                std::string nm = m.map.name;
+                if (askText("Название локации", "Строка name в файле карты", nm, nm)) {
+                    m.pushUndo();
+                    m.map.name = netTrim(nm);
+                }
             }
         }
 
         y += 56;
-        sizeRow(y, "Ширина", nw);
-        y += 42;
-        sizeRow(y, "Высота", nh);
+        if (active.modern) {
+            uiLabelLeft(bx, y, 30, "Размер", cText);
+            uiNumber(bx + 160, y, 110, 30, nw, kMapMinSide, kMapMaxSide, 1, 8);
+            uiLabel(bx + 270, y, 30, 30, "×", cTextDim);
+            uiNumber(bx + 300, y, 110, 30, nh, kMapMinSide, kMapMaxSide, 1, 8);
+            y += 42;
+        } else {
+            sizeRow(y, "Ширина", nw);
+            y += 42;
+            sizeRow(y, "Высота", nh);
+        }
         nw = clampI(nw, kMapMinSide, kMapMaxSide);
         nh = clampI(nh, kMapMinSide, kMapMaxSide);
 

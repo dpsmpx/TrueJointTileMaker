@@ -106,6 +106,10 @@ bool Platform::init(const std::string& title, int w, int h, std::string& error) 
 }
 
 void Platform::shutdown() {
+    for (SDL_Cursor*& c : cursors_) {
+        if (c != nullptr) SDL_DestroyCursor(c);
+        c = nullptr;
+    }
     if (texture_ != nullptr) SDL_DestroyTexture(texture_);
     if (renderer_ != nullptr) SDL_DestroyRenderer(renderer_);
     if (window_ != nullptr) SDL_DestroyWindow(window_);
@@ -113,6 +117,25 @@ void Platform::shutdown() {
     renderer_ = nullptr;
     if (window_ != nullptr || SDL_WasInit(SDL_INIT_VIDEO) != 0) SDL_Quit();
     window_ = nullptr;
+}
+
+std::string Platform::prefDir() {
+    char* p = SDL_GetPrefPath("dpsmpx", "TrueJointTileMaker");
+    std::string s = p != nullptr ? p : "";
+    SDL_free(p);
+    return s;
+}
+
+void Platform::setCursor(Cursor c) {
+    if (c == cursor_ || window_ == nullptr) return;
+    cursor_ = c;
+    static constexpr SDL_SystemCursor kSystem[CURSOR_COUNT] = {
+        SDL_SYSTEM_CURSOR_DEFAULT, SDL_SYSTEM_CURSOR_CROSSHAIR, SDL_SYSTEM_CURSOR_MOVE,
+        SDL_SYSTEM_CURSOR_NOT_ALLOWED};
+    SDL_Cursor*& slot = cursors_[static_cast<std::size_t>(c)];
+    if (slot == nullptr) slot = SDL_CreateSystemCursor(kSystem[c]);
+    // Без своего курсора (бывает без экрана) остаётся прежний.
+    if (slot != nullptr) SDL_SetCursor(slot);
 }
 
 void Platform::setTitle(const std::string& title) {
@@ -185,7 +208,7 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
             in_.keyHeld[static_cast<std::size_t>(vk)] = true;
             const SDL_Keymod mod = e.key.mod;
             const KeyPress kp{vk, (mod & SDL_KMOD_SHIFT) != 0, (mod & SDL_KMOD_CTRL) != 0,
-                              (mod & SDL_KMOD_ALT) != 0};
+                              (mod & SDL_KMOD_ALT) != 0, e.key.repeat};
             in_.keys.push_back(kp);
             in_.presses.push_back(kp);
             // Очередь ограничена: если программа долго не разбирала ввод,
@@ -203,6 +226,9 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
         }
         case SDL_EVENT_TEXT_INPUT:
             if (textInputOn_ && e.text.text != nullptr) in_.text += e.text.text;
+            break;
+        case SDL_EVENT_DROP_FILE:
+            if (e.drop.data != nullptr) in_.drops.emplace_back(e.drop.data);
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             // Отпускание после ухода фокуса придёт уже не нам: клавиши
@@ -284,6 +310,10 @@ void Platform::scriptStep() {
                 e.type = SDL_EVENT_TEXT_INPUT;
                 e.text.text = se.text.c_str();
                 break;
+            case ScriptEvent::DROP:
+                e.type = SDL_EVENT_DROP_FILE;
+                e.drop.data = se.text.c_str();
+                break;
         }
         handle(e, false);
     }
@@ -339,8 +369,8 @@ bool Platform::scriptedDialog(std::string& answer) {
 std::string Platform::runDialog(int kind, const std::string& title,
                                 const std::vector<FileFilter>& filters,
                                 const std::string& location) {
-    std::string scripted;
-    if (scriptedDialog(scripted)) return scripted;
+    std::string answer;
+    if (scriptedDialog(answer)) return answer;
 
     std::vector<SDL_DialogFileFilter> f;
     f.reserve(filters.size());
@@ -390,6 +420,41 @@ std::string Platform::saveFileDialog(const std::string& title,
 std::string Platform::openFolderDialog(const std::string& title, const std::string& folder) {
     return runDialog(SDL_FILEDIALOG_OPENFOLDER, title, {},
                      dirExists(folder) ? folder : std::string());
+}
+
+namespace {
+
+// Подпись задана SDL (SDL_ClipboardDataCallback): userdata без const.
+// cppcheck-suppress constParameterCallback
+const void* SDLCALL clipboardImageData(void* userdata, const char* mime, std::size_t* size) {
+    const auto* png = static_cast<const std::vector<std::uint8_t>*>(userdata);
+    if (mime == nullptr || std::string_view(mime) != "image/png" || png->empty()) {
+        *size = 0;
+        return nullptr;
+    }
+    *size = png->size();
+    return png->data();
+}
+
+}  // namespace
+
+void Platform::setClipboardImage(std::vector<std::uint8_t> png) {
+    clipPng_ = std::move(png);
+    const char* mimes[] = {"image/png"};
+    SDL_SetClipboardData(clipboardImageData, nullptr, &clipPng_, mimes, 1);
+}
+
+std::vector<std::uint8_t> Platform::clipboardImage() const {
+    std::vector<std::uint8_t> out;
+    if (!SDL_HasClipboardData("image/png")) return out;
+    std::size_t n = 0;
+    void* p = SDL_GetClipboardData("image/png", &n);
+    if (p != nullptr) {
+        const auto* b = static_cast<const std::uint8_t*>(p);
+        out.assign(b, b + n);
+        SDL_free(p);
+    }
+    return out;
 }
 
 std::string Platform::clipboardText() const {

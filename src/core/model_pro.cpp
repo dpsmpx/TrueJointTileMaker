@@ -319,6 +319,25 @@ void Model::placeFloating(const Grid<Color>& content, const Grid<std::uint8_t>& 
     floatSel = selectionMask();
 }
 
+void Model::nudgeSelection(int dx, int dy) {
+    if (!hasSelection || selW <= 0 || selH <= 0) return;
+    if (docMode == DOC_MAP) {
+        selX = clampI(selX + dx, 0, std::max(0, docW() - selW));
+        selY = clampI(selY + dy, 0, std::max(0, docH() - selH));
+        needRepaint = true;
+        return;
+    }
+    // Вынутое только что положенным возвращает картинку под ним: кусок
+    // можно гонять стрелками туда и обратно, ничего не стирая.
+    const int x = selX + dx;
+    const int y = selY + dy;
+    Grid<Color> content;
+    Grid<std::uint8_t> mask;
+    liftSelection(true, content, mask);
+    placeFloating(content, mask, x, y);
+    needRepaint = true;
+}
+
 /// Плавное преобразование (этап 8) дало новые цвета: номера палитры — по
 /// итогу, в строгом индексном режиме итог сводится к палитре.
 static void smoothIndices(const Model& m, Grid<Color>& img, Grid<PalIndex>& idx) {

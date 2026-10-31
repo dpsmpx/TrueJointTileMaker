@@ -14,6 +14,51 @@ namespace tjtm {
 
 using namespace theme;
 
+void Editor::edgeScrollBegin() {
+    edgeStartX_ = mouseX();
+    edgeStartY_ = mouseY();
+    edgeArmed_ = false;
+}
+
+bool Editor::edgeScroll() {
+    if (classicUi_) return false;
+    if (!edgeArmed_) {
+        if (std::abs(mouseX() - edgeStartX_) + std::abs(mouseY() - edgeStartY_) < 4) return false;
+        edgeArmed_ = true;
+    }
+    // Полоса у края холста: чем глубже в ней курсор или чем дальше за
+    // краем, тем быстрее едет холст.
+    constexpr int kBand = 16;
+    auto speed = [](int depth) { return std::clamp(depth / 2, 1, 24); };
+    const int mx = mouseX();
+    const int my = mouseY();
+    int dx = 0;
+    int dy = 0;
+    if (mx < m.X0 + kBand) {
+        dx = speed(m.X0 + kBand - mx);
+    } else if (mx >= m.W - kBand) {
+        dx = -speed(mx - (m.W - kBand) + 1);
+    }
+    if (my < m.Y0 + kBand) {
+        dy = speed(m.Y0 + kBand - my);
+    } else if (my >= m.H - kBand) {
+        dy = -speed(my - (m.H - kBand) + 1);
+    }
+    if (dx == 0 && dy == 0) return false;
+    const int vx = m.viewX;
+    const int vy = m.viewY;
+    m.viewX += dx;
+    m.viewY += dy;
+    m.clampView();
+    if (m.viewX == vx && m.viewY == vy) return false;
+    // Мазок пишет точки прямо в кадр, мимо картинки холста: перед
+    // перерисовкой её нужно собрать заново, иначе мазок пропадёт.
+    m.tileBmpDirty = true;
+    drawCanvas();
+    drawOverviewSection();
+    return true;
+}
+
 /// Мазок кистью. Промежуточные точки достраиваются отрезком: при быстром
 /// движении мыши в линии не остаётся пропусков.
 void Editor::doPaintStroke(int startX, int startY) {
@@ -28,7 +73,9 @@ void Editor::doPaintStroke(int startX, int startY) {
     } else {
         redraw();
     }
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int mx = m.screenToTileX(mouseX());
         const int my = m.screenToTileY(mouseY());
         if (mx != lastX || my != lastY) {
@@ -40,6 +87,8 @@ void Editor::doPaintStroke(int startX, int startY) {
             } else {
                 redraw();
             }
+        } else if (scrolled) {
+            redraw();
         }
         idle();
     }
@@ -69,11 +118,13 @@ void Editor::emitShape(int ax, int ay, int bx, int by) {
 void Editor::doShapeTool(int ax, int ay) {
     int bx = ax;
     int by = ay;
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         int nx = m.screenToTileX(mouseX());
         int ny = m.screenToTileY(mouseY());
         if (isKeyPressed(KEY_SHIFT)) Model::squarifyTo(ax, ay, nx, ny);
-        if (nx != bx || ny != by) {
+        if (scrolled || nx != bx || ny != by) {
             bx = nx;
             by = ny;
             drawCanvas();
@@ -102,10 +153,12 @@ void Editor::defineSelection(int ax, int ay) {
     m.selY = ay;
     m.selW = 1;
     m.selH = 1;
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = clampI(m.screenToTileX(mouseX()), 0, m.docW() - 1);
         const int ny = clampI(m.screenToTileY(mouseY()), 0, m.docH() - 1);
-        if (nx != bx || ny != by) {
+        if (scrolled || nx != bx || ny != by) {
             bx = nx;
             by = ny;
             m.selX = std::min(ax, bx);
@@ -137,10 +190,12 @@ void Editor::dragSelection(int mx, int my) {
     const int offX = mx - m.selX;
     const int offY = my - m.selY;
     m.draggingSelection = true;
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = m.screenToTileX(mouseX()) - offX;
         const int ny = m.screenToTileY(mouseY()) - offY;
-        if (nx != m.selX || ny != m.selY) {
+        if (scrolled || nx != m.selX || ny != m.selY) {
             m.selX = nx;
             m.selY = ny;
             repaintCanvasOnly();
@@ -175,10 +230,13 @@ void Editor::doSelectTool(int mx, int my) {
 /// Перетаскивание объекта карты на новую клетку.
 void Editor::dragObject(int idx) {
     bool moved = false;
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = clampI(m.screenToTileX(mouseX()), 0, m.map.w - 1);
         const int ny = clampI(m.screenToTileY(mouseY()), 0, m.map.h - 1);
         MapObject& o = m.map.objects[static_cast<std::size_t>(idx)];
+        if (scrolled && nx == o.x && ny == o.y) redraw();
         if (nx != o.x || ny != o.y) {
             if (!moved) {
                 m.pushUndo();
@@ -224,6 +282,7 @@ void Editor::doMiddleDrag() {
     while (mousePressed() && !quitNow_) {
         if (std::abs(mouseX() - sx) > 2 || std::abs(mouseY() - sy) > 2) moved = true;
         if (moved) {
+            if (!classicUi_) pf_.setCursor(Platform::CURSOR_MOVE);
             m.viewX = vx + (mouseX() - sx);
             m.viewY = vy + (mouseY() - sy);
             m.clampView();
@@ -244,6 +303,7 @@ void Editor::doMiddleDrag() {
 /// без протяжки вписывает и теперь.
 void Editor::spaceHand() {
     bool used = false;
+    pf_.setCursor(Platform::CURSOR_MOVE);
     while (isKeyPressed(KEY_SPACE) && !quitNow_) {
         if (mousePressed()) {
             used = true;
@@ -393,23 +453,23 @@ void Editor::handleCanvasClick() {
         return;
     }
     if (kind == LK_GROUP) {
-        showMessage("Это группа",
-                    "Группа сама не рисуется: выберите слой внутри неё на ленте кадров (J).");
+        notify("Это группа",
+               "Группа сама не рисуется: выберите слой внутри неё на ленте кадров (J).");
         return;
     }
     if (kind == LK_REFERENCE && m.toolTile != T_SELECT) {
-        showMessage("Слой-образец",
-                    "Образец — подложка для срисовки: на нём не рисуют, и в выгрузку он не "
-                    "попадает. Выберите слой рисунка на ленте кадров (J) или клавишами PgUp и "
-                    "PgDn.");
+        notify("Слой-образец",
+               "Образец — подложка для срисовки: на нём не рисуют, и в выгрузку он не "
+               "попадает. Выберите слой рисунка на ленте кадров (J) или клавишами PgUp и "
+               "PgDn.");
         return;
     }
     const bool shapeTool = m.toolTile == T_LINE || m.toolTile == T_RECT || m.toolTile == T_ELLIPSE;
     if (kind == LK_VECTOR && !shapeTool) {
-        showMessage("Векторный слой",
-                    "На векторном слое рисуют линией, прямоугольником и овалом — фигуры "
-                    "остаются правимыми. Чтобы рисовать точками, растрируйте слой на экране "
-                    "слоёв и кадров.");
+        notify("Векторный слой",
+               "На векторном слое рисуют линией, прямоугольником и овалом — фигуры "
+               "остаются правимыми. Чтобы рисовать точками, растрируйте слой на экране "
+               "слоёв и кадров.");
         return;
     }
     // По скрытому или запертому слою кисть ничего не меняет: лучше сказать
@@ -417,12 +477,11 @@ void Editor::handleCanvasClick() {
     if (m.toolTile != T_SELECT && !m.activeLayerEditable()) {
         const Layer& l = m.doc.layers[static_cast<std::size_t>(m.activeLayer)];
         const bool own = l.locked || !l.visible;
-        showMessage(m.layerLockedDeep(m.activeLayer) ? "Слой заперт" : "Слой скрыт",
-                    "Слой «" + l.name + "» " +
-                        (m.layerLockedDeep(m.activeLayer) ? "заперт" : "скрыт") +
-                        (own ? "" : " вместе со своей группой") +
-                        ": рисунок на нём не меняется. Щёлкните по замку или глазу на ленте "
-                        "кадров (клавиша J).");
+        notify(m.layerLockedDeep(m.activeLayer) ? "Слой заперт" : "Слой скрыт",
+               "Слой «" + l.name + "» " + (m.layerLockedDeep(m.activeLayer) ? "заперт" : "скрыт") +
+                   (own ? "" : " вместе со своей группой") +
+                   ": рисунок на нём не меняется. Щёлкните по замку или глазу на ленте "
+                   "кадров (клавиша J).");
         return;
     }
     switch (m.toolTile) {
@@ -645,212 +704,6 @@ void Editor::handlePanelClick() {
         } else {
             dragAlphaBar();
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Клавиатура
-// ---------------------------------------------------------------------------
-
-void Editor::handleModifiedKey(int key) {
-    const bool tile = m.docMode == DOC_TILE;
-    if (!lastKey_.ctrl || lastKey_.alt) return;
-    // Файл, отмена и поиск — по общим правилам настольных программ.
-    switch (key) {
-        case KEY_N: commandNew(); return;
-        case KEY_O: commandOpen(); return;
-        case KEY_S:
-            if (lastKey_.shift) {
-                commandSaveAs();
-            } else {
-                commandSave();
-            }
-            return;
-        case KEY_Z:
-            if (lastKey_.shift) {
-                m.doRedo();
-            } else {
-                m.doUndo();
-            }
-            return;
-        case KEY_Y: m.doRedo(); return;
-        case KEY_0:
-            m.fitScale();
-            m.needRepaint = true;
-            return;
-        case KEY_F:
-            if (!tile) showMapFindScreen();
-            return;
-        case KEY_B:
-            // К следующему месту местности тайла на карте (этап 7).
-            ++mapCtxIndex_;
-            m.needRepaint = true;
-            return;
-        default: break;
-    }
-    if (handleGuideKey(key)) return;
-    handleProCtrlKey(key);
-}
-
-void Editor::handleEditorKey(int key) {
-    // У оригинала Ctrl с буквой разбирался как сама буква: Ctrl+O открывал
-    // параметры, Ctrl+Shift+Z был ещё одной отменой, Ctrl+F на тайле
-    // включал ось симметрии (UX-16). Теперь у Ctrl и Alt — своя таблица.
-    if (!classicUi_ && (lastKey_.ctrl || lastKey_.alt)) {
-        handleModifiedKey(key);
-        return;
-    }
-    if (handleGuideKey(key)) return;
-    if (handleProKey(key)) return;
-    if (handleTimelineKey(key)) return;
-    const int step = std::max(1, m.pixelSize * 4);
-    const bool tile = m.docMode == DOC_TILE;
-    if (!tile && lastKey_.ctrl && key == KEY_F) {
-        showMapFindScreen();
-        return;
-    }
-    // Однобуквенные команды, которые пишут файл или меняют всю картинку,
-    // в интерфейсе 1.7 — только с Ctrl или на экране «Изображение»: промах
-    // по клавише инструмента не должен перезаписать файл (UX-17).
-    const bool letters = classicUi_;
-    switch (key) {
-        case KEY_ESC:
-        case KEY_M: showMainMenu(); break;
-        case KEY_H: showHelpScreen(); break;
-        case KEY_N:
-            if (letters) commandNew();
-            break;
-        case KEY_L:
-            if (letters) commandOpen();
-            break;
-        case KEY_S:
-            if (letters) commandSave();
-            break;
-        case KEY_A: commandSaveSelection(); break;
-        case KEY_P:
-            if (tile) showColorScreen();
-            break;
-        case KEY_Z: m.doUndo(); break;
-        case KEY_Y: m.doRedo(); break;
-        case KEY_X: m.swapColors(); break;
-        case KEY_R:
-            if (tile && letters) m.randomizeTile();
-            break;
-        case KEY_DELETE:
-            // Delete с выделением разобран выше; без выделения у оригинала
-            // он очищал весь тайл.
-            if (tile && letters) m.clearTile();
-            break;
-        case KEY_TAB: m.switchMode(tile ? DOC_MAP : DOC_TILE); break;
-        case KEY_ENTER:
-            // Enter над объектом карты — его форма (UX-10); в режиме тайла
-            // Enter разобран лентой кадров.
-            if (!tile && !classicUi_) {
-                const int mx = m.screenToTileX(mouseX());
-                const int my = m.screenToTileY(mouseY());
-                const int obj = m.inDoc(mx, my) ? m.map.objectAt(mx, my) : -1;
-                if (obj >= 0) showObjectForm(obj);
-            }
-            break;
-        case KEY_V:
-            if (m.bufferFilled()) {
-                m.pushUndo();
-                m.pasteBufferAt(m.screenToTileX(mouseX()), m.screenToTileY(mouseY()));
-                m.needRepaint = true;
-            }
-            break;
-        case KEY_G:
-            m.gridOn = !m.gridOn;
-            cfg.showGrid = m.gridOn;
-            saveConfig();
-            m.needRepaint = true;
-            break;
-        case KEY_C:
-            m.checkerOn = !m.checkerOn;
-            cfg.showChecker = m.checkerOn;
-            saveConfig();
-            m.needRepaint = true;
-            break;
-        case KEY_B:
-            // Shift+B — картинки набора: на карте — карта тайлами, у тайла
-            // местности — его окружение на настоящей карте; Ctrl+B — к
-            // следующему месту этой местности (этап 7).
-            if (lastKey_.shift) {
-                if (tile) {
-                    toggleMapContext();
-                } else {
-                    m.mapTiles = !m.mapTiles;
-                    gameTilesDirty_ = true;
-                }
-            } else if (lastKey_.ctrl) {
-                ++mapCtxIndex_;
-            } else {
-                m.seamlessOn = !m.seamlessOn;
-                cfg.showSeamless = m.seamlessOn;
-                saveConfig();
-            }
-            m.needRepaint = true;
-            break;
-        case KEY_W:
-            m.wrapOn = !m.wrapOn;
-            m.needRepaint = true;
-            break;
-        case KEY_F:
-            m.symX = !m.symX;
-            m.needRepaint = true;
-            break;
-        case KEY_D:
-            m.symY = !m.symY;
-            m.needRepaint = true;
-            break;
-        case KEY_E:
-            m.brushReplace = !m.brushReplace;
-            m.needRepaint = true;
-            break;
-        case KEY_T:
-            if (tile) showTilesetScreen();
-            break;
-        case KEY_I:
-            if (tile) toggleIndexed();
-            break;
-        case KEY_PLUS:
-        case KEY_NUMPLUS: m.zoomAt(1, m.W / 2, m.H / 2); break;
-        case KEY_MINUS:
-        case KEY_NUMMINUS: m.zoomAt(-1, m.W / 2, m.H / 2); break;
-        case KEY_LEFT:
-            m.viewX += step;
-            m.clampView();
-            m.needRepaint = true;
-            break;
-        case KEY_RIGHT:
-            m.viewX -= step;
-            m.clampView();
-            m.needRepaint = true;
-            break;
-        case KEY_UP:
-            m.viewY += step;
-            m.clampView();
-            m.needRepaint = true;
-            break;
-        case KEY_DOWN:
-            m.viewY -= step;
-            m.clampView();
-            m.needRepaint = true;
-            break;
-        case KEY_SPACE:
-            if (classicUi_) {
-                m.fitScale();
-                m.needRepaint = true;
-            } else {
-                spaceHand();
-            }
-            break;
-        default:
-            // Цифры выбирают инструмент. Оригинал прижимал номер к числу
-            // инструментов, и в режиме карты клавиши 6..9 все выбирали
-            // выделение; здесь лишние цифры ничего не делают.
-            if (key >= KEY_1 && key <= KEY_9 && key - KEY_1 < m.toolCount()) m.setTool(key - KEY_1);
-            break;
     }
 }
 

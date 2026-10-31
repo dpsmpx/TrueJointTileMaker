@@ -1,6 +1,7 @@
 // Отрисовка холста (TJTM.pas: «Отрисовка холста»).
 
 #include <algorithm>
+#include <set>
 
 #include "app/editor.h"
 #include "core/pmath.h"
@@ -72,8 +73,8 @@ void Editor::drawTileCells() {
     const int Y0 = m.Y0;
     const int ox = m.tileToScreenX(0);
     const int oy = m.tileToScreenY(0);
-    const int sw = m.tile.w * m.pixelSize;
-    const int sh = m.tile.h * m.pixelSize;
+    const int sw = m.scr(m.tile.w);
+    const int sh = m.scr(m.tile.h);
 
     int cl = X0;
     int ct = Y0;
@@ -253,19 +254,104 @@ void Editor::drawCanvas() {
     const Color axis = active.symAxis;
     if (m.symX) {
         // Ось может стоять не посередине: её место — в половинах точки.
-        const int cx = m.tileToScreenX(0) + m.axisX2() * m.pixelSize / 2;
+        const int cx = m.tileToScreenX(0) + m.scr2(m.axisX2());
         fb_.fillRect(cx - 1, m.tileToScreenY(0), cx + 1, m.tileToScreenY(m.docH()), axis);
     }
     if (m.symY) {
-        const int cy = m.tileToScreenY(0) + m.axisY2() * m.pixelSize / 2;
+        const int cy = m.tileToScreenY(0) + m.scr2(m.axisY2());
         fb_.fillRect(m.tileToScreenX(0), cy - 1, m.tileToScreenX(m.docW()), cy + 1, axis);
     }
     fb_.resetClip();
     drawVectorHandles();
     drawBrushGhost();
+    drawCellFrame();
     drawRadialAxes();
     drawGuides();
     drawRulers();
+}
+
+bool Editor::cellFrameShown() {
+    // Пятно кисти видно с любого масштаба: без контура размер не угадать.
+    const int minZoom = m.brushSized() ? 1 : 4;
+    if (classicUi_ || !cfg.cellFrame || m.pixelSize < minZoom || !overCanvas(mouseX(), mouseY()))
+        return false;
+    if (!m.inDoc(m.screenToTileX(mouseX()), m.screenToTileY(mouseY()))) return false;
+    if (m.docMode == DOC_MAP) return m.toolMap != M_SELECT;
+    return m.toolTile != T_SELECT && !brushGhostShown();
+}
+
+/// Клетка, в которую ляжет точка: светлая рамка в тёмной, видна на любом
+/// цвете. У 1.6 над холстом была обычная стрелка, и при масштабе 2–4× не
+/// было видно, какую точку тронет кисть (UX-13).
+void Editor::drawCellFrame() {
+    if (!cellFrameShown()) return;
+    const int tx = m.screenToTileX(mouseX());
+    const int ty = m.screenToTileY(mouseY());
+    if (m.brushSized()) {
+        // Контур пятна кисти: края клеток пятна, за которыми клеток пятна
+        // нет, — тёмной линией снаружи и светлой внутри.
+        std::set<std::pair<int, int>> cells;
+        m.forEachBrushCell(tx, ty, [&](int x, int y) { cells.emplace(x, y); });
+        const int ps = m.cellPx();
+        fb_.setClip(canvasRect());
+        for (const auto& [x, y] : cells) {
+            const int sx = m.tileToScreenX(x);
+            const int sy = m.tileToScreenY(y);
+            if (cells.count({x, y - 1}) == 0) {
+                fb_.fillRect(sx, sy - 1, sx + ps, sy, active.antsDark);
+                fb_.fillRect(sx, sy, sx + ps, sy + 1, active.antsLight);
+            }
+            if (cells.count({x, y + 1}) == 0) {
+                fb_.fillRect(sx, sy + ps, sx + ps, sy + ps + 1, active.antsDark);
+                fb_.fillRect(sx, sy + ps - 1, sx + ps, sy + ps, active.antsLight);
+            }
+            if (cells.count({x - 1, y}) == 0) {
+                fb_.fillRect(sx - 1, sy, sx, sy + ps, active.antsDark);
+                fb_.fillRect(sx, sy, sx + 1, sy + ps, active.antsLight);
+            }
+            if (cells.count({x + 1, y}) == 0) {
+                fb_.fillRect(sx + ps, sy, sx + ps + 1, sy + ps, active.antsDark);
+                fb_.fillRect(sx + ps - 1, sy, sx + ps, sy + ps, active.antsLight);
+            }
+        }
+        fb_.resetClip();
+        return;
+    }
+    const int x0 = m.tileToScreenX(tx);
+    const int y0 = m.tileToScreenY(ty);
+    const int x1 = x0 + m.cellPx();
+    const int y1 = y0 + m.cellPx();
+    fb_.setClip(canvasRect());
+    fb_.frameRect(x0 - 1, y0 - 1, x1 + 1, y1 + 1, active.antsDark);
+    fb_.frameRect(x0, y0, x1, y1, active.antsLight);
+    fb_.resetClip();
+}
+
+Platform::Cursor Editor::cursorWanted() {
+    if (classicUi_ || !overCanvas(mouseX(), mouseY())) return Platform::CURSOR_ARROW;
+    if (isKeyPressed(KEY_SPACE)) return Platform::CURSOR_MOVE;
+    const int tx = m.screenToTileX(mouseX());
+    const int ty = m.screenToTileY(mouseY());
+    if (m.docMode == DOC_MAP) {
+        if (m.toolMap == M_OBJ && m.inDoc(tx, ty) && m.map.objectAt(tx, ty) >= 0)
+            return Platform::CURSOR_MOVE;
+        return m.toolMap == M_SELECT && m.hasSelection && m.isSelected(tx, ty)
+                   ? Platform::CURSOR_MOVE
+                   : Platform::CURSOR_CROSSHAIR;
+    }
+    if (m.toolTile == T_SELECT) {
+        return m.hasSelection && m.inDoc(tx, ty) && m.isSelected(tx, ty)
+                   ? Platform::CURSOR_MOVE
+                   : Platform::CURSOR_CROSSHAIR;
+    }
+    // Слой, на котором кисть ничего не изменит, — запрет прямо на курсоре,
+    // а не только страница с объяснением после щелчка.
+    const int kind = m.activeKind();
+    const bool shapeTool = m.toolTile == T_LINE || m.toolTile == T_RECT || m.toolTile == T_ELLIPSE;
+    const bool blocked =
+        m.toolTile != T_PICK && (kind == LK_GROUP || kind == LK_REFERENCE ||
+                                 (kind == LK_VECTOR && !shapeTool) || !m.activeLayerEditable());
+    return blocked ? Platform::CURSOR_NOT_ALLOWED : Platform::CURSOR_CROSSHAIR;
 }
 
 }  // namespace tjtm

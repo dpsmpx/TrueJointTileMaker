@@ -74,12 +74,11 @@ void Editor::applyLayout() {
     if (m.H == h && m.X0 == r && m.Y0 == r) return;
     // Тайл, что влезал в холст целиком, влезает и в укороченный; иначе
     // масштаб остаётся прежним, а вид лишь поджимается к краям.
-    const bool fitted =
-        m.docW() * m.pixelSize <= m.W - m.X0 && m.docH() * m.pixelSize <= m.H - m.Y0;
+    const bool fitted = m.scr(m.docW()) <= m.W - m.X0 && m.scr(m.docH()) <= m.H - m.Y0;
     m.H = h;
     m.X0 = r;
     m.Y0 = r;
-    if (fitted && (m.docW() * m.pixelSize > m.W - m.X0 || m.docH() * m.pixelSize > m.H - m.Y0)) {
+    if (fitted && (m.scr(m.docW()) > m.W - m.X0 || m.scr(m.docH()) > m.H - m.Y0)) {
         m.fitScale();
     } else {
         m.clampView();
@@ -127,9 +126,6 @@ void Editor::drawTimeline() {
         const bool on = (b == TB_PLAY && playing_) || (b == TB_ONION && m.onionSkin);
         const bool enabled = (b != TB_DEL_FRAME || nf > 1) && (b != TB_DEL_LAYER || nl > 1) &&
                              (b != TB_PLAY || nf > 1);
-        fb_.fillRoundRect(x0, TB_Y, x1, TB_Y + TB_H, 5, 5, on ? cAccent : cBorder);
-        fb_.fillRoundRect(x0 + 1, TB_Y + 1, x1 - 1, TB_Y + TB_H - 1, 5, 5,
-                          on ? cHover : (enabled ? cBack : cFace));
         std::string label;
         switch (b) {
             case TB_PLAY: label = playing_ ? "■" : "►"; break;
@@ -142,6 +138,16 @@ void Editor::drawTimeline() {
             case TB_TAG: label = "Метка"; break;
             default: label = "…"; break;
         }
+        if (active.modern) {
+            const bool over = enabled && mouseX() >= x0 && mouseX() < x1 && mouseY() >= TB_Y &&
+                              mouseY() < TB_Y + TB_H;
+            drawButtonModern(x0, TB_Y, kTbW[b], TB_H, label, enabled, on, over, false,
+                             Btn::Outlined);
+            continue;
+        }
+        fb_.fillRoundRect(x0, TB_Y, x1, TB_Y + TB_H, 5, 5, on ? cAccent : cBorder);
+        fb_.fillRoundRect(x0 + 1, TB_Y + 1, x1 - 1, TB_Y + TB_H - 1, 5, 5,
+                          on ? cHover : (enabled ? cBack : cFace));
         textCentered(x0, TB_Y, x1, TB_Y + TB_H, label, enabled ? cText : cTextDim);
     }
     const std::string info = std::to_string(af + 1) + " / " + std::to_string(nf) + "   " +
@@ -320,6 +326,14 @@ void Editor::drawLayerKindMark(int x, int cy, const Layer& layer) {
     }
 }
 
+int Editor::timelineButtonAt(int x, int y) const {
+    if (y < TB_Y || y >= TB_Y + TB_H) return -1;
+    for (int b = 0; b < TB_COUNT; ++b) {
+        if (x >= tbX(b) && x < tbX(b) + kTbW[b]) return b;
+    }
+    return -1;
+}
+
 void Editor::handleTimelineClick() {
     const int x = frameClickX_;
     const int y = frameClickY_;
@@ -416,50 +430,6 @@ void Editor::handleTimelineClick() {
     if (frameOk) {
         m.setActiveCel(l, frameAt);
         if (right) editFrameDuration(frameAt);
-    }
-}
-
-bool Editor::handleTimelineKey(int key) {
-    if (m.docMode != DOC_TILE) return false;
-    const int nf = m.doc.frameCount();
-    const int nl = m.doc.layerCount();
-    switch (key) {
-        case KEY_J:
-            timelineOn_ = !timelineOn_;
-            if (!timelineOn_) stopPlayback();
-            m.needRepaint = true;
-            return true;
-        case KEY_ENTER: togglePlayback(); return true;
-        case KEY_COMMA:
-            stopPlayback();
-            m.setActiveCel(m.activeLayer, (m.activeFrame + nf - 1) % std::max(1, nf));
-            return true;
-        case KEY_PERIOD:
-            stopPlayback();
-            m.setActiveCel(m.activeLayer, (m.activeFrame + 1) % std::max(1, nf));
-            return true;
-        case KEY_HOME:
-            stopPlayback();
-            m.setActiveCel(m.activeLayer, 0);
-            return true;
-        case KEY_END:
-            stopPlayback();
-            m.setActiveCel(m.activeLayer, nf - 1);
-            return true;
-        case KEY_PGUP:
-            stopPlayback();
-            m.setActiveCel(std::min(nl - 1, m.activeLayer + 1), m.activeFrame);
-            return true;
-        case KEY_PGDN:
-            stopPlayback();
-            m.setActiveCel(std::max(0, m.activeLayer - 1), m.activeFrame);
-            return true;
-        case KEY_F3:
-            m.onionSkin = !m.onionSkin;
-            m.tileBmpDirty = true;
-            m.needRepaint = true;
-            return true;
-        default: return false;
     }
 }
 

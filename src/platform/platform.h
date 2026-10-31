@@ -17,100 +17,17 @@
 #include <string>
 #include <vector>
 
+#include "core/keys.h"
 #include "gfx/surface.h"
 #include "platform/script.h"
 
 struct SDL_Window;
 struct SDL_Renderer;
 struct SDL_Texture;
+struct SDL_Cursor;
 union SDL_Event;
 
 namespace tjtm {
-
-/// Коды клавиш оригинала.
-enum : int {
-    KEY_BACK = 8,
-    KEY_TAB = 9,
-    KEY_ENTER = 13,
-    KEY_SHIFT = 16,
-    KEY_CTRL = 17,
-    KEY_ALT = 18,
-    KEY_ESC = 27,
-    KEY_SPACE = 32,
-    KEY_PGUP = 33,
-    KEY_PGDN = 34,
-    KEY_END = 35,
-    KEY_HOME = 36,
-    KEY_LEFT = 37,
-    KEY_UP = 38,
-    KEY_RIGHT = 39,
-    KEY_DOWN = 40,
-    KEY_INSERT = 45,
-    KEY_DELETE = 46,
-    KEY_0 = 48,
-    KEY_1 = 49,
-    KEY_2 = 50,
-    KEY_3 = 51,
-    KEY_4 = 52,
-    KEY_5 = 53,
-    KEY_6 = 54,
-    KEY_7 = 55,
-    KEY_8 = 56,
-    KEY_9 = 57,
-    KEY_A = 65,
-    KEY_B,
-    KEY_C,
-    KEY_D,
-    KEY_E,
-    KEY_F,
-    KEY_G,
-    KEY_H,
-    KEY_I,
-    KEY_J,
-    KEY_K,
-    KEY_L,
-    KEY_M,
-    KEY_N,
-    KEY_O,
-    KEY_P,
-    KEY_Q,
-    KEY_R,
-    KEY_S,
-    KEY_T,
-    KEY_U,
-    KEY_V,
-    KEY_W,
-    KEY_X,
-    KEY_Y,
-    KEY_Z,
-    KEY_NUM0 = 96,
-    KEY_NUMPLUS = 107,
-    KEY_NUMMINUS = 109,
-    KEY_F1 = 112,
-    KEY_F2,
-    KEY_F3,
-    KEY_F4,
-    KEY_F5,
-    KEY_F6,
-    KEY_F7,
-    KEY_F8,
-    KEY_F9,
-    KEY_F10,
-    KEY_F11,
-    KEY_F12,
-    KEY_SEMICOLON = 186,
-    KEY_PLUS = 187,
-    KEY_COMMA = 188,
-    KEY_MINUS = 189,
-    KEY_PERIOD = 190,
-    KEY_SLASH = 191,
-    KEY_GRAVE = 192,
-    KEY_LBRACKET = 219,
-    KEY_BACKSLASH = 220,
-    KEY_RBRACKET = 221,
-    KEY_QUOTE = 222,
-    KEY_CODE_MAX = 255,
-};
 
 /// Кнопки мыши оригинала: левая 1, правая 2, всё прочее — «средняя».
 inline constexpr int MB_LEFT = 1;
@@ -123,6 +40,9 @@ struct KeyPress {
     bool shift = false;
     bool ctrl = false;
     bool alt = false;
+    /// Автоповтор зажатой клавиши: холст стрелками едет плавно сам, и
+    /// повторы ему только мешают.
+    bool repeat = false;
 };
 
 struct Input {
@@ -141,6 +61,8 @@ struct Input {
     std::deque<KeyPress> presses;
     std::string text;
     int wheel = 0;
+    /// Файлы, брошенные в окно.
+    std::vector<std::string> drops;
     /// Целые шаги прокрутки вбок: +1 вправо.
     int wheelX = 0;
     /// Копить дробные доли щелчка (UX-12). У оригинала каждое событие
@@ -197,8 +119,20 @@ public:
     /// Выбор папки системным диалогом; folder — с какой начать.
     std::string openFolderDialog(const std::string& title, const std::string& folder);
 
+    /// Картинка в системный буфер обмена — PNG (UX-14); и обратно: пусто,
+    /// если там не картинка.
+    void setClipboardImage(std::vector<std::uint8_t> png);
+    [[nodiscard]] std::vector<std::uint8_t> clipboardImage() const;
+    /// PNG, который положили мы: своё выделение вставляется из внутреннего
+    /// буфера, с номерами палитры.
+    [[nodiscard]] const std::vector<std::uint8_t>& ownClipboardImage() const { return clipPng_; }
     std::string clipboardText() const;
     void setClipboardText(const std::string& s);
+
+    /// Курсор мыши: обычная стрелка, перекрестье рисования, перенос (рука
+    /// и перемещение выделения), запрет.
+    enum Cursor { CURSOR_ARROW, CURSOR_CROSSHAIR, CURSOR_MOVE, CURSOR_NOT_ALLOWED, CURSOR_COUNT };
+    void setCursor(Cursor c);
 
     void startTextInput(int x, int y, int w, int h);
     void stopTextInput();
@@ -209,6 +143,9 @@ public:
     bool runScript(const std::string& path, const std::string& shotDir, std::string& error);
     /// Сценарий был и весь пройден: программе пора закрываться.
     [[nodiscard]] bool scriptFinished() const { return scripted_ && scriptDone_; }
+    [[nodiscard]] bool scripted() const { return scripted_; }
+    /// Папка настроек пользователя (SDL_GetPrefPath); пусто — нет такой.
+    [[nodiscard]] static std::string prefDir();
 
 private:
     /// convert — пересчитать координаты окна в координаты кадра. События
@@ -227,6 +164,9 @@ private:
     int h_ = 0;
     Input in_;
     bool textInputOn_ = false;
+    std::array<SDL_Cursor*, CURSOR_COUNT> cursors_{};
+    std::vector<std::uint8_t> clipPng_;
+    Cursor cursor_ = CURSOR_ARROW;
     /// Нажатые кнопки мыши битами: «нажата» — пока нажата хоть одна.
     unsigned buttons_ = 0;
 

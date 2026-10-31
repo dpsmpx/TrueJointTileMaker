@@ -11,6 +11,7 @@
 #   tools/gui.sh TARGET keydown|keyup KEY...   держать клавишу (shift, ctrl, alt)
 #   tools/gui.sh TARGET click X Y [BTN]          щелчок; BTN 1/2/3, ролик 4/5
 #   tools/gui.sh TARGET drag X0 Y0 X1 Y1 [BTN]   протяжка с нажатой кнопкой
+#   tools/gui.sh TARGET mousedown|mouseup [BTN]  нажать или отпустить кнопку
 #   tools/gui.sh TARGET type TEXT    набрать текст
 #   tools/gui.sh compare A.png B.png [DIFF.png]  число несовпавших пикселей
 #
@@ -218,6 +219,13 @@ cmd_drag() {
     sleep 0.15
 }
 
+# Кнопка мыши нажата или отпущена там, где курсор: между ними — move и sleep.
+cmd_button() {
+    use_display
+    xdotool "$1" "${2:-1}"
+    sleep 0.05
+}
+
 cmd_type() {
     use_display
     local wid
@@ -265,6 +273,7 @@ case "${1:-}" in
     keydown|keyup) cmd_hold "$@" ;;
     click) shift; cmd_click "$@" ;;
     drag) shift; cmd_drag "$@" ;;
+    mousedown|mouseup) cmd_button "$@" ;;
     type) shift; cmd_type "$@" ;;
     *) usage ;;
 esac

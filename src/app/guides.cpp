@@ -49,9 +49,9 @@ void tinyNumber(gfx::Surface& fb, int x, int y, int v, Color c) {
 
 /// Шаг делений: наименьшая степень двойки, у которой деление не уже
 /// minPx точек экрана. Степени двойки — потому что тайлы 8, 16, 32.
-int rulerStep(int pixelSize, int minPx) {
+int rulerStep(double scale, int minPx) {
     int s = 1;
-    while (s * pixelSize < minPx && s < (1 << 20))
+    while (s * scale < minPx && s < (1 << 20))
         s *= 2;
     return s;
 }
@@ -63,26 +63,26 @@ int rulerStep(int pixelSize, int minPx) {
 // ---------------------------------------------------------------------------
 
 void Editor::drawGuides() {
-    const int ps = m.pixelSize;
+    const int ps = m.cellPx();
     const int ox = m.tileToScreenX(0);
     const int oy = m.tileToScreenY(0);
     const int dw = m.docW();
     const int dh = m.docH();
     if (dw <= 0 || dh <= 0) return;
-    const int ex = ox + dw * ps;
-    const int ey = oy + dh * ps;
+    const int ex = ox + m.scr(dw);
+    const int ey = oy + m.scr(dh);
     fb_.setClip(canvasRect());
 
     // Крупная сетка — по границам точек, поверх мелкой.
     if (m.majorGridW > 0) {
         for (int k = m.majorGridW; k < dw; k += m.majorGridW) {
-            const int sx = ox + k * ps - (ps >= 2 ? 1 : 0);
+            const int sx = ox + m.scr(k) - (ps >= 2 ? 1 : 0);
             fb_.fillRect(sx, oy, sx + 1, ey, active.majorGrid);
         }
     }
     if (m.majorGridH > 0) {
         for (int k = m.majorGridH; k < dh; k += m.majorGridH) {
-            const int sy = oy + k * ps - (ps >= 2 ? 1 : 0);
+            const int sy = oy + m.scr(k) - (ps >= 2 ? 1 : 0);
             fb_.fillRect(ox, sy, ex, sy + 1, active.majorGrid);
         }
     }
@@ -102,31 +102,31 @@ void Editor::drawGuides() {
     if (m.guideCellCenters) {
         if (m.majorGridW > 0) {
             for (int k = 0; (2 * k + 1) * m.majorGridW <= 2 * dw; ++k)
-                dottedV(ox + (2 * k + 1) * m.majorGridW * ps / 2, active.cellCenter, 2, 3);
+                dottedV(ox + m.scr2((2 * k + 1) * m.majorGridW), active.cellCenter, 2, 3);
         }
         if (m.majorGridH > 0) {
             for (int k = 0; (2 * k + 1) * m.majorGridH <= 2 * dh; ++k)
-                dottedH(oy + (2 * k + 1) * m.majorGridH * ps / 2, active.cellCenter, 2, 3);
+                dottedH(oy + m.scr2((2 * k + 1) * m.majorGridH), active.cellCenter, 2, 3);
         }
     }
     if (m.guideCenter) {
-        dottedV(ox + dw * ps / 2, active.guideCenter, 5, 3);
-        dottedH(oy + dh * ps / 2, active.guideCenter, 5, 3);
+        dottedV(ox + m.scr2(dw), active.guideCenter, 5, 3);
+        dottedH(oy + m.scr2(dh), active.guideCenter, 5, 3);
     }
     // Свои направляющие идут через весь холст, как в редакторах растра:
     // по ним выравнивают и то, что за краем документа в бесшовном виде.
     for (const int x2 : m.guidesX2) {
-        const int sx = ox + x2 * ps / 2;
+        const int sx = ox + m.scr2(x2);
         fb_.fillRect(sx, m.Y0, sx + 1, m.H, active.guide);
     }
     for (const int y2 : m.guidesY2) {
-        const int sy = oy + y2 * ps / 2;
+        const int sy = oy + m.scr2(y2);
         fb_.fillRect(m.X0, sy, m.W, sy + 1, active.guide);
     }
     // Начало координат, сдвинутое с угла документа, — крестиком.
     if (m.originX != 0 || m.originY != 0) {
-        const int cx = ox + m.originX * ps;
-        const int cy = oy + m.originY * ps;
+        const int cx = ox + m.scr(m.originX);
+        const int cy = oy + m.scr(m.originY);
         fb_.fillRect(cx - 6, cy, cx + 7, cy + 1, active.guideCenter);
         fb_.fillRect(cx, cy - 6, cx + 1, cy + 7, active.guideCenter);
     }
@@ -137,10 +137,10 @@ void Editor::drawRadialAxes() {
     if (m.symRadial < 2) return;
     // Лучи из точки пересечения осей: видно, на сколько секторов делится
     // рисунок. Первый луч смотрит вверх.
-    const int ps = m.pixelSize;
+    const double ps = m.scale();
     const double cx = m.tileToScreenX(0) + m.axisX2() * ps / 2.0;
     const double cy = m.tileToScreenY(0) + m.axisY2() * ps / 2.0;
-    const double r = static_cast<double>(std::max(m.docW(), m.docH()) * ps);
+    const double r = std::max(m.docW(), m.docH()) * ps;
     const Color c = active.radialAxis;
     fb_.setClip(canvasRect());
     for (int k = 0; k < m.symRadial; ++k) {
@@ -159,7 +159,7 @@ void Editor::drawRulers() {
     fb_.fillRect(0, m.Y0, m.X0, m.H, cPanel);
     fb_.fillRect(0, m.Y0 - 1, m.W, m.Y0, cBorder);
     fb_.fillRect(m.X0 - 1, 0, m.X0, m.H, cBorder);
-    const int ps = m.pixelSize;
+    const double ps = m.scale();
     const int minor = rulerStep(ps, 4);
     const int major = rulerStep(ps, 36);
 
@@ -174,7 +174,7 @@ void Editor::drawRulers() {
         if (big) tinyNumber(fb_, sx + 2, 3, u, cText);
     }
     for (const int x2 : m.guidesX2) {
-        const int sx = m.tileToScreenX(0) + x2 * ps / 2;
+        const int sx = m.tileToScreenX(0) + m.scr2(x2);
         fb_.fillRect(sx - 3, m.Y0 - 7, sx + 4, m.Y0 - 4, active.rulerMark);
         fb_.fillRect(sx - 1, m.Y0 - 4, sx + 2, m.Y0 - 1, active.rulerMark);
     }
@@ -191,7 +191,7 @@ void Editor::drawRulers() {
         if (big) tinyNumber(fb_, 2, sy + 2, v, cText);
     }
     for (const int y2 : m.guidesY2) {
-        const int sy = m.tileToScreenY(0) + y2 * ps / 2;
+        const int sy = m.tileToScreenY(0) + m.scr2(y2);
         fb_.fillRect(m.X0 - 7, sy - 3, m.X0 - 4, sy + 4, active.rulerMark);
         fb_.fillRect(m.X0 - 4, sy - 1, m.X0 - 1, sy + 2, active.rulerMark);
     }
@@ -218,10 +218,10 @@ void Editor::handleRulerPress() {
         return;
     }
     std::vector<int>* const list = top ? &m.guidesX2 : &m.guidesY2;
-    const int ps = m.pixelSize;
+    const double ps = m.scale();
     const int origin = top ? m.tileToScreenX(0) : m.tileToScreenY(0);
     const int limit2 = 2 * (top ? m.docW() : m.docH());
-    auto screenOf = [&](int v2) { return origin + v2 * ps / 2; };
+    auto screenOf = [&](int v2) { return origin + m.scr2(v2); };
     // Направляющая встаёт на границу точек; с Shift — и на середину точки.
     auto valueAt = [&](int s) {
         const double u = static_cast<double>(s - origin) / ps;
@@ -260,22 +260,6 @@ void Editor::handleRulerPress() {
     if (v < 0 || v > limit2) list->erase(list->begin() + hit);
     m.markModified();
     m.needRepaint = true;
-}
-
-bool Editor::handleGuideKey(int key) {
-    if (!lastKey_.ctrl) return false;
-    switch (key) {
-        case KEY_R:
-            m.rulersOn = !m.rulersOn;
-            m.needRepaint = true;
-            return true;
-        case KEY_SEMICOLON:
-            m.guidesOn = !m.guidesOn;
-            m.needRepaint = true;
-            return true;
-        case KEY_G: showGridScreen(); return true;
-        default: return false;
-    }
 }
 
 // ---------------------------------------------------------------------------

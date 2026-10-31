@@ -84,7 +84,7 @@ void Editor::showBrushOptions() {
         } else if (mode == PEN_STAMP) {
             if (uiButton(LX, 130, 360, 30, "Взять из выделения   Ctrl+E", m.hasSelection)) {
                 if (!m.brushFromSelection())
-                    showMessage("Пустое выделение", "В выделении нет ни одной видимой точки.");
+                    notify("Пустое выделение", "В выделении нет ни одной видимой точки.");
             }
             uiLabelLeft(LX, 176, 22, "Кисть — выделенный кусок активного слоя, серединой",
                         cTextDim);
@@ -223,10 +223,12 @@ void Editor::doGradientTool(int ax, int ay) {
     int by = ay;
     m.applyGradient(region, ax, ay, bx, by);
     bool first = true;
+    edgeScrollBegin();
     while ((mousePressed() || first) && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = m.screenToTileX(mouseX());
         const int ny = m.screenToTileY(mouseY());
-        if (first || nx != bx || ny != by) {
+        if (first || scrolled || nx != bx || ny != by) {
             first = false;
             bx = nx;
             by = ny;
@@ -237,7 +239,7 @@ void Editor::doGradientTool(int ax, int ay) {
             m.applyGradient(region, ax, ay, bx, by);
             drawCanvas();
             // Направление — линией цвета выделения от центра к центру точек.
-            const int ps = m.pixelSize;
+            const int ps = m.cellPx();
             fb_.setClip(canvasRect());
             fb_.line(m.tileToScreenX(ax) + ps / 2, m.tileToScreenY(ay) + ps / 2,
                      m.tileToScreenX(bx) + ps / 2, m.tileToScreenY(by) + ps / 2, cAccent);
@@ -267,7 +269,7 @@ void Editor::drawBrushGhost() {
     const int cy = m.screenToTileY(mouseY());
     const int ox = cx - (b.w - 1) / 2;
     const int oy = cy - (b.h - 1) / 2;
-    const int ps = m.pixelSize;
+    const int ps = m.cellPx();
     fb_.setClip(canvasRect());
     for (int y = 0; y < b.h; ++y) {
         for (int x = 0; x < b.w; ++x) {

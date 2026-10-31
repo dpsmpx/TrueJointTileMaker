@@ -137,3 +137,23 @@ uia        08_wheel_part    0    0  780  560
 uia        09_wheel_zoom    0    0  780  560
 uia        10_hand          0    0  780  560
 uia        11_fit           0    0  780  560
+# Интерфейс, этап B — то же: окно целиком, светлая тема.
+uib        01_tip_tool      0    0  780  560
+uib        02_tip_timeline  0    0  780  560
+uib        03_cell_frame    0    0  780  560
+uib        04_card          0    0  780  560
+uib        05_new_size      0    0  780  560
+uib        06_new_tile      0    0  780  560
+uib        07_brush         0    0  780  560
+uib        08_toast         0    0  780  560
+uib        09_error         0    0  780  560
+uib        10_dropped       0    0  780  560
+uib        11_color         0    0  780  560
+uib        12_keys          0    0  780  560
+uib        13_keys_find     0    0  780  560
+uib        14_zoom_out      0    0  780  560
+uib        15_arrow_pan     0    0  780  560
+uib        16_nudge         0    0  780  560
+uib        17_edge_scroll   0    0  780  560
+uib        18_focus_tab     0    0  780  560
+uib        19_menu_arrows   0    0  780  560

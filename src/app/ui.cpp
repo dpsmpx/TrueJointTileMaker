@@ -5,6 +5,7 @@
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
 
@@ -26,7 +27,7 @@ void Editor::idle() {
 /// Снимок щелчка на кадр. Весь кадр — и отрисовка, и попадания — работает
 /// с ним, а живой признак снова копит приходящее. Щелчок посреди кадра
 /// поэтому не пропадает: он достаётся следующему.
-void Editor::beginFrameInput() {
+void Editor::beginFrameInput(bool screen) {
     pf_.pump();
     Input& in = pf_.input();
     frameClick_ = in.clickPending;
@@ -34,7 +35,71 @@ void Editor::beginFrameInput() {
     frameClickY_ = in.clickY;
     frameClickButton_ = in.clickButton;
     in.clickPending = false;
+    tipEvaluate();
+    focusFrame(screen);
     checkQuit();
+}
+
+void Editor::focusFrame(bool screen) {
+    focusCount_ = focusSeen_;
+    focusSeen_ = 0;
+    focusPress_ = false;
+    focusMoved_ = false;
+    const bool arrows = focusArrows_;
+    focusArrows_ = false;
+    focusOn_ = screen && !classicUi_;
+    if (!focusOn_) return;
+    if (frameClick_) focusShown_ = false;
+    // Набираемое поле разбирает Tab само: принимает набранное и передаёт
+    // фокус дальше.
+    if (numEdit_ != 0 || textEditId_ != 0) return;
+    Input& in = pf_.input();
+    std::deque<KeyPress> rest;
+    for (const KeyPress& k : in.keys) {
+        const bool arrow =
+            k.vk == KEY_UP || k.vk == KEY_DOWN || k.vk == KEY_LEFT || k.vk == KEY_RIGHT;
+        if (!k.ctrl && !k.alt && (k.vk == KEY_TAB || (arrows && arrow))) {
+            const bool back = k.vk == KEY_TAB ? k.shift : k.vk == KEY_UP || k.vk == KEY_LEFT;
+            focusStep(back ? -1 : 1);
+            continue;
+        }
+        if ((k.vk == KEY_ENTER || k.vk == KEY_SPACE) && focusShown_ && focusIdx_ >= 0 &&
+            focusIdx_ < focusCount_) {
+            focusPress_ = true;
+            continue;
+        }
+        rest.push_back(k);
+    }
+    in.keys = std::move(rest);
+}
+
+void Editor::focusStep(int d) {
+    const int n = std::max(1, focusCount_);
+    if (!focusShown_ || focusIdx_ < 0 || focusIdx_ >= n) {
+        // Первый Tab — к первому элементу, Shift+Tab — к последнему.
+        focusIdx_ = d > 0 ? 0 : n - 1;
+    } else {
+        focusIdx_ = (focusIdx_ + d + n) % n;
+    }
+    focusShown_ = true;
+    focusMoved_ = true;
+}
+
+bool Editor::focusSlot(int x, int y, int w, int h) {
+    if (!focusOn_) return false;
+    const bool focused = focusShown_ && focusSeen_ == focusIdx_;
+    ++focusSeen_;
+    if (focused) {
+        const int r = active.radius * 2 + 6;
+        fb_.strokeRoundRect(x - 3, y - 3, x + w + 3, y + h + 3, r, r, cAccent, 2);
+    }
+    return focused;
+}
+
+bool Editor::focusPressed(bool focused) {
+    if (!focused || !focusPress_) return false;
+    focusPress_ = false;
+    return true;
 }
 
 /// Забыть и накопленное, и снятое: щелчок, которым открыли экран, не должен
@@ -42,6 +107,17 @@ void Editor::beginFrameInput() {
 void Editor::dropInput() {
     pf_.input().clickPending = false;
     frameClick_ = false;
+    numEdit_ = 0;
+    numPress_ = 0;
+    if (textEditId_ != 0) {
+        textEditId_ = 0;
+        pf_.stopTextInput();
+    }
+    // Новый экран — фокус с начала и пока без рамки.
+    focusIdx_ = -1;
+    focusShown_ = false;
+    // Экраны открываются отсюда: на них — обычная стрелка.
+    pf_.setCursor(Platform::CURSOR_ARROW);
 }
 
 int Editor::takeKey() {
@@ -74,6 +150,8 @@ void Editor::waitMouseRelease() {
 }
 
 void Editor::redraw() {
+    drawToast();
+    if (!classicUi_) drawTip();
     pf_.present(fb_);
 }
 
@@ -112,6 +190,7 @@ void Editor::rememberFile(const std::string& p, bool isMap) {
         cfg.lastFile = p;
     }
     cfg.lastFolder = pathDirName(p);
+    cfg.addRecent(p);
     saveConfig();
 }
 
@@ -128,17 +207,98 @@ bool Editor::uiButton(int x, int y, int bw, int bh, const std::string& caption, 
     return uiButtonEx(x, y, bw, bh, caption, enabled, false);
 }
 
+bool Editor::uiPrimary(int x, int y, int bw, int bh, const std::string& caption, bool enabled) {
+    return uiButtonEx(x, y, bw, bh, caption, enabled, false, Btn::Filled);
+}
+
 /// Кнопка-переключатель: включённая обведена цветом выделения и подсвечена,
 /// как выбранный инструмент, — чтобы состояние читалось без подписи «вкл».
 bool Editor::uiToggle(int x, int y, int bw, int bh, const std::string& caption, bool on) {
     return uiButtonEx(x, y, bw, bh, caption, true, on);
 }
 
+bool Editor::uiTab(int x, int y, int bw, int bh, const std::string& caption, bool open) {
+    if (!active.modern) {
+        // Как в 1.6: открытая — выключенной кнопкой с точкой.
+        return uiButton(x, y, bw, bh, open ? "• " + caption : caption, !open);
+    }
+    const bool over = mouseX() >= x && mouseX() < x + bw && mouseY() >= y && mouseY() < y + bh;
+    if (over && !open) fb_.fillRoundRect(x, y, x + bw, y + bh, BTN_R * 2, BTN_R * 2, cHover);
+    textCentered(x + 4, y, x + bw - 4, y + bh, fitTextEnd(caption, bw - 8),
+                 open ? cAccent : cTextDim);
+    fb_.fillRect(x, y + bh - 1, x + bw, y + bh, cBorder);
+    if (open) fb_.fillRect(x + 6, y + bh - 3, x + bw - 6, y + bh, cAccent);
+    const bool focused = !open && focusSlot(x, y, bw, bh);
+    if (frameClick_ && frameClickX_ >= x && frameClickX_ < x + bw && frameClickY_ >= y &&
+        frameClickY_ < y + bh) {
+        frameClick_ = false;
+        return !open && frameClickButton_ == MB_LEFT;
+    }
+    return focusPressed(focused);
+}
+
+void Editor::drawButtonModern(int x, int y, int bw, int bh, const std::string& caption,
+                              bool enabled, bool on, bool over, bool down, Btn kind) {
+    // Цвет поля и подписи по виду, состояние — прозрачным слоем цвета
+    // подписи поверх (наведение 8 %, нажатие 10 %), недоступное —
+    // приглушено (docs/ui-design-system.md, «Состояния»).
+    const theme::Theme& t = active;
+    const int r = t.radius * 2;
+    bool filled = true;
+    Color field = t.back;
+    Color content = t.text;
+    bool outlined = false;
+    switch (kind) {
+        case Btn::Filled:
+            field = t.accent;
+            content = t.onAccent;
+            break;
+        case Btn::Tonal:
+            field = t.accentContainer;
+            content = t.onAccentContainer;
+            break;
+        case Btn::Outlined:
+            filled = false;
+            outlined = true;
+            break;
+        case Btn::Text:
+            filled = false;
+            content = t.accent;
+            break;
+    }
+    if (on && kind != Btn::Filled) {
+        filled = true;
+        field = t.accentContainer;
+        content = t.onAccentContainer;
+    }
+    if (!enabled) {
+        field = argb(31, t.text.r, t.text.g, t.text.b);
+        content = argb(97, t.text.r, t.text.g, t.text.b);
+    }
+    if (filled) fb_.fillRoundRect(x, y, x + bw, y + bh, r, r, field);
+    if (enabled && over)
+        fb_.fillRoundRect(x, y, x + bw, y + bh, r, r,
+                          argb(down ? 26 : 20, content.r, content.g, content.b));
+    if (outlined)
+        fb_.strokeRoundRect(x, y, x + bw, y + bh, r, r,
+                            enabled ? t.outline : argb(31, t.text.r, t.text.g, t.text.b));
+    const std::string shown = fitTextEnd(caption, bw - 8);
+    textCentered(x + 4, y, x + bw - 4, y + bh, shown, content);
+    // Обрезанная подпись — целиком в подсказке.
+    if (shown != caption) uiTip(x, y, bw, bh, caption);
+}
+
 bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
-                        bool on) {
+                        bool on, Btn kind) {
     const bool over =
         enabled && mouseX() >= x && mouseX() < x + bw && mouseY() >= y && mouseY() < y + bh;
     const bool down = over && mousePressed();
+
+    if (active.modern) {
+        drawButtonModern(x, y, bw, bh, caption, enabled, on, over, down, kind);
+        const bool focused = enabled && focusSlot(x, y, bw, bh);
+        return takeButtonClick(x, y, bw, bh, enabled) || focusPressed(focused);
+    }
 
     // Мягкая тень на точку ниже отделяет кнопку от фона там, где тихая
     // обводка уже не справляется. У нажатой тени нет: она выглядит
@@ -166,6 +326,11 @@ bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption
     // (UX-32); полный текст покажет подсказка (этап B).
     const std::string shown = classicUi_ ? caption : fitTextEnd(caption, bw - 8);
     textCentered(x + 4, y, x + bw - 4, y + bh, shown, enabled ? cText : cTextDim);
+    const bool focused = enabled && focusSlot(x, y, bw, bh);
+    return takeButtonClick(x, y, bw, bh, enabled) || focusPressed(focused);
+}
+
+bool Editor::takeButtonClick(int x, int y, int bw, int bh, bool enabled) {
     // Щелчок забирается кнопкой: одно нажатие приводит в действие ровно
     // одну кнопку, даже если экран сменился посреди кадра.
     if (enabled && frameClick_ && frameClickX_ >= x && frameClickX_ < x + bw && frameClickY_ >= y &&
@@ -178,9 +343,242 @@ bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption
     return false;
 }
 
+bool Editor::uiNumber(int x, int y, int w, int h, int& v, int lo, int hi, int step, int big,
+                      const std::string& unit) {
+    const int before = v;
+    const auto id = reinterpret_cast<std::uintptr_t>(&v);
+    Input& in = pf_.input();
+    auto inside = [&](int px, int py) { return px >= x && px < x + w && py >= y && py < y + h; };
+    const bool shift = isKeyPressed(KEY_SHIFT);
+    auto commit = [&]() {
+        if (!numText_.empty() && numText_ != "-") v = clampI(std::atoi(numText_.c_str()), lo, hi);
+        numEdit_ = 0;
+    };
+    // Щелчок мимо набираемого поля принимает набранное, но не забирается:
+    // он нажимает то, по чему щёлкнули.
+    if (numEdit_ == id && frameClick_ && !inside(frameClickX_, frameClickY_)) commit();
+    if (frameClick_ && frameClickButton_ == MB_LEFT && inside(frameClickX_, frameClickY_)) {
+        frameClick_ = false;
+        if (numEdit_ != id) {
+            numPress_ = id;
+            numPressX_ = frameClickX_;
+            numPressV_ = v;
+            numDragged_ = false;
+        }
+    }
+    if (numPress_ == id) {
+        if (mousePressed()) {
+            const int dx = mouseX() - numPressX_;
+            if (std::abs(dx) > 3) numDragged_ = true;
+            if (numDragged_) v = clampI(numPressV_ + dx / 4 * step, lo, hi);
+        } else {
+            // Щелчок без протяжки — набор с клавиатуры.
+            if (!numDragged_) {
+                numEdit_ = id;
+                numText_ = std::to_string(v);
+                numFresh_ = true;
+            }
+            numPress_ = 0;
+        }
+    }
+    if (numEdit_ != id && inside(mouseX(), mouseY()) && in.wheel != 0) {
+        v = clampI(v + in.wheel * (shift ? big : step), lo, hi);
+        in.wheel = 0;
+    }
+    if (numEdit_ == id) {
+        // Набор забирает свои клавиши, чтобы экран их не разобрал: Enter
+        // принимает число, а не закрывает экран.
+        std::deque<KeyPress> rest;
+        for (const KeyPress& k : in.keys) {
+            const int d = k.vk >= KEY_0 && k.vk <= KEY_0 + 9         ? k.vk - KEY_0
+                          : k.vk >= KEY_NUM0 && k.vk <= KEY_NUM0 + 9 ? k.vk - KEY_NUM0
+                                                                     : -1;
+            if (d >= 0 && numEdit_ == id) {
+                if (numText_ == "0" || numFresh_) numText_.clear();
+                if (numText_.size() < 7) numText_ += static_cast<char>('0' + d);
+            } else if ((k.vk == KEY_MINUS || k.vk == KEY_NUMMINUS) && lo < 0 && numEdit_ == id) {
+                numText_ = numText_.starts_with('-') ? numText_.substr(1) : "-" + numText_;
+            } else if (k.vk == KEY_BACK && numEdit_ == id) {
+                if (numFresh_) {
+                    numText_.clear();
+                } else if (!numText_.empty()) {
+                    numText_.pop_back();
+                }
+            } else if (k.vk == KEY_ENTER && numEdit_ == id) {
+                commit();
+            } else if (k.vk == KEY_TAB && numEdit_ == id) {
+                commit();
+                if (focusOn_) focusStep(k.shift ? -1 : 1);
+            } else if (k.vk == KEY_ESC && numEdit_ == id) {
+                numEdit_ = 0;
+            } else if ((k.vk == KEY_UP || k.vk == KEY_DOWN) && numEdit_ == id) {
+                commit();
+                v = clampI(v + (k.vk == KEY_UP ? 1 : -1) * (k.shift ? big : step), lo, hi);
+                numEdit_ = id;
+                numText_ = std::to_string(v);
+            } else {
+                rest.push_back(k);
+                continue;
+            }
+            numFresh_ = false;
+        }
+        in.keys = std::move(rest);
+        in.presses.clear();
+    }
+
+    const bool editing = numEdit_ == id;
+    const bool over = inside(mouseX(), mouseY());
+    const int r = active.radius * 2;
+    fb_.fillRoundRect(x, y, x + w, y + h, r, r, active.field);
+    // Фокус пришёл с клавиатуры — сразу набор: Tab, цифры, Tab.
+    if (focusSlot(x, y, w, h) && focusMoved_ && !editing) {
+        numEdit_ = id;
+        numText_ = std::to_string(v);
+        numFresh_ = true;
+    }
+    fb_.strokeRoundRect(x, y, x + w, y + h, r, r, editing ? cAccent : (over ? cText : cOutline),
+                        editing ? 2 : 1);
+    if (editing) {
+        const int tw = textWidth(numText_);
+        const int tx = x + (w - tw) / 2;
+        textOut(tx, y + (h - textHeight()) / 2, numText_, cText);
+        if ((pf_.milliseconds() / 530) % 2 == 0)
+            fb_.fillRect(tx + tw + 1, y + 6, tx + tw + 2, y + h - 6, cText);
+    } else {
+        textCentered(x, y, x + w, y + h, std::to_string(v) + unit, cText);
+    }
+    uiTip(x, y, w, h,
+          "Щелчок — набрать число, ролик или протяжка — изменить\nShift — шаг " +
+              std::to_string(big));
+    return v != before;
+}
+
+bool Editor::uiTextLine(int x, int y, int w, int h, std::string& value) {
+    const auto id = reinterpret_cast<std::uintptr_t>(&value);
+    Input& in = pf_.input();
+    auto inside = [&](int px, int py) { return px >= x && px < x + w && py >= y && py < y + h; };
+    bool committed = false;
+    auto finish = [&](bool keep) {
+        if (keep) {
+            const std::string v = u32ToUtf8(textEdit_.text);
+            committed = v != value;
+            value = v;
+        }
+        textEditId_ = 0;
+        pf_.stopTextInput();
+    };
+    if (textEditId_ == id && frameClick_ && !inside(frameClickX_, frameClickY_)) finish(true);
+    // Фокус пришёл с клавиатуры — сразу набор, как после щелчка.
+    const bool focused = focusSlot(x, y, w, h);
+    const bool byFocus = focused && focusMoved_ && textEditId_ != id;
+    if (byFocus || (textEditId_ != id && frameClick_ && frameClickButton_ == MB_LEFT &&
+                    inside(frameClickX_, frameClickY_))) {
+        if (!byFocus) frameClick_ = false;
+        textEditId_ = id;
+        textEdit_ = TextField{};
+        textEdit_.text = utf8ToU32(value);
+        textEdit_.caret = textEdit_.text.size();
+        textEdit_.anchor = 0;
+        pf_.startTextInput(x, y, w, h);
+        in.presses.clear();
+        in.text.clear();
+    }
+    if (textEditId_ == id) {
+        while (!in.presses.empty()) {
+            const KeyPress kp = in.presses.front();
+            in.presses.pop_front();
+            if (kp.vk == KEY_ENTER) {
+                finish(true);
+                break;
+            }
+            if (kp.vk == KEY_TAB) {
+                finish(true);
+                if (focusOn_) focusStep(kp.shift ? -1 : 1);
+                break;
+            }
+            if (kp.vk == KEY_ESC) {
+                finish(false);
+                break;
+            }
+            editTextField(textEdit_, kp, pf_);
+        }
+        if (textEditId_ == id && !in.text.empty()) {
+            textEdit_.insert(utf8ToU32(in.text));
+            in.text.clear();
+        }
+        // Клавиши поля экран разбирать не должен: Escape — отмена правки, а
+        // не закрытие экрана.
+        in.keys.clear();
+    }
+    const bool editing = textEditId_ == id;
+    const int r = active.radius * 2;
+    fb_.fillRoundRect(x, y, x + w, y + h, r, r, active.field);
+    fb_.strokeRoundRect(x, y, x + w, y + h, r, r,
+                        editing ? cAccent : (inside(mouseX(), mouseY()) ? cText : cOutline),
+                        editing ? 2 : 1);
+    const std::string shown = editing ? u32ToUtf8(textEdit_.text) : value;
+    const int ty = y + (h - textHeight()) / 2;
+    fb_.setClip(gfx::Rect{x + 4, y + 2, x + w - 4, y + h - 2});
+    if (editing) {
+        auto widthOf = [&](std::size_t n) {
+            return textWidth(u32ToUtf8(std::u32string_view(textEdit_.text).substr(0, n)));
+        };
+        const int scroll = std::max(0, widthOf(textEdit_.caret) - (w - 20));
+        const int tx = x + 8 - scroll;
+        if (textEdit_.hasSel())
+            fb_.fillRect(tx + widthOf(textEdit_.selLo()), ty, tx + widthOf(textEdit_.selHi()),
+                         ty + textHeight(), active.fieldSelection);
+        textOut(tx, ty, shown, cText);
+        if ((pf_.milliseconds() / 530) % 2 == 0) {
+            const int cx = tx + widthOf(textEdit_.caret);
+            fb_.fillRect(cx, ty, cx + 1, ty + textHeight(), cText);
+        }
+    } else {
+        textOut(x + 8, ty, fitTextEnd(shown, w - 16), cText);
+    }
+    fb_.resetClip();
+    return committed;
+}
+
+bool Editor::uiSwitch(int x, int y, int w, const std::string& caption, bool& on) {
+    // Дорожка 36×20 справа, подпись слева; щелчок по всей строке.
+    constexpr int kTw = 36;
+    constexpr int kTh = 20;
+    const int h = 30;
+    uiLabelLeft(x, y, h, caption, cText);
+    const int tx = x + w - kTw;
+    const int ty = y + (h - kTh) / 2;
+    const bool over = mouseX() >= x && mouseX() < x + w && mouseY() >= y && mouseY() < y + h;
+    fb_.fillRoundRect(tx, ty, tx + kTw, ty + kTh, kTh, kTh, on ? cAccent : cFace);
+    fb_.strokeRoundRect(tx, ty, tx + kTw, ty + kTh, kTh, kTh, on ? cAccent : cOutline);
+    const int d = on ? kTh - 6 : kTh - 10;
+    const int cx = on ? tx + kTw - 3 - d : tx + 5;
+    const int cy = ty + (kTh - d) / 2;
+    fb_.fillRoundRect(cx, cy, cx + d, cy + d, d, d, on ? active.onAccent : cOutline);
+    if (over)
+        fb_.fillRoundRect(tx - 2, ty - 2, tx + kTw + 2, ty + kTh + 2, kTh + 4, kTh + 4,
+                          argb(20, cText.r, cText.g, cText.b));
+    const bool focused = focusSlot(x, y, w, h);
+    if (takeButtonClick(x, y, w, h, true) || focusPressed(focused)) {
+        on = !on;
+        return true;
+    }
+    return false;
+}
+
 bool Editor::uiStepper(int x, int y, const std::string& label, int& v, int lo, int hi, int big,
                        const std::string& unit) {
     const int before = v;
+    if (active.modern) {
+        // Один элемент «число» вместо четырёх кнопок ±1 и ±big (UX-26):
+        // «−» и «+» по краям, Shift с ними — крупный шаг.
+        uiLabelLeft(x, y, 30, label, cText);
+        const bool shift = isKeyPressed(KEY_SHIFT);
+        if (uiButton(x + 130, y, 30, 30, "−", v > lo)) v = std::max(lo, v - (shift ? big : 1));
+        uiNumber(x + 164, y, 160, 30, v, lo, hi, 1, big, unit);
+        if (uiButton(x + 328, y, 30, 30, "+", v < hi)) v = std::min(hi, v + (shift ? big : 1));
+        return v != before;
+    }
     uiLabelLeft(x, y, 30, label, cText);
     const std::string b = std::to_string(big);
     if (uiButton(x + 130, y, 44, 30, "−" + b, v > lo)) v = std::max(lo, v - big);

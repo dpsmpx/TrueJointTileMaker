@@ -79,9 +79,33 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             tilesFolder = val;
         } else if (key == "iconsfolder") {
             iconsFolder = val;
+        } else if (key == "tooltips") {
+            tooltips = parseBool(val, tooltips);
+        } else if (key == "cellframe") {
+            cellFrame = parseBool(val, cellFrame);
+        } else if (key == "recentfiles") {
+            // Пути через «|»: в путях Windows и Linux его не бывает.
+            recentFiles.clear();
+            std::size_t a = 0;
+            while (a <= val.size() && recentFiles.size() < kRecentMax) {
+                const std::size_t b = val.find('|', a);
+                const std::string one =
+                    netTrim(val.substr(a, b == std::string::npos ? std::string::npos : b - a));
+                if (!one.empty()) recentFiles.push_back(one);
+                if (b == std::string::npos) break;
+                a = b + 1;
+            }
         } else if (key == "theme") {
             const std::string t = netToLower(val);
-            theme = t == "classic" ? "классика" : t == "light" ? "светлая" : t;
+            if (t == "classic") {
+                theme = "классика";
+            } else if (t == "light") {
+                theme = "светлая";
+            } else if (t == "dark" || t == "темная") {
+                theme = "тёмная";
+            } else {
+                theme = t;
+            }
         } else {
             continue;
         }
@@ -163,8 +187,28 @@ std::string Config::serialize() const {
     add("");
     const Config def;
     if (theme != def.theme) {
-        add("# Тема окна: светлая или классика (облик 1.6).");
+        add("# Тема окна: светлая, тёмная или классика (облик 1.6).");
         add("Theme = " + theme);
+        add("");
+    }
+    if (tooltips != def.tooltips) {
+        add("# Всплывающие подсказки при наведении.");
+        add(std::string("Tooltips = ") + ruBool(tooltips));
+        add("");
+    }
+    if (!recentFiles.empty()) {
+        std::string list;
+        for (const std::string& f : recentFiles) {
+            if (!list.empty()) list += '|';
+            list += f;
+        }
+        add("# Недавние файлы, последний — первым. Заполняется программой.");
+        add("RecentFiles = " + list);
+        add("");
+    }
+    if (cellFrame != def.cellFrame) {
+        add("# Рамка клетки под курсором на холсте.");
+        add(std::string("CellFrame = ") + ruBool(cellFrame));
         add("");
     }
     add("# Заполняется программой.");
@@ -172,6 +216,13 @@ std::string Config::serialize() const {
     add("LastMapFile = " + lastMapFile);
     add("LastFolder = " + lastFolder);
     return out;
+}
+
+void Config::addRecent(const std::string& path) {
+    if (path.empty()) return;
+    std::erase(recentFiles, path);
+    recentFiles.insert(recentFiles.begin(), path);
+    if (recentFiles.size() > kRecentMax) recentFiles.resize(kRecentMax);
 }
 
 bool configSave(const std::string& fileName, const Config& cfg) {

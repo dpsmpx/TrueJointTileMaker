@@ -10,12 +10,15 @@
 
 #include <array>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "app/textfield.h"
 #include "core/config.h"
 #include "core/grid.h"
 #include "core/model.h"
+#include "core/shortcuts.h"
 #include "gfx/font.h"
 #include "gfx/surface.h"
 #include "platform/platform.h"
@@ -59,6 +62,24 @@ private:
     int lastClickCX_ = -100000;
     int lastClickCY_ = -100000;
 
+    // --- всплывающие подсказки (tips.cpp) ---
+    std::string tipCand_;  // что назвало себя под курсором в этом кадре
+    std::string tipLast_;  // что было под курсором в прошлом кадре
+    int tipSince_ = 0;     // с какого мига
+    std::string tipWant_;  // подсказка, которую пора показывать
+    std::string tipShown_;  // подсказка, нарисованная поверх главного окна
+    int tipX_ = 0, tipY_ = 0;
+    /// Элемент под курсором называет себя: через полсекунды — подсказка.
+    void uiTip(int x, int y, int w, int h, const std::string& text);
+    void tipEvaluate();
+    void drawTip();
+    std::string toolTip(int i) const;
+    /// Подсказки панели и ленты главного окна: их элементы — не uiButton.
+    void registerEditorTips();
+    void editorTipFrame();
+    /// Кнопка ленты кадров под точкой или -1.
+    int timelineButtonAt(int x, int y) const;
+
     // --- кэши отрисовки ---
     Grid<Color> tileBmp_;
     bool tileBmpChecker_ = false;
@@ -84,8 +105,33 @@ private:
 
     // --- утилиты (TJTM.pas: «Мелкие утилиты», «Ввод») ---
     void idle();
-    void beginFrameInput();
+    /// screen = false — кадр главного окна: там Tab переключает режим, а
+    /// не фокус.
+    void beginFrameInput(bool screen = true);
     void dropInput();
+
+    // --- фокус с клавиатуры (план «Интерфейс», B14, UX-19) ---
+    // У 1.6 диалоги разбирали только Escape: ни Tab по кнопкам, ни рамки
+    // фокуса. Кнопки, вкладки, тумблеры и поля встают в очередь фокуса в
+    // порядке вызова за кадр (immediate mode: другого порядка нет), Tab и
+    // Shift+Tab ходят по ней, Enter и пробел нажимают элемент в фокусе.
+    // Рамка видна после клавиатуры и прячется от щелчка мышью.
+    /// Разбор Tab, стрелок меню, Enter и пробела в начале кадра.
+    void focusFrame(bool screen);
+    void focusStep(int d);
+    /// Элемент встал в очередь; true — он в фокусе (рамка нарисована).
+    bool focusSlot(int x, int y, int w, int h);
+    /// Элемент в фокусе нажат с клавиатуры (Enter, пробел).
+    bool focusPressed(bool focused);
+    bool focusOn_ = false;
+    bool focusShown_ = false;
+    bool focusPress_ = false;
+    bool focusMoved_ = false;  // фокус пришёл в этом кадре: поле — сразу набор
+    /// Стрелки ходят, как Tab: меню и списки ставят на каждый кадр.
+    bool focusArrows_ = false;
+    int focusIdx_ = -1;
+    int focusCount_ = 0;
+    int focusSeen_ = 0;
     int takeKey();
     int takeWheel();
     /// Целые шаги прокрутки вбок: +1 вправо.
@@ -107,10 +153,47 @@ private:
     void saveConfig();
 
     // --- примитивы интерфейса ---
+    /// Вид кнопки в новых темах (docs/ui-design-system.md, «Компоненты»):
+    /// с рамкой — обычная, залитая — главное действие экрана, тональная —
+    /// второстепенное, текстовая — третье. «Классика» рисует все одинаково.
+    enum class Btn { Outlined, Filled, Tonal, Text };
     bool uiButton(int x, int y, int bw, int bh, const std::string& caption, bool enabled);
+    /// Главная кнопка экрана: залитая акцентом, её же нажимает Enter.
+    bool uiPrimary(int x, int y, int bw, int bh, const std::string& caption, bool enabled);
     bool uiToggle(int x, int y, int bw, int bh, const std::string& caption, bool on);
-    bool uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
-                    bool on);
+    bool uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled, bool on,
+                    Btn kind = Btn::Outlined);
+    /// Вкладка: открытая подчёркнута акцентом (UX-33). У 1.6 открытая
+    /// рисовалась выключенной кнопкой с точкой и казалась недоступной.
+    bool uiTab(int x, int y, int bw, int bh, const std::string& caption, bool open);
+    void drawButtonModern(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
+                          bool on, bool over, bool down, Btn kind);
+    /// Щелчок по прямоугольнику кнопки в этом кадре; забирает его.
+    bool takeButtonClick(int x, int y, int bw, int bh, bool enabled);
+    /// Поле числа (UX-26): щелчок — набрать с клавиатуры (Enter, Tab или
+    /// щелчок мимо — принять, Escape — отменить), ролик и стрелки над полем
+    /// — шаг, Shift — крупный шаг, протяжка по полю — быстро. true —
+    /// значение изменилось.
+    bool uiNumber(int x, int y, int w, int h, int& v, int lo, int hi, int step = 1, int big = 10,
+                  const std::string& unit = "");
+    /// Тумблер «вкл/выкл» с подписью слева (UX-28): у 1.6 — кнопка с
+    /// надписью «да» или «нет», и было не ясно, состояние это или действие.
+    bool uiSwitch(int x, int y, int w, const std::string& caption, bool& on);
+    /// Поле строки на месте (UX-28): щелчок — править, Enter или щелчок
+    /// мимо — принять (true), Escape — отменить. Работают выделение и буфер
+    /// обмена, как в askText.
+    bool uiTextLine(int x, int y, int w, int h, std::string& value);
+    std::uintptr_t textEditId_ = 0;
+    TextField textEdit_;
+    /// Поле, которое сейчас набирают, и поле, по которому нажали; номер —
+    /// адрес числа.
+    std::uintptr_t numEdit_ = 0;
+    std::uintptr_t numPress_ = 0;
+    std::string numText_;
+    /// Число только что открыто для набора: первая цифра заменяет его.
+    bool numFresh_ = false;
+    int numPressX_ = 0, numPressV_ = 0;
+    bool numDragged_ = false;
     void uiLabel(int x, int y, int bw, int bh, const std::string& caption, Color c);
     /// Число со ступенями: подпись, −big, −1, значение, +1, +big. Ширина
     /// 358 точек, высота 30. true — значение изменилось.
@@ -139,6 +222,12 @@ private:
     void drawMapCells();
     void drawAnts(int x0, int y0, int x1, int y1);
     void drawCanvas();
+    /// Рамка клетки под курсором (UX-13): нужна ли она сейчас и сама рамка.
+    bool cellFrameShown();
+    void drawCellFrame();
+    bool cellFrameWas_ = false;
+    /// Курсор по месту и инструменту.
+    Platform::Cursor cursorWanted();
 
     // --- панель ---
     void ensureHSVBitmap();
@@ -161,15 +250,51 @@ private:
     void repaintColorOnly();
 
     // --- экраны ---
+    /// Диалог карточкой над притушенным окном (UX-04): снимок того, что
+    /// было на экране, с затемнением темы. Пусто — «Классика» рисует диалог
+    /// страницей во всё окно, как 1.6.
+    struct CardBack {
+        gfx::Surface dim;  // снимок с затемнением — фон карточки
+        gfx::Surface orig;  // снимок как был — вернуть в кадр после диалога
+    };
+    std::optional<CardBack> cardBackdrop();
+    /// Начало кадра диалога: притушенный снимок и карточка, или страница.
+    void dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0, int x1, int y1);
+    /// Конец диалога: в кадре снова то, что было под карточкой, — следующий
+    /// диалог снимет чистый кадр, а не прежнюю карточку.
+    void endCard(const std::optional<CardBack>& backdrop);
     void showTextScreen(const std::string& title, const std::vector<std::string>& paragraphs);
     void showMessage(const std::string& title, const std::string& text);
+    /// Уведомление в углу на несколько секунд (UX-45): успех и запреты не
+    /// закрывают окно страницей. «Классика» — страницей, как 1.6.
+    void notify(const std::string& title, const std::string& text);
+    void drawToast();
+    std::string toastTitle_, toastText_;
+    int toastUntil_ = 0;
+    /// Ошибка с объяснением для человека и следующим шагом; технические
+    /// подробности — по кнопке (UX-46).
+    void showError(const std::string& title, const std::string& human, const std::string& details);
+    /// Не открылся или не записался файл: объяснение — какое бывает чаще.
+    void errorOpen(const std::string& title, const std::string& details);
+    void errorSave(const std::string& title, const std::string& details);
     static std::string keysHint(const std::string& enter, const std::string& escape);
     int ask3(const std::string& title, const std::string& text, const std::string& yes,
              const std::string& no, const std::string& cancel);
     bool askYesNo(const std::string& title, const std::string& text, const std::string& yes,
                   const std::string& no);
-    bool askNewSize(const std::string& title, int& nw, int& nh, int lo, int hi);
+    /// background — фон нового тайла: 0 прозрачный, 1 белый, 2 второй цвет;
+    /// nullptr — без выбора (карта).
+    bool askNewSize(const std::string& title, int& nw, int& nh, int lo, int hi,
+                    int* background = nullptr);
+    bool askNewSizeCard(const std::string& title, int& nw, int& nh, int lo, int hi,
+                        int* background);
     void showColorScreen();
+    /// Выбор цвета карточкой (color_ui.cpp, UX-27): квадрат и полосы, поля
+    /// RGBA, HSV и HEX, было и стало, недавние цвета, «в палитру».
+    void showColorPicker();
+    /// Цвет, выбранный в карточке, — первым в недавних (не больше 12).
+    void rememberColor(Color c);
+    std::vector<Color> recentColors_;
     bool askText(const std::string& title, const std::string& prompt, const std::string& initial,
                  std::string& value);
     void showColorOpsScreen();
@@ -216,6 +341,26 @@ private:
     void commandSaveSelection();
     void quitApp();
     void commandExit();
+    /// Недавние файлы списком из меню (UX-24): true — файл открыт.
+    bool openRecentAsk();
+    /// Открыть файл любого вида на место документа своего режима, спросив о
+    /// несохранённом в нём.
+    bool openAnyFile(const std::string& path);
+    /// Файл, брошенный в окно (UX-14): открыть, с Shift — слоем-образцом.
+    void openDropped(const std::string& raw, bool asReference);
+    /// Выделение — и в системный буфер обмена картинкой (UX-14).
+    void exportBufferToClipboard();
+    /// Картинка из системного буфера, положенная другой программой, —
+    /// во внутренний буфер. true — взята.
+    bool importClipboardImage();
+    /// Автосохранение (UX-23): несохранённое — в папку autosave рядом с
+    /// настройками раз в две минуты; чистый выход её очищает, а оставшееся
+    /// после сбоя программа предлагает вернуть при запуске.
+    [[nodiscard]] std::string autosaveDir() const;
+    void autosave();
+    void clearAutosave();
+    void offerRestore();
+    int autosaveMs_ = 0;
 
     // --- наборы тайлов ---
     std::string tilesDir() const;
@@ -255,7 +400,38 @@ private:
     void handlePaletteClick();
     void doOverviewDrag();
     void handlePanelClick();
+    /// Автопрокрутка при протяжке (dpsmpx/TrueJointTileMaker#16): курсор у
+    /// края холста или за ним двигает холст, и выделить или нарисовать
+    /// больше видимого можно, не отпуская кнопку. edgeScrollBegin — перед
+    /// протяжкой: пока курсор не сдвинулся, холст стоит, и мазок, начатый у
+    /// края, его не увозит.
+    void edgeScrollBegin();
+    /// true — холст сдвинут и уже перерисован; кадр нужно вывести.
+    bool edgeScroll();
+    int edgeStartX_ = 0;
+    int edgeStartY_ = 0;
+    bool edgeArmed_ = false;
+
+    // --- клавиатура (keys.cpp): таблица сочетаний, шпаргалка ---
     void handleEditorKey(int key);
+    /// Разбор клавиш 1.6 для «Классики»: Ctrl с буквой — та же буква, если
+    /// у неё нет своего сочетания с Ctrl.
+    void handleClassicKey(int key);
+    /// Команда из таблицы сочетаний; arg — номер инструмента у Cmd::Tool.
+    void runCommand(Cmd c, int arg = 0);
+    /// Шпаргалка клавиш поверх холста (F1, ?), из той же таблицы.
+    void showCheatsheet();
+    /// Стрелки двигают выделенное: инструмент выделения и есть что двигать
+    /// (правило владельца, #16). Иначе стрелки двигают холст.
+    bool arrowsMoveSelection() const;
+    /// Холст, пока стрелка зажата: плавно и всё быстрее, кадр за кадром,
+    /// а не рывками автоповтора.
+    void stepArrowPan();
+    int arrowPanMs_ = -1;  // когда нажали стрелку, двигающую холст; -1 — нет
+    int arrowPanLast_ = 0;
+    int nudgeMs_ = -1000000;
+    static constexpr int kNudgeBurstMs = 800;
+    static constexpr int kArrowPanDelayMs = 200;
 
     // --- этап 1 RoadToProLevel (pro.cpp) ---
     /// Три ячейки третьего ряда инструментов тайла: режим кисти,
@@ -268,14 +444,8 @@ private:
     void definePolygonSelection(int ax, int ay, int op);
     void moveSelectionPro(int mx, int my, bool copy);
     void drawSelectionMask();
-    bool handleProKey(int key);
-    /// Сочетания с Ctrl режима тайла: выделение, буфер, кисть из выделения.
-    bool handleProCtrlKey(int key);
     /// Вставка буфера плавающим выделением под курсором.
     void pasteBufferHere();
-    /// Клавиша с Ctrl или Alt в интерфейсе 1.7: только сочетания из таблицы,
-    /// буква без своего сочетания ничего не делает (UX-16).
-    void handleModifiedKey(int key);
     void showToolOptions();
     void showImageScreen();
     void showRotateDialog();
@@ -418,7 +588,6 @@ private:
     void drawRadialAxes();
     void drawRulers();
     void handleRulerPress();
-    bool handleGuideKey(int key);
     void showGridScreen();
 
     // --- этап 4: лента слоёв и кадров (timeline.cpp) ---
@@ -448,7 +617,6 @@ private:
     std::vector<int> timelineRows() const;
     void drawLayerKindMark(int x, int cy, const Layer& layer);
     void handleTimelineClick();
-    bool handleTimelineKey(int key);
     void timelineWheel(int wheel);
     void togglePlayback();
     void stopPlayback();

@@ -55,6 +55,9 @@ public:
     /// с дугами w x h, сглаженный. Как и у GraphABC, правый и нижний край
     /// фигуры — x2 - 1 и y2 - 1.
     void fillRoundRect(int x1, int y1, int x2, int y2, int rw, int rh, Color c);
+    /// Обводка того же контура толщиной width, без заливки: кнопке с рамкой
+    /// в новой теме поле не нужно, под ней видно то, на чём она лежит.
+    void strokeRoundRect(int x1, int y1, int x2, int y2, int rw, int rh, Color c, int width = 1);
     /// Линия толщиной в точку. Оригинал рисовал ими только сетку —
     /// вертикали и горизонтали, — им и место здесь.
     void line(int x1, int y1, int x2, int y2, Color c);

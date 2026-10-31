@@ -70,14 +70,14 @@ bool Editor::loadPaletteFile(const std::string& path, bool quiet, bool merge) {
         std::string error;
         const auto text = readFile(path);
         if (!text) {
-            if (!quiet) showMessage("Палитра не прочитана", "Не открыть файл " + path);
+            if (!quiet) errorOpen("Палитра не прочитана", "Не открыть файл " + path);
             return false;
         }
         const bool ok = ext == ".gpl"   ? pal::parseGpl(*text, p, error)
                         : ext == ".hex" ? pal::parseHex(*text, p, error)
                                         : pal::parseJasc(*text, p, error);
         if (!ok) {
-            if (!quiet) showMessage("Палитра не прочитана", error);
+            if (!quiet) errorOpen("Палитра не прочитана", error);
             return false;
         }
     } else {
@@ -119,7 +119,7 @@ bool Editor::savePaletteFile(const std::string& path) {
         ok = saveGridTo(g, path);
         return ok;
     }
-    if (!ok) showMessage("Палитра не сохранена", "Не записать файл " + path);
+    if (!ok) errorSave("Палитра не сохранена", "Не записать файл " + path);
     return ok;
 }
 
@@ -258,8 +258,7 @@ void Editor::showPaletteScreen() {
         y += 32;
         if (uiButton(RX, y, BW, BH, "Убрать повторы", true)) {
             const int removed = m.removeDuplicateEntries();
-            if (removed > 0)
-                showMessage("Повторы", "Убрано ячеек: " + std::to_string(removed) + ".");
+            if (removed > 0) notify("Повторы", "Убрано ячеек: " + std::to_string(removed) + ".");
         }
         if (uiButton(RX + BW + 6, y, BW, BH, "Стандартная", true)) {
             m.pushUndo();
@@ -317,8 +316,7 @@ void Editor::showPaletteScreen() {
                     "Палитра из картинки", "Цвета без повторов; лишние сводятся медианным разрезом",
                     {{"Не больше цветов", &maxColors, 2, pal::MAX_PALETTE}}, "Извлечь", nullptr)) {
                 const int got = m.extractPaletteFromTile(maxColors);
-                showMessage("Палитра из картинки",
-                            "Цветов в палитре: " + std::to_string(got) + ".");
+                notify("Палитра из картинки", "Цветов в палитре: " + std::to_string(got) + ".");
             }
         }
 
