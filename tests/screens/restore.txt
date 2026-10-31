@@ -1,0 +1,8 @@
+# Автосохранение после сбоя (тест AppScreens.AutosaveRestored кладёт его в
+# каталог прогона): вопрос при запуске, Enter — «Восстановить».
+key Return
+sleep 0.3
+key Escape                 # меню при запуске (настройки сценариев)
+move 770 550
+sleep 0.2
+shot 01_restored

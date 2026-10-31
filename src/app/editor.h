@@ -309,6 +309,16 @@ private:
     void commandSaveSelection();
     void quitApp();
     void commandExit();
+    /// Недавние файлы списком из меню (UX-24): true — файл открыт.
+    bool openRecentAsk();
+    /// Автосохранение (UX-23): несохранённое — в папку autosave рядом с
+    /// настройками раз в две минуты; чистый выход её очищает, а оставшееся
+    /// после сбоя программа предлагает вернуть при запуске.
+    [[nodiscard]] std::string autosaveDir() const;
+    void autosave();
+    void clearAutosave();
+    void offerRestore();
+    int autosaveMs_ = 0;
 
     // --- наборы тайлов ---
     std::string tilesDir() const;

@@ -770,7 +770,106 @@ void Editor::commandSaveSelection() {
 
 void Editor::quitApp() {
     saveConfig();
+    // Выход чистый: всё сохранено или отброшено сознательно.
+    clearAutosave();
     quitNow_ = true;
+}
+
+std::string Editor::autosaveDir() const {
+    return pathCombine(pathDirName(configPath_), "autosave");
+}
+
+void Editor::autosave() {
+    autosaveMs_ = pf_.milliseconds();
+    if (!m.tileModified && !m.mapModified) {
+        clearAutosave();
+        return;
+    }
+    const std::string dir = autosaveDir();
+    if (!makeDirs(dir)) return;
+    std::string err;
+    const std::string tile = pathCombine(dir, "tile.tjt");
+    const std::string map = pathCombine(dir, "map.map");
+    if (m.tileModified) {
+        projectSave(tile, m, err);
+    } else {
+        removeFile(tile);
+    }
+    if (m.mapModified) {
+        mapSave(map, m.map);
+    } else {
+        removeFile(map);
+    }
+    // Откуда документы: восстановленный тайл сохранится туда, где был.
+    writeFile(pathCombine(dir, "info.txt"),
+              "tile = " + m.currentFile + "\nmap = " + m.currentMapFile + "\n");
+}
+
+void Editor::clearAutosave() {
+    if (configPath_.empty()) return;
+    const std::string dir = autosaveDir();
+    for (const char* f : {"tile.tjt", "map.map", "info.txt"})
+        removeFile(pathCombine(dir, f));
+}
+
+void Editor::offerRestore() {
+    const std::string dir = autosaveDir();
+    const std::string tile = pathCombine(dir, "tile.tjt");
+    const std::string map = pathCombine(dir, "map.map");
+    if (!fileExists(tile) && !fileExists(map)) return;
+    std::string tileFrom;
+    std::string mapFrom;
+    if (const auto info = readFile(pathCombine(dir, "info.txt"))) {
+        for (const std::string& line : splitLines(*info)) {
+            if (line.starts_with("tile = ")) tileFrom = line.substr(7);
+            if (line.starts_with("map = ")) mapFrom = line.substr(6);
+        }
+    }
+    std::string what;
+    if (fileExists(tile))
+        what += tileFrom.empty() ? "новый тайл" : "«" + fileNameOnly(tileFrom) + "»";
+    if (fileExists(map)) {
+        if (!what.empty()) what += " и ";
+        what += mapFrom.empty() ? "новую карту" : "«" + fileNameOnly(mapFrom) + "»";
+    }
+    if (!askYesNo("Восстановить работу?",
+                  "Прошлый раз программа закрылась, не сохранив изменения. Вернуть " + what +
+                      " в том виде, в каком они были при последнем автосохранении?",
+                  "Восстановить", "Отбросить")) {
+        clearAutosave();
+        return;
+    }
+    if (fileExists(tile) && loadTileFrom(tile, false, false)) {
+        m.currentFile = tileFrom;
+        m.tileModified = true;
+    }
+    if (fileExists(map) && loadMapFrom(map, false, false)) {
+        m.currentMapFile = mapFrom;
+        m.mapModified = true;
+        // Карта открылась поверх тайла — вид остаётся на тайле, если был он.
+        if (fileExists(tile)) m.switchMode(DOC_TILE);
+    }
+}
+
+bool Editor::openRecentAsk() {
+    std::vector<std::string> items;
+    for (const std::string& f : cfg.recentFiles)
+        items.push_back(fileNameOnly(f) + "   —   " + pathDirName(f));
+    const int k = askChoice("Недавние файлы", "Щелчок — открыть; последний — сверху", items);
+    if (k < 0 || k >= static_cast<int>(cfg.recentFiles.size())) return false;
+    const std::string path = cfg.recentFiles[static_cast<std::size_t>(k)];
+    if (!fileExists(path)) {
+        errorOpen("Файл не найден", path);
+        return false;
+    }
+    const bool isMap = pathExtLower(path) == ".map";
+    // Вопрос — о том документе, который откроется на место текущего.
+    const int was = m.docMode;
+    m.docMode = isMap ? DOC_MAP : DOC_TILE;
+    const bool go = confirmDiscard("Открыть " + fileNameOnly(path) + "?");
+    m.docMode = was;
+    if (!go) return false;
+    return isMap ? loadMapFrom(path, false, true) : loadTileFrom(path, false, true);
 }
 
 void Editor::commandExit() {

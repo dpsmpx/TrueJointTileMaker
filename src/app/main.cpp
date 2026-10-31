@@ -29,6 +29,13 @@
 
 namespace tjtm {
 
+namespace {
+
+/// Автосохранение несохранённого — раз в две минуты.
+constexpr int kAutosaveMs = 2 * 60 * 1000;
+
+}  // namespace
+
 Editor::Editor() {
     m.drawTilePixel = [this](int x, int y) { drawTilePixel(x, y); };
     m.drawPreviewPixel = [this](int x, int y) { drawPreviewPixel(x, y); };
@@ -98,6 +105,19 @@ bool Editor::appInit(int argc, char** argv) {
         return false;
     }
     configPath_ = resolvePath("Config.txt");
+    // Настройки — рядом с программой, если туда можно писать (переносной
+    // режим, как у оригинала); иначе — в папке пользователя (UX-24): из
+    // Program Files или /usr/bin они молча не сохранялись бы.
+    if (!classic && base.empty() && !fileWritable(configPath_)) {
+        const std::string pref = Platform::prefDir();
+        if (!pref.empty()) {
+            const std::string user = pathCombine(pref, "Config.txt");
+            if (!fileExists(user)) {
+                if (const auto def = readFile(configPath_)) writeFile(user, *def);
+            }
+            configPath_ = user;
+        }
+    }
     fb_.resize(WIN_W, WIN_H, theme::cWindow);
 
     if (!TTF_Init()) {
@@ -187,6 +207,10 @@ bool Editor::appInit(int argc, char** argv) {
     ensureIcons();
     syncTitle();
     repaint();
+    autosaveMs_ = pf_.milliseconds();
+    // Работа, оставшаяся после сбоя, — вернуть, пока ничего не открыто
+    // поверх.
+    if (!classic && framesLeft_ < 0) offerRestore();
     if (framesLeft_ < 0) {
         if (cfg.showHelpOnStart) showHelpScreen();
         if (cfg.showMenuOnStart) showMainMenu();
@@ -200,6 +224,7 @@ void Editor::appStep() {
     // долгой, и щелчок во время неё не должен пропасть.
     beginFrameInput();
     editorTipFrame();
+    if (!classicUi_ && pf_.milliseconds() - autosaveMs_ >= kAutosaveMs) autosave();
     // Уведомление отслужило — стереть его полной перерисовкой.
     if (!toastText_.empty() && pf_.milliseconds() >= toastUntil_) {
         toastText_.clear();

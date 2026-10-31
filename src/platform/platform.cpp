@@ -119,6 +119,13 @@ void Platform::shutdown() {
     window_ = nullptr;
 }
 
+std::string Platform::prefDir() {
+    char* p = SDL_GetPrefPath("dpsmpx", "TrueJointTileMaker");
+    std::string s = p != nullptr ? p : "";
+    SDL_free(p);
+    return s;
+}
+
 void Platform::setCursor(Cursor c) {
     if (c == cursor_ || window_ == nullptr) return;
     cursor_ = c;

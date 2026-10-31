@@ -51,6 +51,11 @@ struct Config {
     bool tooltips = true;
     /// Рамка клетки под курсором на холсте.
     bool cellFrame = true;
+    /// Недавние файлы, последний — первым; не больше kRecentMax (UX-24).
+    std::vector<std::string> recentFiles;
+    static constexpr std::size_t kRecentMax = 10;
+    /// Файл открыт или сохранён: он — первым в недавних.
+    void addRecent(const std::string& path);
 
     /// Применяет строки файла. Возвращает число распознанных параметров.
     int applyLines(const std::vector<std::string>& lines);

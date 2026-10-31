@@ -4,6 +4,7 @@
 
 #include <cmath>
 
+#include "core/config.h"
 #include "core/model.h"
 #include "core/theme.h"
 
@@ -162,6 +163,34 @@ TEST(UiPlan, SizedEraserStrokeIsWide) {
     EXPECT_EQ(m.tile.at(8, 10).a, 255);
     m.brushSize = 1;
     EXPECT_FALSE(m.brushSized()) << "одна точка — путь оригинала";
+}
+
+// B8: недавние файлы — последний первым, без повторов, не больше десяти;
+// в файле — только когда есть, чтобы файл по умолчанию был как у оригинала.
+TEST(UiPlan, RecentFilesInConfig) {
+    Config c;
+    EXPECT_EQ(c.serialize().find("RecentFiles"), std::string::npos);
+    c.addRecent("/a/one.png");
+    c.addRecent("/b/два.map");
+    c.addRecent("/a/one.png");
+    ASSERT_EQ(c.recentFiles.size(), 2U);
+    EXPECT_EQ(c.recentFiles[0], "/a/one.png");
+    for (int i = 0; i < 12; ++i)
+        c.addRecent("/x/" + std::to_string(i) + ".png");
+    EXPECT_EQ(c.recentFiles.size(), Config::kRecentMax);
+    EXPECT_EQ(c.recentFiles[0], "/x/11.png");
+    Config back;
+    std::vector<std::string> lines;
+    const std::string text = c.serialize();
+    std::size_t a = 0;
+    while (a < text.size()) {
+        const std::size_t b = text.find('\n', a);
+        lines.push_back(text.substr(a, b == std::string::npos ? std::string::npos : b - a));
+        if (b == std::string::npos) break;
+        a = b + 1;
+    }
+    back.applyLines(lines);
+    EXPECT_EQ(back.recentFiles, c.recentFiles);
 }
 
 // A6: контраст по WCAG 2.1 — относительная яркость и отношение (L1 + 0,05) /

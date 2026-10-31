@@ -215,6 +215,9 @@ public:
     bool runScript(const std::string& path, const std::string& shotDir, std::string& error);
     /// Сценарий был и весь пройден: программе пора закрываться.
     [[nodiscard]] bool scriptFinished() const { return scripted_ && scriptDone_; }
+    [[nodiscard]] bool scripted() const { return scripted_; }
+    /// Папка настроек пользователя (SDL_GetPrefPath); пусто — нет такой.
+    [[nodiscard]] static std::string prefDir();
 
 private:
     /// convert — пересчитать координаты окна в координаты кадра. События

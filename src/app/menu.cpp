@@ -589,7 +589,12 @@ void Editor::showMainMenu() {
         int y = 100;
         if (uiButton(bx, y, bw, bh, "Продолжить редактирование", true)) done = true;
         y += stp;
-        if (uiButton(bx, y, bw, bh, fitText(lastCaption, bw - 20), lastOk)) {
+        if (active.modern) {
+            // Список недавних вместо одного «последнего файла» (UX-24).
+            if (uiButton(bx, y, bw, bh, "Недавние файлы…", !cfg.recentFiles.empty()) &&
+                openRecentAsk())
+                done = true;
+        } else if (uiButton(bx, y, bw, bh, fitText(lastCaption, bw - 20), lastOk)) {
             commandOpenLast();
             done = true;
         }

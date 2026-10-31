@@ -17,6 +17,10 @@ bool writeFile(const std::string& path, std::string_view data);
 bool fileExists(const std::string& path);
 bool dirExists(const std::string& path);
 bool makeDirs(const std::string& path);
+/// Удалить файл; его уже нет — тоже успех.
+bool removeFile(const std::string& path);
+/// Можно ли писать в файл (или создать его) — пробой дописывания.
+bool fileWritable(const std::string& path);
 
 /// Path.IsPathRooted.
 bool isPathRooted(const std::string& p);

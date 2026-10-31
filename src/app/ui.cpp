@@ -124,6 +124,7 @@ void Editor::rememberFile(const std::string& p, bool isMap) {
         cfg.lastFile = p;
     }
     cfg.lastFolder = pathDirName(p);
+    cfg.addRecent(p);
     saveConfig();
 }
 
