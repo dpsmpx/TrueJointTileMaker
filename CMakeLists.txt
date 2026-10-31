@@ -106,6 +106,7 @@ if(TJTM_BUILD_APP)
         src/app/guides.cpp
         src/app/main.cpp
         src/app/map_ui.cpp
+        src/app/tips.cpp
         src/app/menu.cpp
         src/app/palette_ui.cpp
         src/app/panel.cpp

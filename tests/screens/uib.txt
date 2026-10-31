@@ -1,0 +1,15 @@
+# Этап B плана «Интерфейс» (docs/roadmap.md): основа удобства. Светлая тема
+# (uib.config); меню при запуске закрывается.
+key Escape
+sleep 0.4
+# B2: подсказка через полсекунды над значком инструмента и кнопкой ленты.
+move 622 22
+sleep 0.8
+shot 01_tip_tool
+key j
+move 384 434
+sleep 0.8
+shot 02_tip_timeline
+key j
+move 300 280
+sleep 0.3

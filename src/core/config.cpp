@@ -79,6 +79,8 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             tilesFolder = val;
         } else if (key == "iconsfolder") {
             iconsFolder = val;
+        } else if (key == "tooltips") {
+            tooltips = parseBool(val, tooltips);
         } else if (key == "theme") {
             const std::string t = netToLower(val);
             if (t == "classic") {
@@ -173,6 +175,11 @@ std::string Config::serialize() const {
     if (theme != def.theme) {
         add("# Тема окна: светлая, тёмная или классика (облик 1.6).");
         add("Theme = " + theme);
+        add("");
+    }
+    if (tooltips != def.tooltips) {
+        add("# Всплывающие подсказки при наведении.");
+        add(std::string("Tooltips = ") + ruBool(tooltips));
         add("");
     }
     add("# Заполняется программой.");

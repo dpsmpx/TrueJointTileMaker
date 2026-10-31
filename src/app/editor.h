@@ -59,6 +59,24 @@ private:
     int lastClickCX_ = -100000;
     int lastClickCY_ = -100000;
 
+    // --- всплывающие подсказки (tips.cpp) ---
+    std::string tipCand_;  // что назвало себя под курсором в этом кадре
+    std::string tipLast_;  // что было под курсором в прошлом кадре
+    int tipSince_ = 0;     // с какого мига
+    std::string tipWant_;  // подсказка, которую пора показывать
+    std::string tipShown_;  // подсказка, нарисованная поверх главного окна
+    int tipX_ = 0, tipY_ = 0;
+    /// Элемент под курсором называет себя: через полсекунды — подсказка.
+    void uiTip(int x, int y, int w, int h, const std::string& text);
+    void tipEvaluate();
+    void drawTip();
+    std::string toolTip(int i) const;
+    /// Подсказки панели и ленты главного окна: их элементы — не uiButton.
+    void registerEditorTips();
+    void editorTipFrame();
+    /// Кнопка ленты кадров под точкой или -1.
+    int timelineButtonAt(int x, int y) const;
+
     // --- кэши отрисовки ---
     Grid<Color> tileBmp_;
     bool tileBmpChecker_ = false;

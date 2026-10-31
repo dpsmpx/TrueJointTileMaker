@@ -34,6 +34,7 @@ void Editor::beginFrameInput() {
     frameClickY_ = in.clickY;
     frameClickButton_ = in.clickButton;
     in.clickPending = false;
+    tipEvaluate();
     checkQuit();
 }
 
@@ -74,6 +75,7 @@ void Editor::waitMouseRelease() {
 }
 
 void Editor::redraw() {
+    if (!classicUi_) drawTip();
     pf_.present(fb_);
 }
 
@@ -202,7 +204,10 @@ void Editor::drawButtonModern(int x, int y, int bw, int bh, const std::string& c
     if (outlined)
         fb_.strokeRoundRect(x, y, x + bw, y + bh, r, r,
                             enabled ? t.outline : argb(31, t.text.r, t.text.g, t.text.b));
-    textCentered(x + 4, y, x + bw - 4, y + bh, fitTextEnd(caption, bw - 8), content);
+    const std::string shown = fitTextEnd(caption, bw - 8);
+    textCentered(x + 4, y, x + bw - 4, y + bh, shown, content);
+    // Обрезанная подпись — целиком в подсказке.
+    if (shown != caption) uiTip(x, y, bw, bh, caption);
 }
 
 bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
