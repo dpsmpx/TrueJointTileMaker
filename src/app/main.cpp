@@ -159,6 +159,7 @@ bool Editor::appInit(int argc, char** argv) {
     // Интерфейс 1.7 и дальше (docs/roadmap.md, «Интерфейс — план»).
     classicUi_ = classic;
     m.keepSelectionPerDoc = !classic;
+    m.zoomSteps = !classic;
     pf_.input().fineWheel = !classic;
     if (!classic) {
         m.undoBudget = std::int64_t{256} * 1024 * 1024;

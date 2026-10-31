@@ -46,6 +46,7 @@ enum class Cmd {
     ZoomIn,
     ZoomOut,
     ZoomFit,
+    Zoom100,
     Hand,
     PanLeft,
     PanRight,

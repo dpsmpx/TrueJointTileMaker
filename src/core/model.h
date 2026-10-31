@@ -22,6 +22,7 @@
 #include "core/color.h"
 #include "core/grid.h"
 #include "core/mapdoc.h"
+#include "core/pmath.h"
 #include "core/png.h"
 #include "core/sprite.h"
 #include "core/theme.h"
@@ -217,6 +218,14 @@ public:
 
     // Панорама и масштаб, общие для обоих режимов.
     int pixelSize = 8;
+    /// Масштаб ступенями 1, 2, 3, 4, 6, 8 … 64 и уменьшение до 50 и 25 %
+    /// (план «Интерфейс», B12, UX-03). У оригинала ролик только удваивал
+    /// и делил, и большой лист в окно не помещался; без флага — так же.
+    bool zoomSteps = false;
+    /// Уменьшение: на точке экрана zoomOut точек документа (2 — 50 %,
+    /// 4 — 25 %), pixelSize тогда 1. Только у тайла: клетка карты при
+    /// 100 % и так в одну точку.
+    int zoomOut = 1;
     int viewX = 0, viewY = 0;
     bool gridOn = false;
     bool checkerOn = true;
@@ -452,8 +461,18 @@ public:
     int docH() const;
     bool isModified() const;
     void markModified();
-    int tileToScreenX(int tx) const { return viewX + tx * pixelSize; }
-    int tileToScreenY(int ty) const { return viewY + ty * pixelSize; }
+    int tileToScreenX(int tx) const { return viewX + scr(tx); }
+    int tileToScreenY(int ty) const { return viewY + scr(ty); }
+    /// Длина n точек документа на экране.
+    int scr(int n) const { return zoomOut > 1 ? floorDiv(n, zoomOut) : n * pixelSize; }
+    /// То же для координаты в половинах точки (оси, направляющие).
+    int scr2(int n2) const { return zoomOut > 1 ? floorDiv(n2, 2 * zoomOut) : n2 * pixelSize / 2; }
+    /// Сторона одной точки документа на экране, не меньше точки экрана.
+    int cellPx() const { return zoomOut > 1 ? 1 : pixelSize; }
+    /// Точек экрана на точку документа.
+    double scale() const { return static_cast<double>(pixelSize) / zoomOut; }
+    /// Масштаб в процентах: 800 — восемь точек экрана на точку.
+    int zoomPercent() const { return zoomOut > 1 ? 100 / zoomOut : pixelSize * 100; }
     int screenToTileX(int sx) const;
     int screenToTileY(int sy) const;
     /// Единственная проверка границ, которой пользуются все операции.
@@ -463,6 +482,8 @@ public:
     void fitScale();
     /// Масштаб вокруг точки экрана: клетка под курсором остаётся на месте.
     void zoomAt(int dir, int ax, int ay);
+    /// Задать масштаб вокруг точки экрана (out — zoomOut).
+    void setZoom(int ps, int out, int ax, int ay);
     void resetSelection();
 
     // --- палитра и привязка ---

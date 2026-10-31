@@ -74,12 +74,11 @@ void Editor::applyLayout() {
     if (m.H == h && m.X0 == r && m.Y0 == r) return;
     // Тайл, что влезал в холст целиком, влезает и в укороченный; иначе
     // масштаб остаётся прежним, а вид лишь поджимается к краям.
-    const bool fitted =
-        m.docW() * m.pixelSize <= m.W - m.X0 && m.docH() * m.pixelSize <= m.H - m.Y0;
+    const bool fitted = m.scr(m.docW()) <= m.W - m.X0 && m.scr(m.docH()) <= m.H - m.Y0;
     m.H = h;
     m.X0 = r;
     m.Y0 = r;
-    if (fitted && (m.docW() * m.pixelSize > m.W - m.X0 || m.docH() * m.pixelSize > m.H - m.Y0)) {
+    if (fitted && (m.scr(m.docW()) > m.W - m.X0 || m.scr(m.docH()) > m.H - m.Y0)) {
         m.fitScale();
     } else {
         m.clampView();

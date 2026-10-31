@@ -97,3 +97,11 @@ shot 13_keys_find
 key Escape
 key Escape
 sleep 0.2
+# B12: масштаб ступенями; Ctrl+1 — 100 %, ступень вниз — 50 %, в сведениях
+# — проценты.
+key ctrl+1 minus
+move 700 558
+sleep 0.2
+shot 14_zoom_out
+key ctrl+0
+sleep 0.2

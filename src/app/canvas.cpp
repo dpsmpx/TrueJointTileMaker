@@ -73,8 +73,8 @@ void Editor::drawTileCells() {
     const int Y0 = m.Y0;
     const int ox = m.tileToScreenX(0);
     const int oy = m.tileToScreenY(0);
-    const int sw = m.tile.w * m.pixelSize;
-    const int sh = m.tile.h * m.pixelSize;
+    const int sw = m.scr(m.tile.w);
+    const int sh = m.scr(m.tile.h);
 
     int cl = X0;
     int ct = Y0;
@@ -254,11 +254,11 @@ void Editor::drawCanvas() {
     const Color axis = active.symAxis;
     if (m.symX) {
         // Ось может стоять не посередине: её место — в половинах точки.
-        const int cx = m.tileToScreenX(0) + m.axisX2() * m.pixelSize / 2;
+        const int cx = m.tileToScreenX(0) + m.scr2(m.axisX2());
         fb_.fillRect(cx - 1, m.tileToScreenY(0), cx + 1, m.tileToScreenY(m.docH()), axis);
     }
     if (m.symY) {
-        const int cy = m.tileToScreenY(0) + m.axisY2() * m.pixelSize / 2;
+        const int cy = m.tileToScreenY(0) + m.scr2(m.axisY2());
         fb_.fillRect(m.tileToScreenX(0), cy - 1, m.tileToScreenX(m.docW()), cy + 1, axis);
     }
     fb_.resetClip();
@@ -292,7 +292,7 @@ void Editor::drawCellFrame() {
         // нет, — тёмной линией снаружи и светлой внутри.
         std::set<std::pair<int, int>> cells;
         m.forEachBrushCell(tx, ty, [&](int x, int y) { cells.emplace(x, y); });
-        const int ps = m.pixelSize;
+        const int ps = m.cellPx();
         fb_.setClip(canvasRect());
         for (const auto& [x, y] : cells) {
             const int sx = m.tileToScreenX(x);
@@ -319,8 +319,8 @@ void Editor::drawCellFrame() {
     }
     const int x0 = m.tileToScreenX(tx);
     const int y0 = m.tileToScreenY(ty);
-    const int x1 = x0 + m.pixelSize;
-    const int y1 = y0 + m.pixelSize;
+    const int x1 = x0 + m.cellPx();
+    const int y1 = y0 + m.cellPx();
     fb_.setClip(canvasRect());
     fb_.frameRect(x0 - 1, y0 - 1, x1 + 1, y1 + 1, active.antsDark);
     fb_.frameRect(x0, y0, x1, y1, active.antsLight);

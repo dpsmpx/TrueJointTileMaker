@@ -316,8 +316,11 @@ void Editor::drawInfoSection() {
     } else {
         s = "—";
     }
-    s += "\n" + std::to_string(m.docW()) + "x" + std::to_string(m.docH()) + "  " +
-         std::to_string(m.pixelSize) + "x" + alpha;
+    // Масштаб в процентах (UX-03): «8x» рядом с «64x64» читался как ещё
+    // один размер. «Классика» пишет по-старому.
+    const std::string zoom =
+        active.modern ? std::to_string(m.zoomPercent()) + "%" : std::to_string(m.pixelSize) + "x";
+    s += "\n" + std::to_string(m.docW()) + "x" + std::to_string(m.docH()) + "  " + zoom + alpha;
     if (m.docMode == DOC_MAP) s += "  объектов " + std::to_string(m.map.objects.size());
     // У карты нет миниатюры буфера: сведения — во всю ширину, иначе
     // строка размера рвалась на три (UX-32).

@@ -180,7 +180,7 @@ void Editor::definePolygonSelection(int ax, int ay, int op) {
         const int fx = m.tileToScreenX(pts.front().first);
         const int fy = m.tileToScreenY(pts.front().second);
         fb_.setClip(canvasRect());
-        fb_.frameRect(fx - 3, fy - 3, fx + m.pixelSize + 3, fy + m.pixelSize + 3, cAccent);
+        fb_.frameRect(fx - 3, fy - 3, fx + m.cellPx() + 3, fy + m.cellPx() + 3, cAccent);
         fb_.resetClip();
         redraw();
         if (frameClick_) {

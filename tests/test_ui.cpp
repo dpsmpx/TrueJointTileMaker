@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 #include "core/config.h"
 #include "core/model.h"
@@ -354,6 +355,109 @@ TEST(UiShortcuts, SheetLabels) {
     EXPECT_EQ(row(Cmd::MainMenu), "Esc, M");
     EXPECT_EQ(row(Cmd::Tool), "1 … 9");
     EXPECT_EQ(keyName(KEY_SEMICOLON, MOD_CTRL), "Ctrl+;");
+}
+
+// --- B12: масштаб ступенями и меньше 100 % ---------------------------------
+
+TEST(UiZoom, OriginalDoubles) {
+    Model m = tileModel();
+    m.pixelSize = 8;
+    m.zoomAt(1, 100, 100);
+    EXPECT_EQ(m.pixelSize, 16);
+    m.pixelSize = 1;
+    m.zoomAt(-1, 100, 100);
+    EXPECT_EQ(m.pixelSize, 1);
+    EXPECT_EQ(m.zoomOut, 1);
+}
+
+TEST(UiZoom, StepsUpAndDown) {
+    Model m = tileModel();
+    m.zoomSteps = true;
+    m.pixelSize = 8;
+    std::vector<int> up;
+    for (int i = 0; i < 7; ++i) {
+        m.zoomAt(1, 100, 100);
+        up.push_back(m.zoomPercent());
+    }
+    EXPECT_EQ(up, (std::vector<int>{1200, 1600, 2400, 3200, 4800, 6400, 6400}));
+    m.pixelSize = 8;
+    std::vector<int> down;
+    for (int i = 0; i < 8; ++i) {
+        m.zoomAt(-1, 100, 100);
+        down.push_back(m.zoomPercent());
+    }
+    EXPECT_EQ(down, (std::vector<int>{600, 400, 300, 200, 100, 50, 25, 25}));
+    // Вписанный масштаб между ступенями: шаг — к соседней ступени.
+    m.setZoom(5, 1, 100, 100);
+    m.zoomAt(1, 100, 100);
+    EXPECT_EQ(m.pixelSize, 6);
+    m.setZoom(5, 1, 100, 100);
+    m.zoomAt(-1, 100, 100);
+    EXPECT_EQ(m.pixelSize, 4);
+}
+
+TEST(UiZoom, MapStopsAtHundred) {
+    Model m = tileModel();
+    m.zoomSteps = true;
+    m.switchMode(DOC_MAP);
+    m.setZoom(1, 1, 100, 100);
+    m.zoomAt(-1, 100, 100);
+    EXPECT_EQ(m.zoomOut, 1);
+    m.setZoom(1, 2, 100, 100);
+    EXPECT_EQ(m.zoomOut, 1);
+}
+
+TEST(UiZoom, ZoomOutCoordinates) {
+    Model m = tileModel(200, 200);
+    m.zoomSteps = true;
+    m.setZoom(1, 2, 0, 0);
+    EXPECT_EQ(m.scr(200), 100);
+    // Точка экрана — первая из двух точек документа под ней, и обратно.
+    for (int tx : {0, 1, 2, 57, 199}) {
+        const int sx = m.tileToScreenX(tx);
+        EXPECT_EQ(m.screenToTileX(sx), tx - tx % 2) << tx;
+    }
+    // Документ меньше холста — по середине.
+    EXPECT_EQ(m.tileToScreenX(0), m.X0 + (m.W - m.X0 - 100) / 2);
+}
+
+TEST(UiZoom, AnchorStays) {
+    Model m = tileModel(300, 300);
+    m.zoomSteps = true;
+    m.setZoom(8, 1, 0, 0);
+    m.viewX = -600;
+    m.viewY = -600;
+    m.clampView();
+    const int ax = 300;
+    const int ay = 250;
+    const int tx = m.screenToTileX(ax);
+    const int ty = m.screenToTileY(ay);
+    m.zoomAt(1, ax, ay);
+    EXPECT_NEAR(m.screenToTileX(ax), tx, 1);
+    EXPECT_NEAR(m.screenToTileY(ay), ty, 1);
+}
+
+TEST(UiZoom, FitShrinksBigSheet) {
+    // Лист 512×512 в холсте 300×300 (линейки, лента, а с этапа C — окно
+    // любого размера).
+    Model m = tileModel(512, 512);
+    m.W = m.X0 + 300;
+    m.H = m.Y0 + 300;
+    m.fitScale();
+    EXPECT_EQ(m.zoomOut, 1);  // без флага — как у оригинала: 100 %, не влезает
+    m.zoomSteps = true;
+    m.fitScale();
+    EXPECT_EQ(m.zoomOut, 2);
+    EXPECT_LE(m.scr(m.docW()), m.W - m.X0);
+    EXPECT_LE(m.scr(m.docH()), m.H - m.Y0);
+    m.W = m.X0 + 120;
+    m.fitScale();
+    EXPECT_EQ(m.zoomOut, 4);  // мельче 25 % не бывает
+    Model small = tileModel(16, 16);
+    small.zoomSteps = true;
+    small.fitScale();
+    EXPECT_EQ(small.zoomOut, 1);
+    EXPECT_GT(small.pixelSize, 1);
 }
 
 }  // namespace

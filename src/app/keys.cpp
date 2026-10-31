@@ -210,6 +210,7 @@ void Editor::runCommand(Cmd c, int arg) {
             m.fitScale();
             m.needRepaint = true;
             break;
+        case Cmd::Zoom100: m.setZoom(1, 1, (m.X0 + m.W) / 2, (m.Y0 + m.H) / 2); break;
         case Cmd::Hand: spaceHand(); break;
         case Cmd::PanLeft: pan(step, 0); break;
         case Cmd::PanRight: pan(-step, 0); break;
@@ -359,7 +360,7 @@ void Editor::showCheatsheet() {
     constexpr int kMinText = 100;  // уже — клавиши строкой ниже текста
     const int colW = (kX1 - kX0 - 28 - (kCols - 1) * kColGap) / kCols;
     const int lh = textHeight();
-    const int rowLh = lh + 3;
+    int rowLh = lh + 3;  // уменьшается, если иначе не влезает (fitRows)
     const bool tile = m.docMode == DOC_TILE;
     const std::span<const Shortcut> all = shortcuts();
     std::string query;
@@ -374,8 +375,9 @@ void Editor::showCheatsheet() {
         int keysW = 0;
         std::vector<std::string> text;
         bool keysBelow = false;  // клавиши не помещаются рядом с текстом
-        int h = 0;
+        int lines = 0;
     };
+    auto rowH = [&](const Row& r) { return r.header ? lh + 6 : r.lines * rowLh + 3; };
     // Общие клавиши — строкой внизу: они нужны в любом режиме и иначе не
     // помещаются в столбцы.
     struct Foot {
@@ -405,7 +407,7 @@ void Editor::showCheatsheet() {
                 Row hdr;
                 hdr.header = true;
                 hdr.text = {s.group};
-                hdr.h = lh + 6;
+                hdr.lines = 1;
                 rows.push_back(hdr);
             }
             r.keysW = textWidth(r.keys) + 12;
@@ -413,12 +415,41 @@ void Editor::showCheatsheet() {
             r.keysBelow = besideW < kMinText;
             r.text = wrapWords(s.text, r.keysBelow ? colW : besideW,
                                [&](const std::string& t) { return textWidth(t); });
-            r.h = static_cast<int>(r.text.size() + (r.keysBelow ? 1 : 0)) * rowLh + 3;
+            r.lines = static_cast<int>(r.text.size()) + (r.keysBelow ? 1 : 0);
             rows.push_back(r);
         }
         return rows;
     };
+    const int top = kY0 + 48;
+    const int bottom = kY1 - 40;
+    // Столбцы: заголовок раздела не остаётся один внизу столбца. Отдаёт
+    // столбец и y каждой строки; столбец kCols — не влезла.
+    auto place = [&](const std::vector<Row>& rows, std::vector<std::pair<int, int>>& at) {
+        at.clear();
+        int col = 0;
+        int y = top;
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            const int h = rowH(rows[i]);
+            const int need = h + (rows[i].header && i + 1 < rows.size() ? rowH(rows[i + 1]) : 0);
+            if (y + need > bottom && y > top) {
+                ++col;
+                y = top;
+            }
+            at.emplace_back(col, y);
+            y += h;
+        }
+        return col < kCols;
+    };
+    // Таблица растёт — строки плотнее, но всё на одном экране.
+    auto fitRows = [&](const std::vector<Row>& rows, std::vector<std::pair<int, int>>& at) {
+        for (rowLh = lh + 3; rowLh > lh; --rowLh) {
+            if (place(rows, at)) return;
+        }
+        place(rows, at);
+    };
     std::vector<Row> rows = layout(query);
+    std::vector<std::pair<int, int>> at;
+    fitRows(rows, at);
     std::string laidFor = query;
 
     while (!done && !quitNow_) {
@@ -437,26 +468,17 @@ void Editor::showCheatsheet() {
         const std::string live = searching ? u32ToUtf8(textEdit_.text) : query;
         if (laidFor != live) {
             rows = layout(live);
+            fitRows(rows, at);
             laidFor = live;
         }
 
-        // Столбцы: заголовок раздела не остаётся один внизу столбца.
-        const int top = kY0 + 48;
-        const int bottom = kY1 - 40;
-        int col = 0;
-        int y = top;
         for (std::size_t i = 0; i < rows.size(); ++i) {
             const Row& r = rows[i];
-            const int need = r.h + (r.header && i + 1 < rows.size() ? rows[i + 1].h : 0);
-            if (y + need > bottom && y > top) {
-                ++col;
-                y = top;
-            }
+            const auto [col, y] = at[i];
             if (col >= kCols) break;
             const int x = kX0 + 14 + col * (colW + kColGap);
             if (r.header) {
                 textOut(x, y + 5, r.text[0], cAccent);
-                y += r.h;
                 continue;
             }
             int ty = y;
@@ -469,7 +491,6 @@ void Editor::showCheatsheet() {
             fb_.fillRoundRect(kx, ky - 1, kx + r.keysW, ky + lh + 2, 8, 8, cFace);
             fb_.strokeRoundRect(kx, ky - 1, kx + r.keysW, ky + lh + 2, 8, 8, cOutline, 1);
             textOut(kx + 6, ky, r.keys, cText);
-            y += r.h;
         }
         if (rows.empty() && foot.empty()) textOut(kX0 + 14, top + 6, "Ничего не нашлось", cTextDim);
         int fx = kX0 + 14;

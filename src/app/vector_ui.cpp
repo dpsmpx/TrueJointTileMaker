@@ -76,7 +76,7 @@ void Editor::drawVectorHandles() {
     // обводкой читается на любом рисунке, у последней тронутой — цвета
     // выделения.
     fb_.setClip(canvasRect());
-    const int ps = m.pixelSize;
+    const double ps = m.scale();
     for (std::size_t i = 0; i < m.tileShapes.size(); ++i) {
         const bool sel = static_cast<int>(i) == vecSel_;
         for (const VecPoint& p : m.tileShapes[i].pts) {
@@ -91,7 +91,7 @@ void Editor::drawVectorHandles() {
 
 void Editor::doVectorTool(int mx, int my) {
     const bool vectorLayer = m.activeKind() == LK_VECTOR;
-    const int ps = std::max(1, m.pixelSize);
+    const double ps = m.scale();
     auto docX = [&](int sx) { return static_cast<double>(sx - m.tileToScreenX(0)) / ps; };
     auto docY = [&](int sy) { return static_cast<double>(sy - m.tileToScreenY(0)) / ps; };
     const double r = std::max(0.6, 6.0 / ps);

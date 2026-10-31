@@ -237,7 +237,7 @@ void Editor::doGradientTool(int ax, int ay) {
             m.applyGradient(region, ax, ay, bx, by);
             drawCanvas();
             // Направление — линией цвета выделения от центра к центру точек.
-            const int ps = m.pixelSize;
+            const int ps = m.cellPx();
             fb_.setClip(canvasRect());
             fb_.line(m.tileToScreenX(ax) + ps / 2, m.tileToScreenY(ay) + ps / 2,
                      m.tileToScreenX(bx) + ps / 2, m.tileToScreenY(by) + ps / 2, cAccent);
@@ -267,7 +267,7 @@ void Editor::drawBrushGhost() {
     const int cy = m.screenToTileY(mouseY());
     const int ox = cx - (b.w - 1) / 2;
     const int oy = cy - (b.h - 1) / 2;
-    const int ps = m.pixelSize;
+    const int ps = m.cellPx();
     fb_.setClip(canvasRect());
     for (int y = 0; y < b.h; ++y) {
         for (int x = 0; x < b.w; ++x) {
