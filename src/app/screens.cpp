@@ -81,8 +81,56 @@ std::string Editor::keysHint(const std::string& enter, const std::string& escape
     return s;
 }
 
+std::optional<gfx::Surface> Editor::cardBackdrop() {
+    if (!active.modern) return std::nullopt;
+    gfx::Surface s = fb_;
+    s.fillRect(0, 0, WIN_W, WIN_H, active.scrim);
+    return s;
+}
+
+void Editor::dialogBack(const std::optional<gfx::Surface>& backdrop, int x0, int y0, int x1,
+                        int y1) {
+    if (!backdrop) {
+        fb_.clear(cWindow);
+        return;
+    }
+    fb_ = *backdrop;
+    const int r = active.radius * 4;
+    fb_.fillRoundRect(x0, y0, x1, y1, r, r, cBorder);
+    fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 2, r - 2, cFace);
+}
+
 void Editor::showMessage(const std::string& title, const std::string& text) {
-    showTextScreen(title, {text});
+    // Сообщение в несколько строк — карточкой над окном, как вопрос:
+    // страница во всё окно ради одной строки теряла картинку (UX-45).
+    constexpr int kW = 560;
+    const std::vector<std::string> lines = layoutText({text}, kW - 48);
+    if (!active.modern || lines.size() > 12) {
+        showTextScreen(title, {text});
+        return;
+    }
+    const auto backdrop = cardBackdrop();
+    const int lh = textHeight() + 2;
+    const int h = 112 + static_cast<int>(lines.size()) * lh;
+    const int x0 = (WIN_W - kW) / 2;
+    const int y0 = (WIN_H - h) / 2;
+    bool done = false;
+    dropInput();
+    pf_.input().keys.clear();
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        dialogBack(backdrop, x0, y0, x0 + kW, y0 + h);
+        textCentered(x0, y0 + 12, x0 + kW, y0 + 40, title, cText);
+        for (std::size_t i = 0; i < lines.size(); ++i)
+            textOut(x0 + 24, y0 + 48 + static_cast<int>(i) * lh, lines[i], cText);
+        if (uiPrimary(x0 + kW / 2 - 70, y0 + h - 50, 140, 34, "Закрыть", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC || key == KEY_ENTER || key == KEY_BACK) done = true;
+        idle();
+    }
+    waitMouseRelease();
+    m.needRepaint = true;
 }
 
 /// Вопрос с тремя вариантами: 1 — да, 0 — нет, -1 — отмена.
@@ -90,14 +138,17 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
                  const std::string& no, const std::string& cancel) {
     int res = -1;
     bool done = false;
+    const auto backdrop = cardBackdrop();
     dropInput();
     pf_.input().keys.clear();
     const int H = WIN_H;
+    // На карточке текст — в её ширину, на странице — почти во всё окно.
+    const int tx = backdrop ? WIN_W / 2 - 280 : 40;
     while (!done && !quitNow_) {
         beginFrameInput();
-        fb_.clear(cWindow);
+        dialogBack(backdrop, WIN_W / 2 - 300, H / 2 - 104, WIN_W / 2 + 300, H / 2 + 104);
         textCentered(0, H / 2 - 90, WIN_W, H / 2 - 50, title, cText);
-        textCentered(40, H / 2 - 46, WIN_W - 40, H / 2 + 10, text, cText);
+        textCentered(tx, H / 2 - 46, WIN_W - tx, H / 2 + 10, text, cText);
         if (uiPrimary(WIN_W / 2 - 270, H / 2 + 30, 170, 34, yes, true)) {
             res = 1;
             done = true;
@@ -134,14 +185,16 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
                       const std::string& no) {
     bool res = false;
     bool done = false;
+    const auto backdrop = cardBackdrop();
     dropInput();
     pf_.input().keys.clear();
     const int H = WIN_H;
+    const int tx = backdrop ? WIN_W / 2 - 230 : 40;
     while (!done && !quitNow_) {
         beginFrameInput();
-        fb_.clear(cWindow);
+        dialogBack(backdrop, WIN_W / 2 - 250, H / 2 - 104, WIN_W / 2 + 250, H / 2 + 104);
         textCentered(0, H / 2 - 90, WIN_W, H / 2 - 50, title, cText);
-        textCentered(40, H / 2 - 46, WIN_W - 40, H / 2 + 10, text, cText);
+        textCentered(tx, H / 2 - 46, WIN_W - tx, H / 2 + 10, text, cText);
         if (uiPrimary(WIN_W / 2 - 180, H / 2 + 30, 170, 34, yes, true)) {
             res = true;
             done = true;
@@ -381,6 +434,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
                      const std::string& initial, std::string& value) {
     bool done = false;
     bool ok = false;
+    const auto backdrop = cardBackdrop();
     dropInput();
     pf_.input().keys.clear();
     pf_.input().presses.clear();
@@ -456,7 +510,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
         if (cx - tf.scroll > inner) tf.scroll = cx - inner;
         if (cx - tf.scroll < 0) tf.scroll = cx;
 
-        fb_.clear(cWindow);
+        dialogBack(backdrop, fx - 24, fy - 120, fx + fw + 24, fy + 110);
         textCentered(0, fy - 110, WIN_W, fy - 74, title, cText);
         uiLabel(0, fy - 70, WIN_W, 24, prompt, cTextDim);
         uiLabel(0, fy + 34, WIN_W, 20,
@@ -476,7 +530,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
             fb_.fillRect(tx + cx, ty, tx + cx + 1, ty + mono_.textHeight(), cText);
         fb_.resetClip();
 
-        if (uiButton(WIN_W / 2 - 180, fy + 60, 170, 36, "Готово", true)) {
+        if (uiPrimary(WIN_W / 2 - 180, fy + 60, 170, 36, "Готово", true)) {
             ok = true;
             done = true;
         }

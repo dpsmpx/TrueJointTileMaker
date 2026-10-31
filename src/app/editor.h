@@ -10,6 +10,7 @@
 
 #include <array>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -198,6 +199,12 @@ private:
     void repaintColorOnly();
 
     // --- экраны ---
+    /// Диалог карточкой над притушенным окном (UX-04): снимок того, что
+    /// было на экране, с затемнением темы. Пусто — «Классика» рисует диалог
+    /// страницей во всё окно, как 1.6.
+    std::optional<gfx::Surface> cardBackdrop();
+    /// Начало кадра диалога: притушенный снимок и карточка, или страница.
+    void dialogBack(const std::optional<gfx::Surface>& backdrop, int x0, int y0, int x1, int y1);
     void showTextScreen(const std::string& title, const std::vector<std::string>& paragraphs);
     void showMessage(const std::string& title, const std::string& text);
     static std::string keysHint(const std::string& enter, const std::string& escape);

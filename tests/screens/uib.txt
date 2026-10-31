@@ -17,3 +17,11 @@ sleep 0.3
 move 302 282
 sleep 0.2
 shot 03_cell_frame
+# B4: вопрос — карточкой над притушенным окном, картинку видно.
+key 1
+drag 150 150 300 150
+key ctrl+n
+sleep 0.3
+shot 04_card
+key Escape
+sleep 0.2
