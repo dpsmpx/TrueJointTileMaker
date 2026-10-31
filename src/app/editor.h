@@ -9,6 +9,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -445,6 +446,25 @@ private:
     std::string statusInfo();
     void drawStatusBar();
     int menuHover_ = -1;
+    /// Галочка включённого: в шрифте знака ✓ нет — рисуется линиями.
+    void drawCheck(int x, int y, Color c);
+
+    // Панель параметров инструмента (C2, UX-08, UX-18): всё, что у 1.6
+    // открывалось правой кнопкой по инструменту, и режимы — с видимым
+    // состоянием. Раскладка — списком элементов: по нему и рисуется, и
+    // разбирается щелчок, и находятся подсказки.
+    struct BarItem {
+        int x0 = 0, x1 = 0;
+        std::string text;
+        std::string tip;
+        bool on = false;
+        bool button = true;  // false — подпись
+        std::function<void()> act;
+    };
+    std::vector<BarItem> optionsItems();
+    void drawOptionsBar();
+    void handleOptionsBarClick();
+    int optionsHover_ = -1;
 
     // --- клавиатура (keys.cpp): таблица сочетаний, шпаргалка ---
     void handleEditorKey(int key);

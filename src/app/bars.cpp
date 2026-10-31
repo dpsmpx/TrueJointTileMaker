@@ -10,8 +10,10 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <ranges>
 
 #include "app/editor.h"
+#include "core/imageops.h"
 #include "core/text.h"
 #include "core/theme.h"
 
@@ -31,7 +33,7 @@ constexpr int kSepH = 9;
 
 void Editor::applyBars() const {
     const bool bars = active.modern && !classicUi_;
-    gLayout.top = bars ? kMenuBarH : 0;
+    gLayout.top = bars ? kMenuBarH + OPTIONS_BAR_H : 0;
     gLayout.bottom = bars ? kStatusH : 0;
 }
 
@@ -220,7 +222,7 @@ void Editor::openMenu(int menu) {
                 fb_.fillRoundRect(x0 + 4, r.y0, x1 - 4, r.y1, active.radius * 2, active.radius * 2,
                                   cHover);
             const int ty = r.y0 + (kItemH - textHeight()) / 2;
-            if (cmdChecked(r.item->cmd)) textOut(x0 + 12, ty, "✓", cAccent);
+            if (cmdChecked(r.item->cmd)) drawCheck(x0 + 11, r.y0 + kItemH / 2, cAccent);
             textOut(x0 + 30, ty, r.item->text, cText);
             const std::string keys = commandKeys(r.item->cmd, r.item->arg, tile);
             if (!keys.empty()) textOut(x1 - 14 - textWidth(keys), ty, keys, cTextDim);
@@ -263,6 +265,213 @@ void Editor::openMenu(int menu) {
     dropInput();
     m.needRepaint = true;
     if (chosen) runCommand(run, runArg);
+}
+
+void Editor::drawCheck(int x, int y, Color c) {
+    // Две черты в две точки толщиной: короткая вниз-вправо, длинная вверх.
+    for (int t = 0; t < 2; ++t) {
+        fb_.line(x, y + t, x + 3, y + 3 + t, c);
+        fb_.line(x + 3, y + 3 + t, x + 10, y - 4 + t, c);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Панель параметров инструмента
+// ---------------------------------------------------------------------------
+
+std::vector<Editor::BarItem> Editor::optionsItems() {
+    std::vector<BarItem> left;
+    std::vector<BarItem> right;
+    const bool tile = m.docMode == DOC_TILE;
+    const int tool = tile ? m.toolTile : m.toolMap;
+    auto label = [&](const std::string& t) {
+        BarItem b;
+        b.text = t;
+        b.button = false;
+        left.push_back(b);
+    };
+    auto button = [&](const std::string& t, const std::string& tip, bool on,
+                      std::function<void()> act) {
+        BarItem b;
+        b.text = t;
+        b.tip = tip;
+        b.on = on;
+        b.act = std::move(act);
+        left.push_back(b);
+    };
+    // Размер и форма пятна — у карандаша, затенения, ластика и узора (B6).
+    auto sizeGroup = [&]() {
+        label("Размер");
+        button("−", "Кисть меньше · [", false,
+               [this] { m.brushSize = std::max(1, m.brushSize - 1); });
+        label(std::to_string(m.brushSize));
+        button("+", "Кисть больше · ]", false,
+               [this] { m.brushSize = std::min(64, m.brushSize + 1); });
+        button("Круг", "Пятно кистью-кругом", m.brushRound, [this] { m.brushRound = true; });
+        button("Квадрат", "Пятно кистью-квадратом", !m.brushRound,
+               [this] { m.brushRound = false; });
+    };
+    // Название инструмента — первая строка его подсказки, без клавиши.
+    std::string name = splitLines(toolTip(tool)).front();
+    if (const std::size_t dot = name.find(" · "); dot != std::string::npos) name.resize(dot);
+    label(name);
+    if (tile) {
+        static constexpr const char* kPen[PEN_MODES] = {"точки", "аэрограф", "кисть", "затенение"};
+        switch (tool) {
+            case T_PEN:
+                button(std::string("Вид: ") + kPen[std::clamp(m.penMode, 0, PEN_MODES - 1)],
+                       "Вид карандаша и его параметры", false, [this] { showBrushOptions(); });
+                if (m.penMode == PEN_PENCIL || m.penMode == PEN_SHADE) sizeGroup();
+                break;
+            case T_ERASER: sizeGroup(); break;
+            case T_DITHER: {
+                const int n = img::ditherPatternCount();
+                button("‹", "Узор назад · Shift+[", false,
+                       [this, n] { m.ditherPattern = (m.ditherPattern + n - 1) % n; });
+                label(img::ditherPatternName(m.ditherPattern));
+                button("›", "Узор вперёд · Shift+]", false,
+                       [this, n] { m.ditherPattern = (m.ditherPattern + 1) % n; });
+                sizeGroup();
+                break;
+            }
+            case T_FILL:
+                button("Параметры заливки…", "Допуск, градиент узором", false,
+                       [this] { showFillOptions(); });
+                break;
+            case T_LINE:
+            case T_RECT:
+            case T_ELLIPSE:
+                button("Параметры фигур…", "Вид линии, толщина, сглаживание", false,
+                       [this] { showShapeOptions(); });
+                label("Ctrl — залитая · Shift — ровная");
+                break;
+            case T_SELECT: {
+                static constexpr const char* kSel[SS_COUNT] = {"Рамка",   "Овал",     "Лассо",
+                                                               "Палочка", "По цвету", "Вершины"};
+                for (int s = 0; s < SS_COUNT; ++s)
+                    button(kSel[s], "Вид выделения", m.selShape == s,
+                           [this, s] { m.selShape = s; });
+                break;
+            }
+            default: break;
+        }
+    } else if (tool == M_PAINT || tool == M_FILL || tool == M_RECT) {
+        button("Кисть карты…", "Одна местность или смесь по весам", false,
+               [this] { showMapBrushOptions(); });
+    } else if (tool == M_OBJ) {
+        label("Вид: " + mapKindName(m.mapObjKind));
+    }
+
+    // Режимы — справа, с видимым состоянием (UX-18): у 1.6 заворот не был
+    // показан нигде, оси — полупрозрачной линией.
+    struct Mode {
+        const char* full;
+        const char* key;
+        const char* tip;
+        bool on;
+        Cmd cmd;
+    };
+    std::vector<Mode> modes;
+    modes.push_back({"Сетка", "G", "Сетка между точками · G", m.gridOn, Cmd::Grid});
+    if (tile) {
+        modes.push_back(
+            {"Бесшовно", "B", "Бесшовный предпросмотр · B", m.seamlessOn, Cmd::Seamless});
+        modes.push_back(
+            {"Заворот", "W", "Мазок через край — с другой стороны · W", m.wrapOn, Cmd::Wrap});
+        modes.push_back({"Ось ↕", "F", "Вертикальная ось симметрии · F", m.symX, Cmd::SymX});
+        modes.push_back({"Ось ↔", "D", "Горизонтальная ось симметрии · D", m.symY, Cmd::SymY});
+        modes.push_back({"ПП", "Q", "Пиксель-перфект: без углов «Г» в мазке · Q", m.pixelPerfect,
+                         Cmd::PixelPerfect});
+        modes.push_back(
+            {"Смесь", "E", "Смешивание вместо замены цвета · E", !m.brushReplace, Cmd::BlendMode});
+        modes.push_back({"Индекс", "I", "Индексная палитра · I", m.indexedOn, Cmd::Indexed});
+    } else {
+        modes.push_back(
+            {"Картинками", "B", "Карта картинками набора · Shift+B", m.mapTiles, Cmd::MapTiles});
+    }
+
+    // Раскладка: слева направо и справа налево; не помещается — режимы
+    // буквой клавиши, потом без названия инструмента.
+    constexpr int kGap = 4;
+    auto widthOf = [&](const BarItem& b) { return textWidth(b.text) + (b.button ? 18 : 8); };
+    auto leftWidth = [&](std::size_t from) {
+        int w = 8;
+        for (std::size_t i = from; i < left.size(); ++i)
+            w += widthOf(left[i]) + kGap;
+        return w;
+    };
+    auto buildRight = [&](bool shortLabels) {
+        right.clear();
+        int w = 8;
+        for (const Mode& md : modes) {
+            BarItem b;
+            b.text = shortLabels ? md.key : md.full;
+            b.tip = md.tip;
+            b.on = md.on;
+            b.act = [this, c = md.cmd] { runCommand(c); };
+            w += widthOf(b) + kGap;
+            right.push_back(b);
+        }
+        return w;
+    };
+    const int room = panelX();
+    std::size_t from = 0;
+    int rw = buildRight(false);
+    if (leftWidth(0) + rw > room) rw = buildRight(true);
+    if (leftWidth(0) + rw > room) from = 1;
+    // И так тесно — убрать режимы слева направо: они есть и в меню «Вид»,
+    // и на клавишах, а параметры инструмента — только здесь.
+    while (!right.empty() && leftWidth(from) + rw > room) {
+        rw -= widthOf(right.front()) + kGap;
+        right.erase(right.begin());
+    }
+    std::vector<BarItem> out;
+    int x = 8;
+    for (std::size_t i = from; i < left.size(); ++i) {
+        BarItem b = left[i];
+        b.x0 = x;
+        b.x1 = x + widthOf(b);
+        x = b.x1 + kGap;
+        out.push_back(b);
+    }
+    x = room - 8;
+    for (BarItem b : std::views::reverse(right)) {
+        b.x1 = x;
+        b.x0 = x - widthOf(b);
+        x = b.x0 - kGap;
+        out.push_back(b);
+    }
+    return out;
+}
+
+void Editor::drawOptionsBar() {
+    if (gLayout.top == 0) return;
+    const int y0 = kMenuBarH;
+    const int y1 = y0 + OPTIONS_BAR_H;
+    fb_.fillRect(0, y0, panelX(), y1, cPanel);
+    fb_.fillRect(0, y1 - 1, panelX(), y1, cBorder);
+    const std::vector<BarItem> items = optionsItems();
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        const BarItem& b = items[i];
+        if (!b.button) {
+            textCentered(b.x0, y0, b.x1, y1 - 1, b.text, cTextDim);
+            continue;
+        }
+        const bool over = static_cast<int>(i) == optionsHover_;
+        drawButtonModern(b.x0, y0 + 4, b.x1 - b.x0, OPTIONS_BAR_H - 9, b.text, true, b.on, over,
+                         false, Btn::Text);
+    }
+}
+
+void Editor::handleOptionsBarClick() {
+    if (frameClickButton_ != MB_LEFT) return;
+    for (const BarItem& b : optionsItems()) {
+        if (b.button && b.act && frameClickX_ >= b.x0 && frameClickX_ < b.x1) {
+            b.act();
+            m.needRepaint = true;
+            return;
+        }
+    }
 }
 
 std::string Editor::statusInfo() {

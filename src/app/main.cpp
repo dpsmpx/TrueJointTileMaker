@@ -317,7 +317,11 @@ void Editor::appStep() {
         const bool aboveCanvas = frameClickY_ < gLayout.top;
         const bool belowAll = frameClickY_ >= gLayout.h - gLayout.bottom;
         if (frameClickX_ < m.W && aboveCanvas) {
-            handleMenuBarClick();
+            if (frameClickY_ < MENU_BAR_H) {
+                handleMenuBarClick();
+            } else {
+                handleOptionsBarClick();
+            }
         } else if (frameClickX_ < m.W && belowAll) {
             // Строка состояния — только сведения.
         } else if (frameClickX_ < m.W && timelineShown() && frameClickY_ >= m.H) {
@@ -357,11 +361,25 @@ void Editor::appStep() {
     }
     // Название меню под курсором подсвечено: строка меню отвечает на
     // наведение, как кнопки.
-    if (gLayout.top > 0) {
+    if (gLayout.top > 0 && !m.needRepaint) {
         const int hover = menuSlotAt(mouseX(), mouseY());
-        if (hover != menuHover_ && !m.needRepaint) {
+        if (hover != menuHover_) {
             menuHover_ = hover;
             drawMenuBar();
+            redraw();
+        }
+        // Кнопка панели параметров под курсором — тоже.
+        int opt = -1;
+        if (mouseY() >= MENU_BAR_H && mouseY() < gLayout.top && mouseX() < panelX()) {
+            const std::vector<BarItem> items = optionsItems();
+            for (std::size_t i = 0; i < items.size(); ++i) {
+                if (items[i].button && mouseX() >= items[i].x0 && mouseX() < items[i].x1)
+                    opt = static_cast<int>(i);
+            }
+        }
+        if (opt != optionsHover_) {
+            optionsHover_ = opt;
+            drawOptionsBar();
             redraw();
         }
     }

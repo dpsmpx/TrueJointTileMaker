@@ -110,6 +110,13 @@ void Editor::registerEditorTips() {
     if (classicUi_ || !cfg.tooltips) return;
     const int px = mouseX();
     const int py = mouseY();
+    // Панель параметров инструмента (C2): подсказка — у каждой кнопки.
+    if (px < panelX() && py >= MENU_BAR_H && py < gLayout.top) {
+        for (const BarItem& b : optionsItems()) {
+            if (px >= b.x0 && px < b.x1) tipCand_ = b.tip;
+        }
+        return;
+    }
     if (px >= panelX()) {
         if (py >= TOOLS_Y0 && py < TOOLS_Y1) {
             int idx = 0;

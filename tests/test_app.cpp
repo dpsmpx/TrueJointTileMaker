@@ -210,10 +210,10 @@ TEST(AppScreens, ReleaseConfigOpensLastFile) {
     ASSERT_TRUE(tjtm::pngLoad((base / fs::path(u8"Картинки") / "debug.png").string(), img, err))
         << err;
     // Картинка вписана в холст: её середина — посреди холста. Меню на её
-    // месте рисовало бы кнопки. Над холстом выпуска — строка меню, под
-    // ним — строка состояния (светлая тема, C2).
-    const int top = tjtm::MENU_BAR_H;
-    const int ch = tjtm::CANVAS_H - tjtm::MENU_BAR_H - tjtm::STATUS_BAR_H;
+    // месте рисовало бы кнопки. Над холстом выпуска — строка меню и
+    // параметры инструмента, под ним — строка состояния (светлая тема, C2).
+    const int top = tjtm::MENU_BAR_H + tjtm::OPTIONS_BAR_H;
+    const int ch = tjtm::CANVAS_H - top - tjtm::STATUS_BAR_H;
     const int ps = std::min(tjtm::CANVAS_W / img.w, ch / img.h);
     const int ox = (tjtm::CANVAS_W - img.w * ps) / 2;
     const int oy = top + (ch - img.h * ps) / 2;

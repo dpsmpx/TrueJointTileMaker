@@ -68,6 +68,8 @@ inline int panelX() {
 /// C2) — в новых темах.
 inline constexpr int MENU_BAR_H = 26;
 inline constexpr int STATUS_BAR_H = 24;
+/// Панель параметров инструмента под строкой меню (C2, UX-08).
+inline constexpr int OPTIONS_BAR_H = 34;
 
 /// Ширина линеек слева и сверху холста (этап 5).
 inline constexpr int RULER_SIZE = 20;

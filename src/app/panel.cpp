@@ -113,6 +113,17 @@ void Editor::drawToolsSection() {
             textCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, toolLabel(i),
                          m.curTool() == i ? sel : cText);
         }
+        // Уголок — у инструмента есть параметры, правой кнопкой (UX-08): у
+        // 1.6 об этом намёка не было нигде.
+        const bool params = m.docMode == DOC_TILE ? (i == T_PEN || i == T_FILL || i == T_LINE ||
+                                                     i == T_RECT || i == T_ELLIPSE)
+                                                  : (i == M_PAINT || i == M_FILL || i == M_RECT);
+        if (active.modern && params) {
+            const int cx = x0 + TOOL_CW - 5;
+            const int cy = y0 + TOOL_CH - 5;
+            for (int k = 0; k < 5; ++k)
+                fb_.fillRect(cx - k, cy - 4 + k, cx + 1, cy - 3 + k, cTextDim);
+        }
     }
     drawToolChips();
 }
@@ -375,6 +386,7 @@ void Editor::repaint() {
     drawTimeline();
     drawPanel();
     drawMenuBar();
+    drawOptionsBar();
     drawStatusBar();
     redraw();
     m.needRepaint = false;
