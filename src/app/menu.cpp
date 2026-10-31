@@ -58,7 +58,7 @@ void Editor::showHelpScreen() {
     add("");
     add("ДВА РЕЖИМА");
     par("Тайл — рисование картинки. Карта — локация игры Andors-Love в формате");
-    par("data/maps/*.map. Переключение через меню; оба документа живут");
+    par("data/maps/*.map. Переключение — клавишей Tab или через меню; оба документа живут");
     par("одновременно, переход туда и обратно ничего не теряет.");
     add("");
     add("ОБЩЕЕ ПРАВИЛО МЫШИ");
@@ -286,7 +286,8 @@ void Editor::showHelpScreen() {
     par("юга 4 и запада 8; за краем карты считается та же местность. Кнопка");
     par("«Заготовка» открывает все варианты сеткой 4 на 4, «Разрезать на");
     par("варианты» пишет их в набор, и карта картинками сразу их подбирает.");
-    par("Сама игра пока читает только основной тайл.");
+    par("Игра Andors-Love читает и основной тайл, и варианты: набор без вариантов");
+    par("она рисует как прежде.");
     add("");
     add("КИСТЬ, ЗАТЕНЕНИЕ, ГРАДИЕНТ, ОБРАЗЕЦ");
     par("Правая кнопка по карандашу выбирает его вид: чистые точки, аэрограф,");
@@ -375,7 +376,7 @@ void Editor::showHelpScreen() {
     par("открыть картинку не удалось: тогда создаётся пустой тайл.");
     add("");
     add("БЛАГОДАРНОСТИ");
-    add("Автор программы — DeadPixel, vk.com/deadpixel_programmer.");
+    add("Автор программы — dpsmpx, vk.com/dpsmpx.");
     par("Команде PascalABC.NET за язык и библиотеку GraphABC: на них написана");
     par("первая версия редактора, и её облик сохранён в этой.");
     add("Авторам SDL за библиотеку, на которой построен нынешний редактор.");
@@ -612,7 +613,7 @@ void Editor::showMainMenu() {
 
         uiLabel(0, WIN_H - 26, WIN_W, 22,
                 std::string("версия ") + kAppVersion +
-                    "   ·   настройки в Config.txt   ·   Escape закрывает меню",
+                    "   ·   Escape закрывает меню",
                 cTextDim);
         redraw();
         if (takeKey() == KEY_ESC) done = true;
@@ -664,8 +665,16 @@ void Editor::ensureIcons() {
         if (path.empty() || !fileExists(path)) continue;
         Grid<Color> g;
         if (!readImageGrid(path, g, true)) continue;
-        iconBmp_[static_cast<std::size_t>(i)] =
-            gridFromBgra(makeThumbAlphaRaw(g, ICON_PX), ICON_PX);
+        // У 1.6 значок 32 точки сжимался до 28 ближайшим соседом: выпадали
+        // четыре строки и столбца, и тонкие линии рвались (UX-31). Теперь
+        // масштаб — только в целое число раз, чтобы влезть в кнопку.
+        int px = ICON_PX;
+        if (!classicUi_) {
+            const int size = std::max({1, g.w, g.h});
+            px = size <= ICON_MAX_PX ? size * (ICON_MAX_PX / size)
+                                     : size / ((size + ICON_MAX_PX - 1) / ICON_MAX_PX);
+        }
+        iconBmp_[static_cast<std::size_t>(i)] = gridFromBgra(makeThumbAlphaRaw(g, px), px);
     }
     m.needRepaint = true;
 }
@@ -851,7 +860,7 @@ bool Editor::showTilesetScreen() {
         if (uiButton(WIN_W / 2 + 120, 456, 220, 32, "Закрыть", true)) done = true;
 
         uiLabel(0, WIN_H - 44, WIN_W, 18,
-                "Пустое место игра рисует по-старому — набор можно делать по одному тайлу",
+                "Пустой слот игра рисует знаком шрифта — набор можно делать по одному тайлу",
                 cTextDim);
         uiLabel(0, WIN_H - 26, WIN_W, 18,
                 "Состав жителей и врагов читается из самой папки: что в ней лежит, то и здесь",

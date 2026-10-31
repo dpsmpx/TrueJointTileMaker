@@ -42,7 +42,7 @@ void Editor::showBrushOptions() {
         }
         const int mode = m.penMode;
         if (mode == PEN_PENCIL) {
-            uiLabelLeft(LX, 130, 22, "Точка за точкой, как в оригинале: замена или смешивание,",
+            uiLabelLeft(LX, 130, 22, "Каждая точка мазка — ровно один пиксель: замена или смешивание,",
                         cTextDim);
             uiLabelLeft(LX, 150, 22, "пиксель-перфект, сила кисти — в параметрах инструментов.",
                         cTextDim);

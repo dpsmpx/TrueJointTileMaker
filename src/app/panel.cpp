@@ -93,8 +93,8 @@ void Editor::drawToolsSection() {
                               (m.docMode == DOC_MAP && i == M_PAINT && m.mapMix);
         if (!airLabel && ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
             !iconBmp_[static_cast<std::size_t>(ic)].empty()) {
-            fb_.drawImage(iconBmp_[static_cast<std::size_t>(ic)], x0 + (TOOL_CW - 2 - ICON_PX) / 2,
-                          y0 + (TOOL_CH - 2 - ICON_PX) / 2);
+            const Grid<Color>& icon = iconBmp_[static_cast<std::size_t>(ic)];
+            fb_.drawImage(icon, x0 + (TOOL_CW - 2 - icon.w) / 2, y0 + (TOOL_CH - 2 - icon.h) / 2);
         } else {
             textCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, toolLabel(i),
                          m.curTool() == i ? active.onAccent : cText);
@@ -194,8 +194,11 @@ void Editor::drawTerrainSection() {
                       m.mapBrush == i ? cAccent : cBorder);
         // Подпись светлая на тёмной местности и наоборот.
         const bool dark = i == MT_WALL || i == MT_TREE || i == MT_WATER || i == MT_DEADWATER;
-        textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MTERR_CH - 2,
-                     std::string(1, mapTileChar(i)) + " " + mapTileName(i),
+        // «стоячая вода» со знаком не влезала и обрезалась снизу (UX-32):
+        // тогда — название без знака.
+        std::string label = std::string(1, mapTileChar(i)) + " " + mapTileName(i);
+        if (textWidth(label) > MSEL_CW - 6) label = fitTextEnd(mapTileName(i), MSEL_CW - 6);
+        textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MTERR_CH - 2, label,
                      dark ? active.labelOnDark : active.labelOnLight);
     }
 }
@@ -303,7 +306,13 @@ void Editor::drawInfoSection() {
     s += "\n" + std::to_string(m.docW()) + "x" + std::to_string(m.docH()) + "  " +
          std::to_string(m.pixelSize) + "x" + alpha;
     if (m.docMode == DOC_MAP) s += "  объектов " + std::to_string(m.map.objects.size());
-    uiLabel(PANEL_X + 46, INFO_Y0, PANEL_W - 48, INFO_Y1 - INFO_Y0, s, cText);
+    // У карты нет миниатюры буфера: сведения — во всю ширину, иначе
+    // строка размера рвалась на три (UX-32).
+    if (m.docMode == DOC_MAP) {
+        uiLabel(PANEL_X + 2, INFO_Y0, PANEL_W - 4, INFO_Y1 - INFO_Y0, s, cText);
+    } else {
+        uiLabel(PANEL_X + 46, INFO_Y0, PANEL_W - 48, INFO_Y1 - INFO_Y0, s, cText);
+    }
 }
 
 void Editor::drawMenuButtonSection() {

@@ -337,7 +337,7 @@ void Editor::showMapBrushOptions() {
         } else {
             uiLabelLeft(LX, 110, 22, "Кисть, прямоугольник и заливка кладут местность, выбранную",
                         cTextDim);
-            uiLabelLeft(LX, 130, 22, "на панели, — как в оригинале.", cTextDim);
+            uiLabelLeft(LX, 130, 22, "на панели.", cTextDim);
         }
         if (uiButton(WIN_W / 2 - 90, WIN_H - 52, 180, 36, "Закрыть", true)) done = true;
         redraw();

@@ -76,6 +76,9 @@ inline constexpr int TOOL_CH = 36;
 /// Сторона значка на кнопке инструмента: значок любого размера
 /// показывается уменьшенным до неё.
 inline constexpr int ICON_PX = 28;
+/// Значок интерфейса 1.7: не больше 32 точек — столько вмещает кнопка
+/// 42×34 без сжатия (UX-31).
+inline constexpr int ICON_MAX_PX = 32;
 
 inline constexpr int BAR_SIZE = 100;
 inline constexpr int BAR_H = 12;

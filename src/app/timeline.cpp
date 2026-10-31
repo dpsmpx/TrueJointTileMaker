@@ -812,7 +812,7 @@ void Editor::showAnimationScreen() {
         y += ST;
         if (act(c4, y, "Анимация APNG…", tile)) exportAnimationAsk(false);
         y += ST;
-        if (act(c4, y, "Кадры отдельными PNG…", tile)) exportFramesAsk();
+        if (act(c4, y, "Каждый кадр в PNG…", tile)) exportFramesAsk();
         y += ST;
         if (act(c4, y, "Проект .tjt…", tile)) commandSaveAs();
         y += ST;

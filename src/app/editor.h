@@ -118,6 +118,7 @@ private:
     void textCentered(int x0, int y0, int x1, int y1, const std::string& s, Color c);
     void textOut(int x, int y, const std::string& s, Color c);
     std::string fitText(const std::string& s, int maxW) const;
+    std::string fitTextEnd(const std::string& s, int maxW) const;
     int textWidth(const std::string& s) const { return font_.textWidth(s); }
     int textHeight() const { return font_.textHeight(); }
     std::vector<std::string> layoutText(const std::vector<std::string>& paragraphs,
