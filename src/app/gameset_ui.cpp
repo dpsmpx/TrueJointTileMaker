@@ -137,7 +137,7 @@ void Editor::drawMapContextLabel() {
                               " из " + std::to_string(count) + "   Ctrl+B — дальше";
     const int lw = textWidth(label) + 12;
     fb_.fillRect(m.X0 + 4, m.Y0 + 4, m.X0 + 4 + lw, m.Y0 + 4 + textHeight() + 6,
-                 argb(200, 255, 255, 255));
+                 active.noteBack);
     textOut(m.X0 + 10, m.Y0 + 7, label, cText);
 }
 

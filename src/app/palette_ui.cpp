@@ -181,7 +181,7 @@ void Editor::showPaletteScreen() {
                 fb_.frameRect(x0, y0, x0 + CELL - 1, y0 + CELL - 1, cAccent);
             }
             if (k == m.firstIdx)
-                fb_.frameRect(x0 + 2, y0 + 2, x0 + CELL - 3, y0 + CELL - 3, rgb(255, 255, 255));
+                fb_.frameRect(x0 + 2, y0 + 2, x0 + CELL - 3, y0 + CELL - 3, active.cellMark);
         }
         // Щелчки по сетке: левая — выбрать (с Shift — до неё), правая —
         // взять цветом, левая по «+» — добавить первый цвет.

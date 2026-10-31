@@ -118,7 +118,7 @@ void Editor::drawTileCells() {
 
     // Соседние копии притушены, чтобы было видно, где сам тайл.
     if (m.seamlessOn || context) {
-        const Color dim = argb(56, 0, 0, 0);
+        const Color dim = active.seamDim;
         if (oy > Y0) fb_.fillRect(X0, Y0, W, std::min(oy, H), dim);
         if (oy + sh < H) fb_.fillRect(X0, std::max(Y0, oy + sh), W, H, dim);
         if (ox > X0) fb_.fillRect(X0, std::max(Y0, oy), std::min(ox, W), std::min(H, oy + sh), dim);
@@ -133,7 +133,7 @@ void Editor::drawTileCells() {
     if (m.hasSelection && m.selW > 0 && m.selH > 0 && m.selMask.empty()) {
         fb_.fillRect(m.tileToScreenX(m.selX), m.tileToScreenY(m.selY),
                      m.tileToScreenX(m.selX + m.selW), m.tileToScreenY(m.selY + m.selH),
-                     argb(64, cAccent.r, cAccent.g, cAccent.b));
+                     accentAlpha(active.selectionAlpha));
     }
 
     // Сетка — линии поверх по последнему столбцу и строке каждой клетки.
@@ -171,11 +171,11 @@ void Editor::drawMapCells() {
                 if (sel)
                     fb_.fillRect(m.tileToScreenX(j), m.tileToScreenY(i), m.tileToScreenX(j + 1) - g,
                                  m.tileToScreenY(i + 1) - g,
-                                 argb(80, cAccent.r, cAccent.g, cAccent.b));
+                                 accentAlpha(active.mapSelectionAlpha));
                 continue;
             }
             Color c = mapTileColor(m.map.at(j, i));
-            if (sel) c = blendOver(argb(80, cAccent.r, cAccent.g, cAccent.b), c);
+            if (sel) c = blendOver(accentAlpha(active.mapSelectionAlpha), c);
             fb_.fillRect(m.tileToScreenX(j), m.tileToScreenY(i), m.tileToScreenX(j + 1) - g,
                          m.tileToScreenY(i + 1) - g, c);
         }
@@ -197,10 +197,10 @@ void Editor::drawMapCells() {
             }
         }
         fb_.fillRect(sx + 1, sy + 1, sx + m.pixelSize - 1, sy + m.pixelSize - 1,
-                     argb(210, 250, 250, 210));
+                     active.mapLabelBack);
         if (m.pixelSize >= 10)
             textCentered(sx, sy, sx + m.pixelSize, sy + m.pixelSize, mapObjGlyph(o.kind),
-                         rgb(20, 20, 30));
+                         active.mapLabelText);
     }
     fb_.resetClip();
 }
@@ -211,8 +211,8 @@ void Editor::drawMapCells() {
 void Editor::drawAnts(int x0, int y0, int x1, int y1) {
     if (x1 <= x0 || y1 <= y0) return;
     fb_.setClip(canvasRect());
-    fb_.dashedRect(x0, y0, x1, y1, argb(255, 245, 245, 250), 1 << 20, 0);
-    fb_.dashedRect(x0, y0, x1, y1, argb(255, 20, 20, 24), 4, antsPhase_);
+    fb_.dashedRect(x0, y0, x1, y1, active.antsLight, 1 << 20, 0);
+    fb_.dashedRect(x0, y0, x1, y1, active.antsDark, 4, antsPhase_);
     fb_.resetClip();
 }
 
@@ -251,7 +251,7 @@ void Editor::drawCanvas() {
 
     // Оси симметрии видно на холсте, иначе легко забыть, что они включены.
     fb_.setClip(canvasRect());
-    const Color axis = argb(90, 220, 60, 60);
+    const Color axis = active.symAxis;
     if (m.symX) {
         // Ось может стоять не посередине: её место — в половинах точки.
         const int cx = m.tileToScreenX(0) + m.axisX2() * m.pixelSize / 2;

@@ -480,6 +480,8 @@ private:
     void exportRange(int& from, int& to) const;
 
     // --- запуск ---
+    /// Тема окна из настроек; с --classic — всегда «Классика».
+    void applyTheme();
     void initColorBars();
     void syncTitle();
     void finishFrame();

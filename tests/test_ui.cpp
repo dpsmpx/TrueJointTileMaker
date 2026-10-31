@@ -2,7 +2,10 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include "core/model.h"
+#include "core/theme.h"
 
 namespace tjtm {
 namespace {
@@ -90,6 +93,46 @@ TEST(UiPlan, PaletteCellWriteIsUndone) {
     m.palette[1] = argb(255, 0, 0, 0);
     m.doUndo();
     EXPECT_EQ(m.palette[1].argb(), before.argb());
+}
+
+// A6: контраст по WCAG 2.1 — относительная яркость и отношение (L1 + 0,05) /
+// (L2 + 0,05).
+double luminance(Color c) {
+    auto lin = [](int v) {
+        const double s = v / 255.0;
+        return s <= 0.04045 ? s / 12.92 : std::pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+}
+
+double contrast(Color a, Color b) {
+    const double la = luminance(a);
+    const double lb = luminance(b);
+    return (std::max(la, lb) + 0.05) / (std::min(la, lb) + 0.05);
+}
+
+TEST(UiTheme, LightThemeMeetsWcag) {
+    const theme::Theme t = theme::lightTheme();
+    EXPECT_GE(contrast(t.text, t.back), 4.5);
+    EXPECT_GE(contrast(t.text, t.window), 4.5);
+    EXPECT_GE(contrast(t.textDim, t.window), 4.5) << "подсказки — мелкий текст";
+    EXPECT_GE(contrast(t.textDim, t.back), 4.5);
+    EXPECT_GE(contrast(t.outline, t.window), 3.0) << "граница нажимаемого";
+    EXPECT_GE(contrast(t.outline, t.back), 3.0);
+    EXPECT_GE(contrast(t.onAccent, t.accent), 4.5);
+    EXPECT_GE(contrast(t.accent, t.window), 4.5) << "акцентом пишут «режим тайла»";
+}
+
+TEST(UiTheme, ClassicKeepsTheLookOf16) {
+    // На «Классике» сверяются сценарии оригинала: её цвета не меняются.
+    const theme::Theme t = theme::classicTheme();
+    EXPECT_EQ(t.window.argb(), rgb(240, 242, 246).argb());
+    EXPECT_EQ(t.border.argb(), rgb(205, 210, 218).argb());
+    EXPECT_EQ(t.outline.argb(), t.border.argb());
+    EXPECT_EQ(t.textDim.argb(), rgb(122, 130, 141).argb());
+    EXPECT_EQ(t.checkA.argb(), rgb(214, 214, 218).argb());
+    EXPECT_EQ(t.radius, 7);
+    EXPECT_LT(contrast(t.textDim, t.window), 4.5) << "в 1.6 подсказки были бледнее нормы";
 }
 
 }  // namespace

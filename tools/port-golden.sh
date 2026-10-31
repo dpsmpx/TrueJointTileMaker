@@ -18,7 +18,11 @@ BIN="$ROOT/build/debug/tjtm"
 WORK="$ROOT/build/port-golden/$SC"
 rm -rf "$WORK"
 mkdir -p "$WORK/base" "$WORK/shots"
-cp "$ROOT/Config.txt" "$WORK/base"/
+# Настройки сценариев, а не выпуска, и добавка сценария — как в тесте.
+cp "$ROOT/tests/screens/Config.txt" "$WORK/base"/
+if [ -f "$ROOT/tests/screens/$SC.config" ]; then
+    cat "$ROOT/tests/screens/$SC.config" >> "$WORK/base/Config.txt"
+fi
 cp -r "$ROOT/Resources" "$ROOT/Картинки" "$WORK/base"/
 # Свои файлы сценария (набор тайлов, карта), как в тесте.
 if [ -d "$ROOT/tests/screens/$SC.files" ]; then

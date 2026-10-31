@@ -34,6 +34,17 @@ Editor::Editor() {
     m.drawPreviewPixel = [this](int x, int y) { drawPreviewPixel(x, y); };
 }
 
+void Editor::applyTheme() {
+    // Сценарии оригинала сверяются с обликом 1.6 — «Классикой».
+    theme::active = classicUi_ || cfg.theme == "классика" ? theme::classicTheme()
+                                                           : theme::lightTheme();
+    m.checkerA = theme::active.checkA;
+    m.checkerB = theme::active.checkB;
+    m.tileBmpDirty = true;
+    m.overDirty = true;
+    m.needRepaint = true;
+}
+
 void Editor::syncTitle() {
     std::string t = std::string(kAppTitle) + " " + kAppVersion + " — ";
     if (m.docMode == DOC_MAP) {
@@ -110,8 +121,8 @@ bool Editor::appInit(int argc, char** argv) {
     m.gridOn = cfg.showGrid;
     m.checkerOn = cfg.showChecker;
     m.seamlessOn = cfg.showSeamless;
-    m.firstColor = argb(255, 0, 0, 0);
-    m.secondColor = argb(255, 255, 255, 255);
+    m.firstColor = kBlack;
+    m.secondColor = kWhite;
     // Этап 1 RoadToProLevel: карандаш пиксель-арта заменяет цвет, а не
     // смешивает; новый и очищенный тайл прозрачен; кисть и заливка не
     // выходят за выделение. Смешивание осталось — клавиша E.
@@ -127,6 +138,7 @@ bool Editor::appInit(int argc, char** argv) {
     // Интерфейс 1.7 и дальше (docs/roadmap.md, «Интерфейс — план»).
     classicUi_ = classic;
     m.keepSelectionPerDoc = !classic;
+    applyTheme();
     m.syncHSVFromColor();
     m.setDefaultPalette();
     m.buffer.clear();

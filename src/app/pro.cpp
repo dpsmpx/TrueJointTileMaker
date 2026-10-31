@@ -308,7 +308,7 @@ void Editor::moveSelectionPro(int mx, int my, bool copy) {
 void Editor::drawSelectionMask() {
     if (m.selMask.empty() || !m.hasSelection) return;
     fb_.setClip(canvasRect());
-    const Color tint = argb(64, cAccent.r, cAccent.g, cAccent.b);
+    const Color tint = accentAlpha(active.selectionAlpha);
     for (int y = m.selY; y < m.selY + m.selH; ++y) {
         int x = m.selX;
         while (x < m.selX + m.selW) {
@@ -323,8 +323,8 @@ void Editor::drawSelectionMask() {
                          m.tileToScreenY(y + 1), tint);
         }
     }
-    const Color light = argb(255, 245, 245, 250);
-    const Color dark = argb(255, 20, 20, 24);
+    const Color light = active.antsLight;
+    const Color dark = active.antsDark;
     // Узор «муравьёв» привязан к экрану по диагонали: бежит одинаково по
     // всем краям, сколько бы их ни было у фигуры.
     auto ant = [&](int px, int py) {
@@ -846,10 +846,6 @@ void Editor::showImageScreen() {
             m.scaleBy(1, 2);
         y += ST;
         if (act(c2, y, "Контур первым цветом…", tile)) showOutlineDialog();
-        y += ST;
-        // Была только клавиша R: промахнуться по ней легко, а заливает она
-        // весь тайл (UX-17).
-        if (act(c2, y, "Случайные цвета на весь тайл", tile)) m.randomizeTile();
 
         // --- холст ---
         y = 78;
@@ -896,7 +892,7 @@ void Editor::showImageScreen() {
         y += ST;
         if (act(c3, y, "Вторым цветом", tile)) m.fillSelectionOrAll(m.secondColor);
         y += ST;
-        if (act(c3, y, "Прозрачным", tile)) m.fillSelectionOrAll(argb(0, 0, 0, 0));
+        if (act(c3, y, "Прозрачным", tile)) m.fillSelectionOrAll(kClear);
         y += ST;
         if (act(c3, y, "Убрать одиночные точки", tile)) m.removeIsolatedPixels();
         y += ST;
@@ -927,6 +923,9 @@ void Editor::showImageScreen() {
                               nullptr))
                 m.scaleImageTo(nw, nh, true);
         }
+        // Была только клавиша R: промахнуться по ней легко, а заливает она
+        // весь тайл (UX-17).
+        if (act(c3, 478, "Случайные цвета на весь тайл", tile)) m.randomizeTile();
         if (act(c2, 447, "Сократить цвета…", tile)) {
             int n = 16;
             if (askNumbers("Сократить цвета",

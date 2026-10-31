@@ -455,13 +455,13 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
                 "Enter — готово, Escape — отмена. Работают выделение и буфер обмена", cTextDim);
 
         fb_.fillRect(fx, fy, fx + fw, fy + fh, cAccent);
-        fb_.fillRect(fx + 1, fy + 1, fx + fw - 1, fy + fh - 1, rgb(255, 255, 255));
+        fb_.fillRect(fx + 1, fy + 1, fx + fw - 1, fy + fh - 1, active.field);
         fb_.setClip(gfx::Rect{fx + 4, fy + 2, fx + fw - 4, fy + fh - 2});
         const int tx = fx + 6 - tf.scroll;
         const int ty = fy + (fh - mono_.textHeight()) / 2;
         if (tf.hasSel()) {
             fb_.fillRect(tx + width(tf.selLo()), ty, tx + width(tf.selHi()),
-                         ty + mono_.textHeight(), rgb(173, 214, 255));
+                         ty + mono_.textHeight(), active.fieldSelection);
         }
         mono_.draw(fb_, tx, ty, u32ToUtf8(tf.text), cText);
         if (((pf_.milliseconds() - blinkStart) / 530) % 2 == 0)

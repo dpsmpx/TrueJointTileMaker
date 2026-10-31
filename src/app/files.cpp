@@ -464,7 +464,7 @@ void Editor::exportSheetAsk() {
     o.padding = padding;
     o.scale = scale;
     o.background =
-        sheetBg_ == 1 ? m.secondColor : (sheetBg_ == 2 ? m.firstColor : argb(0, 0, 0, 0));
+        sheetBg_ == 1 ? m.secondColor : (sheetBg_ == 2 ? m.firstColor : kClear);
     const SpriteSheet sheet = buildSheet(m.animationFrames(first - 1, last - 1), o);
     std::string err;
     if (!pngSave(path, sheet.image, err)) {

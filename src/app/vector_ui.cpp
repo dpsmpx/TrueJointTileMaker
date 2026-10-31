@@ -47,7 +47,7 @@ VecShape Editor::styledShape(int type) const {
     VecShape s;
     s.type = type;
     s.stroke = m.firstColor;
-    s.fill = m.shapeFill ? m.secondColor : argb(0, 0, 0, 0);
+    s.fill = m.shapeFill ? m.secondColor : kClear;
     s.width = m.shapeWidth;
     s.starPoints = m.starPoints;
     s.innerPct = m.starInner;
@@ -57,10 +57,10 @@ VecShape Editor::styledShape(int type) const {
 
 /// Фигура в работе — точками цвета выделения поверх холста.
 void Editor::previewShape(const VecShape& s) {
-    Grid<Color> g(m.docW(), m.docH(), argb(0, 0, 0, 0));
+    Grid<Color> g(m.docW(), m.docH(), kClear);
     VecShape p = s;
-    p.stroke = argb(255, 255, 255, 255);
-    p.fill = s.fill.a != 0 ? argb(255, 255, 255, 255) : argb(0, 0, 0, 0);
+    p.stroke = kWhite;
+    p.fill = s.fill.a != 0 ? kWhite : kClear;
     vec::rasterize(p, g);
     for (int y = 0; y < g.h; ++y) {
         for (int x = 0; x < g.w; ++x) {
@@ -82,8 +82,8 @@ void Editor::drawVectorHandles() {
         for (const VecPoint& p : m.tileShapes[i].pts) {
             const int sx = m.tileToScreenX(0) + pround(p.x * ps);
             const int sy = m.tileToScreenY(0) + pround(p.y * ps);
-            fb_.fillRect(sx - 3, sy - 3, sx + 4, sy + 4, sel ? cAccent : rgb(30, 30, 36));
-            fb_.fillRect(sx - 2, sy - 2, sx + 3, sy + 3, sel ? cHover : rgb(250, 250, 252));
+            fb_.fillRect(sx - 3, sy - 3, sx + 4, sy + 4, sel ? cAccent : active.handleDark);
+            fb_.fillRect(sx - 2, sy - 2, sx + 3, sy + 3, sel ? cHover : active.handleLight);
         }
     }
     fb_.resetClip();
@@ -387,12 +387,12 @@ void Editor::showTilePickerScreen() {
             m.tilemapPixels = !m.tilemapPixels;
         const int b2 = by + 40;
         if (uiButton(GX, b2, 210, 32, "Новый пустой тайл", true)) {
-            m.addTileToActiveSet(Grid<Color>(ts.tw, ts.th, argb(0, 0, 0, 0)));
+            m.addTileToActiveSet(Grid<Color>(ts.tw, ts.th, kClear));
             m.tilemapPixels = true;
         }
         if (uiButton(GX + 216, b2, 210, 32, "Тайл из выделения", m.hasSelection)) {
             m.addTileToActiveSet(tmap::cellImage(img::crop(m.compositeFrame(m.activeFrame), m.selX,
-                                                           m.selY, ts.tw, ts.th, argb(0, 0, 0, 0)),
+                                                           m.selY, ts.tw, ts.th, kClear),
                                                  0, 0, ts.tw, ts.th));
         }
         if (uiButton(GX + 432, b2, 240, 32, "Тайлы из набора игры", true)) importGameTiles();

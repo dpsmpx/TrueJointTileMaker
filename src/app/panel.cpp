@@ -97,7 +97,7 @@ void Editor::drawToolsSection() {
                           y0 + (TOOL_CH - 2 - ICON_PX) / 2);
         } else {
             textCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, toolLabel(i),
-                         m.curTool() == i ? rgb(255, 255, 255) : cText);
+                         m.curTool() == i ? active.onAccent : cText);
         }
     }
     drawToolChips();
@@ -166,14 +166,14 @@ void Editor::drawColorSection() {
 
     int mx = HSV_X0 + percentToAxis(m.sat, BAR_SIZE);
     const int my = HSV_Y0 + valueToAxis(m.val, BAR_SIZE);
-    fb_.fillRect(mx - 1, HSV_Y0, mx + 1, HSV_Y1, argb(200, 0, 0, 0));
-    fb_.fillRect(HSV_X0, my - 1, HSV_X0 + BAR_SIZE, my + 1, argb(200, 0, 0, 0));
+    fb_.fillRect(mx - 1, HSV_Y0, mx + 1, HSV_Y1, active.barMarker);
+    fb_.fillRect(HSV_X0, my - 1, HSV_X0 + BAR_SIZE, my + 1, active.barMarker);
 
     mx = HSV_X0 + hueToAxis(m.hue, BAR_SIZE);
-    fb_.fillRect(mx - 1, HUE_Y0, mx + 1, HUE_Y1, argb(200, 0, 0, 0));
+    fb_.fillRect(mx - 1, HUE_Y0, mx + 1, HUE_Y1, active.barMarker);
 
     mx = HSV_X0 + byteToAxis(m.firstColor.a, BAR_SIZE);
-    fb_.fillRect(mx - 1, ALPHA_Y0, mx + 1, ALPHA_Y1, argb(200, 220, 40, 40));
+    fb_.fillRect(mx - 1, ALPHA_Y0, mx + 1, ALPHA_Y1, active.alphaMarker);
 
     // Оба рабочих цвета: первым рисуют, второй участвует в дизеринге и обмене.
     fb_.fillRect(PANEL_X + 4, SLOT2_Y0, PANEL_X + 34, SLOT2_Y0 + 30,
@@ -196,7 +196,7 @@ void Editor::drawTerrainSection() {
         const bool dark = i == MT_WALL || i == MT_TREE || i == MT_WATER || i == MT_DEADWATER;
         textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MTERR_CH - 2,
                      std::string(1, mapTileChar(i)) + " " + mapTileName(i),
-                     dark ? rgb(245, 245, 245) : rgb(20, 20, 24));
+                     dark ? active.labelOnDark : active.labelOnLight);
     }
 }
 
@@ -210,7 +210,7 @@ void Editor::drawObjectKindSection() {
                           m.mapObjKind == i ? cAccent : cBack);
         textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MOBJ_CH - 2,
                      mapObjGlyph(mapKindName(i)) + " " + mapKindName(i),
-                     m.mapObjKind == i ? rgb(255, 255, 255) : cText);
+                     m.mapObjKind == i ? active.onAccent : cText);
     }
 }
 
@@ -246,7 +246,7 @@ void Editor::drawOverviewSection() {
     int vx1 = 0;
     int vy1 = 0;
     if (m.overviewViewport(vx0, vy0, vx1, vy1))
-        fb_.frameRect(vx0, vy0, vx1, vy1, rgb(250, 240, 80));
+        fb_.frameRect(vx0, vy0, vx1, vy1, active.viewport);
 }
 
 /// Сетка цветов, вписанная в квадрат: перебор по точкам приёмника, поэтому

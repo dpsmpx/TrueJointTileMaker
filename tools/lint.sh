@@ -75,6 +75,17 @@ cppcheck --enable=warning,style,performance,portability --std=c++20 --language=c
     --suppress=missingIncludeSystem --suppress=useStlAlgorithm --suppress=unusedStructMember \
     -I src "${FILES[@]}" || status=1
 
+echo "== цвета интерфейса"
+# Цвет экрана — роль темы (src/core/theme.h), а не число: иначе новые
+# экраны снова рождаются с литералами, и тема их не перекрасит
+# (docs/ui-design-system.md, шаг 2). Цвета документа — kClear, kBlack, kWhite.
+literals=$(grep -nE '\ba?rgb\(\s*[0-9]+\s*(,\s*[0-9]+\s*){2,3}\)' src/app/*.cpp src/app/*.h)
+if [ -n "$literals" ]; then
+    echo "$literals"
+    echo "lint: цвет числом в src/app — заведите роль в src/core/theme.h" >&2
+    status=1
+fi
+
 echo "== shellcheck"
 # Скрипты проверяются всегда целиком: их немного, и они ссылаются друг на друга.
 # Локаль UTF-8 обязательна: без неё проверяльщик спотыкается о кириллицу.

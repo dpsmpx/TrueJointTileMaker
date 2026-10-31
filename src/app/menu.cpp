@@ -450,6 +450,10 @@ void Editor::showSettingsScreen() {
         y += 36;
         if (toggleRow(30, y, "Запускаться в режиме карты", v.startInMapMode))
             v.startInMapMode = !v.startInMapMode;
+        // Облик 1.6 остаётся выбором: «Классика» — те же цвета точка в точку.
+        uiLabelLeft(410, y, 30, "Оформление", cText);
+        if (uiToggle(410 + 130, y, 96, 30, "Светлое", v.theme != "классика")) v.theme = "светлая";
+        if (uiToggle(410 + 232, y, 96, 30, "Классика", v.theme == "классика")) v.theme = "классика";
 
         y += 40;
         stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
@@ -485,6 +489,7 @@ void Editor::showSettingsScreen() {
             v.lastFolder = cfg.lastFolder;
             v.iconsFolder = cfg.iconsFolder;
             cfg = v;
+            applyTheme();
             m.gridOn = v.showGrid;
             m.checkerOn = v.showChecker;
             m.seamlessOn = v.showSeamless;

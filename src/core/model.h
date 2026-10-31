@@ -216,6 +216,10 @@ public:
     int viewX = 0, viewY = 0;
     bool gridOn = false;
     bool checkerOn = true;
+    /// Клетки шахматки под прозрачным: окно берёт их из темы, а ядро темы
+    /// не знает.
+    Color checkerA = theme::classicTheme().checkA;
+    Color checkerB = theme::classicTheme().checkB;
     bool seamlessOn = false;
     bool wrapOn = false;
     bool symX = false, symY = false;

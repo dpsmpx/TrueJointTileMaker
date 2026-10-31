@@ -17,7 +17,6 @@ namespace tjtm {
 
 namespace {
 
-constexpr Color kClear = argb(0, 0, 0, 0);
 
 int luma(Color c) {
     return 299 * c.r + 587 * c.g + 114 * c.b;

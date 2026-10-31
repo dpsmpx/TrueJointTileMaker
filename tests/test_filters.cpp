@@ -16,7 +16,6 @@ namespace {
 constexpr Color kRed = argb(255, 255, 0, 0);
 constexpr Color kGreen = argb(255, 0, 255, 0);
 constexpr Color kBlue = argb(255, 0, 0, 255);
-constexpr Color kClear = argb(0, 0, 0, 0);
 
 Grid<Color> pattern(int w, int h) {
     Grid<Color> g(w, h, kClear);

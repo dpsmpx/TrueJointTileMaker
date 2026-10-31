@@ -137,8 +137,8 @@ std::vector<std::string> splitLines(const std::string& s) {
 
 namespace {
 
-Color checkerAt(int x, int y) {
-    return ((x / 4) + (y / 4)) % 2 == 0 ? theme::cCheckA : theme::cCheckB;
+Color checkerAt(int x, int y, Color a, Color b) {
+    return ((x / 4) + (y / 4)) % 2 == 0 ? a : b;
 }
 
 void putBgra(std::vector<std::uint8_t>& raw, std::size_t k, Color c, std::uint8_t a) {
@@ -160,7 +160,8 @@ std::vector<std::uint8_t> makeThumbRaw(const Grid<Color>& g, int size) {
             const int sy = clampI(py * g.h / size, 0, g.h - 1);
             // Шахматка по точкам миниатюры, а не по пикселям тайла: клетки
             // шахматки одинаковы при любом размере исходника.
-            const Color c = blendOver(g.at(sx, sy), checkerAt(px, py));
+            const Color c = blendOver(g.at(sx, sy), checkerAt(px, py, theme::classicTheme().checkA,
+                                                                   theme::classicTheme().checkB));
             putBgra(raw,
                     (static_cast<std::size_t>(py) * static_cast<std::size_t>(size) +
                      static_cast<std::size_t>(px)) *
@@ -559,7 +560,7 @@ void Model::switchMode(int mode) {
 }
 
 Color Model::checkerColor(int x, int y) const {
-    return checkerAt(x, y);
+    return checkerAt(x, y, checkerA, checkerB);
 }
 
 Color Model::displayColor(int x, int y) const {

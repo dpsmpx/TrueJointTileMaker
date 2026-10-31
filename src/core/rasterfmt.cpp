@@ -109,7 +109,7 @@ std::vector<std::uint8_t> tiffLzwEncode(const std::vector<std::uint8_t>& data) {
         }
         acc &= (1U << bits) - 1;
     };
-    constexpr int kClear = 256;
+    constexpr int kClearCode = 256;
     constexpr int kEoi = 257;
     int next = 258;
     // Словарь «(префикс << 8 | байт) → код»: открытая адресация.
@@ -129,7 +129,7 @@ std::vector<std::uint8_t> tiffLzwEncode(const std::vector<std::uint8_t>& data) {
         return table[h];
     };
     clearTable();
-    put(kClear);
+    put(kClearCode);
     if (data.empty()) {
         put(kEoi);
         if (bits > 0) out.push_back(static_cast<std::uint8_t>((acc << (8 - bits)) & 0xFF));
@@ -151,7 +151,7 @@ std::vector<std::uint8_t> tiffLzwEncode(const std::vector<std::uint8_t>& data) {
         // Ширина кода растёт на код раньше, чем у GIF: так читает libtiff.
         if (next >= (1 << width) && width < 12) ++width;
         if (next >= 4094) {
-            put(kClear);
+            put(kClearCode);
             clearTable();
             next = 258;
             width = 9;
@@ -171,7 +171,7 @@ bool tiffLzwDecode(const std::uint8_t* data, std::size_t n, std::vector<std::uin
                    std::size_t expected) {
     out.clear();
     out.reserve(expected);
-    constexpr int kClear = 256;
+    constexpr int kClearCode = 256;
     constexpr int kEoi = 257;
     std::vector<std::uint16_t> prefix(4096);
     std::vector<std::uint8_t> suffix(4096);
@@ -196,7 +196,7 @@ bool tiffLzwDecode(const std::uint8_t* data, std::size_t n, std::vector<std::uin
         const int code = static_cast<int>((acc >> (bits - width)) & ((1U << width) - 1));
         bits -= width;
         acc &= (1U << bits) - 1;
-        if (code == kClear) {
+        if (code == kClearCode) {
             width = 9;
             next = 258;
             prev = -1;

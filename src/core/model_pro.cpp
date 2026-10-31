@@ -18,12 +18,6 @@
 
 namespace tjtm {
 
-namespace {
-
-constexpr Color kClear = argb(0, 0, 0, 0);
-
-}  // namespace
-
 // --- симметрия --------------------------------------------------------------
 
 int Model::mirrorX(int x) const {

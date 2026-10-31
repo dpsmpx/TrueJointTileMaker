@@ -68,10 +68,10 @@ const char* channelName(int c) {
 
 Color channelColor(int c) {
     switch (c) {
-        case 1: return rgb(210, 50, 50);
-        case 2: return rgb(40, 160, 60);
-        case 3: return rgb(50, 90, 220);
-        default: return rgb(40, 40, 48);
+        case 1: return active.curveChannel[1];
+        case 2: return active.curveChannel[2];
+        case 3: return active.curveChannel[3];
+        default: return active.curveChannel[0];
     }
 }
 
@@ -287,7 +287,7 @@ void Editor::showFiltersScreen() {
                 }
                 auto& pts = fx_.curves[static_cast<std::size_t>(fx_.curveChannel)];
                 fb_.fillRect(CURVE_X - 1, CURVE_Y - 1, CURVE_X + 257, CURVE_Y + 257, cBorder);
-                fb_.fillRect(CURVE_X, CURVE_Y, CURVE_X + 256, CURVE_Y + 256, rgb(250, 250, 252));
+                fb_.fillRect(CURVE_X, CURVE_Y, CURVE_X + 256, CURVE_Y + 256, active.curveBack);
                 for (int v = 0; v < 256; ++v) {
                     const int hh = hist[static_cast<std::size_t>(v)] * 120 / hmax;
                     if (hh > 0)
@@ -436,7 +436,7 @@ void Editor::showFiltersScreen() {
                 int sy = 0;
                 cornerScreen(i, sx, sy);
                 fb_.fillRect(sx - 4, sy - 4, sx + 5, sy + 5, i == dragCorner ? cAccent : cText);
-                fb_.fillRect(sx - 3, sy - 3, sx + 4, sy + 4, rgb(250, 250, 252));
+                fb_.fillRect(sx - 3, sy - 3, sx + 4, sy + 4, active.handleLight);
             }
         }
 

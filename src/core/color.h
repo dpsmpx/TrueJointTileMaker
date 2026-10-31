@@ -48,6 +48,11 @@ constexpr Color argb(int a, int r, int g, int b) {
                  static_cast<std::uint8_t>(g), static_cast<std::uint8_t>(b));
 }
 
+/// Прозрачная точка, чёрный и белый — цвета документа, а не интерфейса.
+inline constexpr Color kClear = argb(0, 0, 0, 0);
+inline constexpr Color kBlack = rgb(0, 0, 0);
+inline constexpr Color kWhite = rgb(255, 255, 255);
+
 /// Цвет в модели HSV: H 0..359, S и V 0..100.
 struct HSVColor {
     int h = 0, s = 0, v = 0;

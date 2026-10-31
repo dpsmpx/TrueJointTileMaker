@@ -48,14 +48,25 @@ std::vector<Region> readRegions() {
     return out;
 }
 
-/// Свежий каталог программы: настройки, ресурсы и картинки из репозитория.
-/// Программа пишет в Config.txt, и прогоны не должны влиять друг на друга.
+/// Свежий каталог программы: настройки сценариев, ресурсы и картинки из
+/// репозитория. Программа пишет в Config.txt, и прогоны не должны влиять
+/// друг на друга.
 fs::path makeBase(const std::string& name, const std::string& scenario = {}) {
     const fs::path src(TJTM_SOURCE_DIR);
     const fs::path base = fs::temp_directory_path() / ("tjtm_app_test_" + name);
     fs::remove_all(base);
     fs::create_directories(base);
-    fs::copy_file(src / "Config.txt", base / "Config.txt");
+    // Настройки сценариев, а не выпуска (tests/screens/Config.txt), и
+    // добавка сценария в конце: последнее значение ключа побеждает.
+    fs::copy_file(src / "tests" / "screens" / "Config.txt", base / "Config.txt");
+    {
+        std::ifstream add(src / "tests" / "screens" / ((scenario.empty() ? name : scenario) + ".config"),
+                          std::ios::binary);
+        if (add) {
+            std::ofstream out(base / "Config.txt", std::ios::binary | std::ios::app);
+            out << add.rdbuf();
+        }
+    }
     fs::copy(src / "Resources", base / "Resources", fs::copy_options::recursive);
     fs::copy(src / fs::path(u8"Картинки"), base / fs::path(u8"Картинки"),
              fs::copy_options::recursive);

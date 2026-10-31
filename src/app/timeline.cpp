@@ -62,10 +62,6 @@ int tbX(int b) {
     return x;
 }
 
-/// Цвета меток: различимы между собой, и тёмная подпись на них читается.
-constexpr Color kTagColors[] = {rgb(255, 214, 102), rgb(140, 206, 255), rgb(170, 230, 150),
-                                rgb(255, 170, 190), rgb(205, 180, 255), rgb(255, 190, 130)};
-
 bool blankGrid(const Grid<Color>& g) {
     return std::all_of(g.d.begin(), g.d.end(), [](Color c) { return c.a == 0; });
 }
@@ -169,7 +165,7 @@ void Editor::drawTimeline() {
         const int x0 = TL_NAME_W + (a - tlFirstFrame_) * TL_CELL_W + 1;
         const int x1 = TL_NAME_W + (b - tlFirstFrame_ + 1) * TL_CELL_W - 1;
         fb_.fillRect(x0, TL_TAG_Y + 1, x1, TL_HEAD_Y - 1,
-                     kTagColors[i % (sizeof kTagColors / sizeof kTagColors[0])]);
+                     active.tag[i % active.tag.size()]);
         if (static_cast<int>(i) == playTag_)
             fb_.frameRect(x0, TL_TAG_Y + 1, x1, TL_HEAD_Y - 1, cAccent);
         fb_.setClip(gfx::Rect{x0 + 1, TL_TAG_Y, x1 - 1, TL_HEAD_Y});

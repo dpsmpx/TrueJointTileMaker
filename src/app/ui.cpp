@@ -139,7 +139,7 @@ bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption
     if (enabled && !down)
         fb_.fillRoundRect(x + 1, y + 2, x + bw - 1, y + bh + 1, BTN_R, BTN_R, cShadow);
 
-    fb_.fillRoundRect(x, y, x + bw, y + bh, BTN_R, BTN_R, on ? cAccent : cBorder);
+    fb_.fillRoundRect(x, y, x + bw, y + bh, BTN_R, BTN_R, on ? cAccent : cOutline);
     Color face = on ? cHover : cBack;
     if (!enabled || down) {
         face = cFace;

@@ -17,7 +17,6 @@ namespace tjtm {
 
 namespace {
 
-constexpr Color kClear = argb(0, 0, 0, 0);
 
 std::vector<int> identity(int n) {
     std::vector<int> v(static_cast<std::size_t>(std::max(0, n)));

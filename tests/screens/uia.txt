@@ -50,3 +50,9 @@ sleep 0.3
 shot 06_unsaved
 key Escape
 sleep 0.2
+# A6: светлая тема (uia.config) — подсказки и обводка кнопок по WCAG.
+key k
+sleep 0.3
+shot 07_theme
+key Escape
+sleep 0.2
