@@ -374,6 +374,8 @@ void Editor::repaint() {
     drawCanvas();
     drawTimeline();
     drawPanel();
+    drawMenuBar();
+    drawStatusBar();
     redraw();
     m.needRepaint = false;
 }

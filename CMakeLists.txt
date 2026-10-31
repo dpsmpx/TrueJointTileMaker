@@ -100,6 +100,7 @@ if(TJTM_BUILD_APP)
 
     add_executable(tjtm
         src/app/art_ui.cpp
+        src/app/bars.cpp
         src/app/canvas.cpp
         src/app/files.cpp
         src/app/filters_ui.cpp

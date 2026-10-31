@@ -287,10 +287,14 @@ TEST(UiShortcuts, NoConflicts) {
 TEST(UiShortcuts, EveryCommandHasKeyAndName) {
     const auto all = shortcuts();
     for (int c = 0; c <= static_cast<int>(Cmd::SwitchMode); ++c) {
-        const bool found = std::any_of(all.begin(), all.end(), [&](const Shortcut& s) {
+        const bool key = std::any_of(all.begin(), all.end(), [&](const Shortcut& s) {
             return static_cast<int>(s.cmd) == c;
         });
-        EXPECT_TRUE(found) << "команда " << c << " без клавиши";
+        const auto menu = menuItems();
+        const bool item = std::any_of(menu.begin(), menu.end(), [&](const MenuItem& mi) {
+            return mi.text != nullptr && static_cast<int>(mi.cmd) == c;
+        });
+        EXPECT_TRUE(key || item) << "команда " << c << " — ни клавиши, ни пункта меню";
     }
     for (const Shortcut& s : all)
         EXPECT_NE(keyName(s.key, s.mods)[0], '#') << "клавиша без имени: " << s.key;
@@ -345,6 +349,26 @@ TEST(UiShortcuts, ShiftFallsBackAndModesSplit) {
     EXPECT_EQ(cmd(KEY_N, 0, true), -1);
     EXPECT_EQ(cmd(KEY_S, 0, true), -1);
     EXPECT_EQ(cmd(KEY_R, 0, true), -1);
+}
+
+TEST(UiShortcuts, MenuItemsAreKnown) {
+    // У каждого меню есть пункты, и пункт стоит в меню из списка.
+    const auto titles = menuTitles();
+    for (const char* t : titles) {
+        const auto items = menuItems();
+        EXPECT_TRUE(std::any_of(items.begin(), items.end(), [&](const MenuItem& mi) {
+            return std::string_view(mi.menu) == t;
+        })) << t;
+    }
+    for (const MenuItem& mi : menuItems()) {
+        EXPECT_TRUE(std::any_of(titles.begin(), titles.end(), [&](const char* t) {
+            return std::string_view(mi.menu) == t;
+        })) << mi.menu;
+    }
+    // Клавиша пункта — из таблицы сочетаний.
+    EXPECT_EQ(commandKeys(Cmd::Save, 0, true), "Ctrl+S");
+    EXPECT_EQ(commandKeys(Cmd::Settings, 0, true), "");
+    EXPECT_EQ(commandKeys(Cmd::ObjectForm, 0, false), "Enter");
 }
 
 TEST(UiShortcuts, SheetLabels) {

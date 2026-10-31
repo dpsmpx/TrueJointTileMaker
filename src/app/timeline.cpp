@@ -37,7 +37,7 @@ int canvasW() {
     return panelX();
 }
 int canvasH() {
-    return gLayout.h;
+    return gLayout.h - gLayout.bottom;
 }
 int tlY0() {
     return canvasH() - TL_H;
@@ -93,7 +93,8 @@ void Editor::applyLayout() {
     const int w = canvasW();
     const int h = timelineShown() ? tlY0() : canvasH();
     const int r = m.rulersOn ? RULER_SIZE : 0;
-    if (m.W == w && m.H == h && m.X0 == r && m.Y0 == r) return;
+    const int top = gLayout.top + r;
+    if (m.W == w && m.H == h && m.X0 == r && m.Y0 == top) return;
     // Тайл, что влезал в холст целиком, влезает и в укороченный (лента,
     // линейки, окно меньше); иначе масштаб остаётся прежним, а вид лишь
     // поджимается к краям.
@@ -101,7 +102,7 @@ void Editor::applyLayout() {
     m.W = w;
     m.H = h;
     m.X0 = r;
-    m.Y0 = r;
+    m.Y0 = top;
     if (fitted && (m.scr(m.docW()) > m.W - m.X0 || m.scr(m.docH()) > m.H - m.Y0)) {
         m.fitScale();
     } else {

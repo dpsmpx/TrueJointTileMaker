@@ -155,7 +155,10 @@ void Editor::drawRadialAxes() {
 void Editor::drawRulers() {
     if (!m.rulersOn || m.X0 <= 0 || m.Y0 <= 0) return;
     fb_.resetClip();
-    fb_.fillRect(0, 0, m.W, m.Y0, cPanel);
+    // Верхняя линейка — сразу над холстом: над ней бывают строка меню и
+    // параметры инструмента (C2).
+    const int rt = m.Y0 - RULER_SIZE;
+    fb_.fillRect(0, rt, m.W, m.Y0, cPanel);
     fb_.fillRect(0, m.Y0, m.X0, m.H, cPanel);
     fb_.fillRect(0, m.Y0 - 1, m.W, m.Y0, cBorder);
     fb_.fillRect(m.X0 - 1, 0, m.X0, m.H, cBorder);
@@ -164,21 +167,21 @@ void Editor::drawRulers() {
     const int major = rulerStep(ps, 36);
 
     // Верхняя: деления по x от начала координат.
-    fb_.setClip(gfx::Rect{m.X0, 0, m.W, m.Y0 - 1});
+    fb_.setClip(gfx::Rect{m.X0, rt, m.W, m.Y0 - 1});
     const int u0 = m.screenToTileX(m.X0) - m.originX - 1;
     const int u1 = m.screenToTileX(m.W) - m.originX + 1;
     for (int u = u0 - ((u0 % minor) + minor) % minor; u <= u1; u += minor) {
         const int sx = m.tileToScreenX(u + m.originX);
         const bool big = u % major == 0;
-        fb_.fillRect(sx, big ? 2 : m.Y0 - 5, sx + 1, m.Y0 - 1, big ? cText : cTextDim);
-        if (big) tinyNumber(fb_, sx + 2, 3, u, cText);
+        fb_.fillRect(sx, big ? rt + 2 : m.Y0 - 5, sx + 1, m.Y0 - 1, big ? cText : cTextDim);
+        if (big) tinyNumber(fb_, sx + 2, rt + 3, u, cText);
     }
     for (const int x2 : m.guidesX2) {
         const int sx = m.tileToScreenX(0) + m.scr2(x2);
         fb_.fillRect(sx - 3, m.Y0 - 7, sx + 4, m.Y0 - 4, active.rulerMark);
         fb_.fillRect(sx - 1, m.Y0 - 4, sx + 2, m.Y0 - 1, active.rulerMark);
     }
-    if (overCanvas(mouseX(), mouseY())) fb_.fillRect(mouseX(), 0, mouseX() + 1, m.Y0 - 1, cAccent);
+    if (overCanvas(mouseX(), mouseY())) fb_.fillRect(mouseX(), rt, mouseX() + 1, m.Y0 - 1, cAccent);
 
     // Левая: деления по y.
     fb_.setClip(gfx::Rect{0, m.Y0, m.X0 - 1, m.H});
@@ -199,9 +202,9 @@ void Editor::drawRulers() {
     fb_.resetClip();
 
     // Угол: сюда щёлкают за экраном сетки и направляющих.
-    fb_.fillRect(0, 0, m.X0 - 1, m.Y0 - 1, cFace);
-    fb_.fillRect(4, m.Y0 / 2, m.X0 - 5, m.Y0 / 2 + 1, cTextDim);
-    fb_.fillRect(m.X0 / 2, 4, m.X0 / 2 + 1, m.Y0 - 5, cTextDim);
+    fb_.fillRect(0, rt, m.X0 - 1, m.Y0 - 1, cFace);
+    fb_.fillRect(4, rt + RULER_SIZE / 2, m.X0 - 5, rt + RULER_SIZE / 2 + 1, cTextDim);
+    fb_.fillRect(m.X0 / 2, rt + 4, m.X0 / 2 + 1, m.Y0 - 5, cTextDim);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +214,7 @@ void Editor::drawRulers() {
 void Editor::handleRulerPress() {
     const int x = frameClickX_;
     const int y = frameClickY_;
-    const bool top = y < m.Y0 && x >= m.X0;
+    const bool top = y >= m.Y0 - RULER_SIZE && y < m.Y0 && x >= m.X0;
     const bool left = x < m.X0 && y >= m.Y0;
     if (!top && !left) {
         showGridScreen();

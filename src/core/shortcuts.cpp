@@ -140,6 +140,84 @@ constexpr std::array kTable = {
     Shortcut{KEY_H, 0, kBoth, Help, 0, kWin, "Справка"},
 };
 
+constexpr const char* kMenuTitles[] = {"Файл",     "Правка", "Выделение", "Изображение",
+                                       "Анимация", "Вид",    "Карта",     "Справка"};
+
+// Порядок пунктов — как в редакторах растра: файл, правка, выделение…
+// Пункты не своего режима не показываются.
+constexpr std::array kMenu = {
+    MenuItem{"Файл", "Новый…", New},
+    MenuItem{"Файл", "Открыть…", Open},
+    MenuItem{"Файл", "Недавние файлы…", Recent},
+    MenuItem{"Файл"},
+    MenuItem{"Файл", "Сохранить", Save},
+    MenuItem{"Файл", "Сохранить как…", SaveAs},
+    MenuItem{"Файл", "Выделение в файл…", SaveSelection, 0, kTile},
+    MenuItem{"Файл"},
+    MenuItem{"Файл", "Настройки…", Settings},
+    MenuItem{"Файл"},
+    MenuItem{"Файл", "Выход", Exit},
+    MenuItem{"Правка", "Отменить", Undo},
+    MenuItem{"Правка", "Повторить", Redo},
+    MenuItem{"Правка"},
+    MenuItem{"Правка", "Копировать", Copy, 0, kTile},
+    MenuItem{"Правка", "Вырезать", Cut, 0, kTile},
+    MenuItem{"Правка", "Вставить", PasteClipboard, 0, kTile},
+    MenuItem{"Правка", "Вставить под курсор", PasteHere},
+    MenuItem{"Правка", "Стереть выделенное", EraseSelection, 0, kTile},
+    MenuItem{"Правка", "Найти и заменить…", MapFind, 0, kMap},
+    MenuItem{"Выделение", "Выделить всё", SelectAll, 0, kTile},
+    MenuItem{"Выделение", "Снять выделение", Deselect, 0, kTile},
+    MenuItem{"Выделение", "Вернуть выделение", Reselect, 0, kTile},
+    MenuItem{"Выделение", "Обратить выделение", InvertSelection, 0, kTile},
+    MenuItem{"Выделение"},
+    MenuItem{"Выделение", "Кисть из выделения", BrushFromSelection, 0, kTile},
+    MenuItem{"Изображение", "Изображение и выделение…", ImageScreen, 0, kTile},
+    MenuItem{"Изображение", "Фильтры и эффекты…", Filters, 0, kTile},
+    MenuItem{"Изображение", "Операции с цветом…", ColorOps, 0, kTile},
+    MenuItem{"Изображение"},
+    MenuItem{"Изображение", "Выбор цвета…", ColorPicker, 0, kTile},
+    MenuItem{"Изображение", "Палитра…", PaletteScreen, 0, kTile},
+    MenuItem{"Изображение", "Индексная палитра", Indexed, 0, kTile},
+    MenuItem{"Изображение", "Поменять цвета местами", SwapColors},
+    MenuItem{"Изображение", "Чёрный и белый", ResetColors, 0, kTile},
+    MenuItem{"Изображение"},
+    MenuItem{"Изображение", "Наборы тайлов…", Tileset, 0, kTile},
+    MenuItem{"Изображение", "Тайлы слоя-тайлкарты…", TilePicker, 0, kTile},
+    MenuItem{"Изображение", "Набор для игры…", GameSet, 0, kTile},
+    MenuItem{"Анимация", "Слои, кадры и экспорт…", LayersScreen, 0, kTile},
+    MenuItem{"Анимация", "Лента кадров", Timeline, 0, kTile},
+    MenuItem{"Анимация", "Проиграть", Play, 0, kTile},
+    MenuItem{"Анимация", "Луковая кожа", Onion, 0, kTile},
+    MenuItem{"Анимация"},
+    MenuItem{"Анимация", "Кадр назад", PrevFrame, 0, kTile},
+    MenuItem{"Анимация", "Кадр вперёд", NextFrame, 0, kTile},
+    MenuItem{"Анимация", "Слой выше", LayerUp, 0, kTile},
+    MenuItem{"Анимация", "Слой ниже", LayerDown, 0, kTile},
+    MenuItem{"Вид", "Крупнее", ZoomIn},
+    MenuItem{"Вид", "Мельче", ZoomOut},
+    MenuItem{"Вид", "Вписать картинку", ZoomFit},
+    MenuItem{"Вид", "Масштаб 100 %", Zoom100},
+    MenuItem{"Вид", "Во весь экран", Fullscreen},
+    MenuItem{"Вид"},
+    MenuItem{"Вид", "Сетка", Grid},
+    MenuItem{"Вид", "Шахматка", Checker},
+    MenuItem{"Вид", "Бесшовный предпросмотр", Seamless},
+    MenuItem{"Вид", "Линейки", Rulers},
+    MenuItem{"Вид", "Направляющие", Guides},
+    MenuItem{"Вид", "Сетка и направляющие…", GridScreen},
+    MenuItem{"Вид"},
+    MenuItem{"Вид", "Тайл в окружении карты", MapContext, 0, kTile},
+    MenuItem{"Вид", "Карта картинками набора", MapTiles, 0, kMap},
+    MenuItem{"Карта", "К редактору карт", SwitchMode, 0, kTile},
+    MenuItem{"Карта", "К редактору тайлов", SwitchMode, 0, kMap},
+    MenuItem{"Карта", "Свойства и проверка локации…", MapProperties, 0, kMap},
+    MenuItem{"Карта", "Форма объекта под курсором", ObjectForm, 0, kMap},
+    MenuItem{"Справка", "Клавиши", Cheatsheet},
+    MenuItem{"Справка", "Справка", Help},
+    MenuItem{"Справка", "Главное меню", MainMenu},
+};
+
 bool fits(const Shortcut& s, bool tile) {
     return s.where == KeyWhere::Both || (s.where == KeyWhere::Tile) == tile;
 }
@@ -148,6 +226,21 @@ bool fits(const Shortcut& s, bool tile) {
 
 std::span<const Shortcut> shortcuts() {
     return kTable;
+}
+
+std::span<const char* const> menuTitles() {
+    return kMenuTitles;
+}
+
+std::span<const MenuItem> menuItems() {
+    return kMenu;
+}
+
+std::string commandKeys(Cmd c, int arg, bool tile) {
+    for (const Shortcut& s : kTable) {
+        if (s.cmd == c && s.arg == arg && fits(s, tile)) return keyName(s.key, s.mods);
+    }
+    return {};
 }
 
 const Shortcut* findShortcut(int key, int mods, bool tile) {

@@ -335,6 +335,13 @@ void Editor::runCommand(Cmd c, int arg) {
         case Cmd::Help: showHelpScreen(); break;
         case Cmd::Cheatsheet: showCheatsheet(); break;
         case Cmd::SwitchMode: m.switchMode(tile ? DOC_MAP : DOC_TILE); break;
+        case Cmd::Recent: openRecentAsk(); break;
+        case Cmd::Settings: showSettingsScreen(); break;
+        case Cmd::Exit: commandExit(); break;
+        case Cmd::ColorOps: showColorOpsScreen(); break;
+        case Cmd::LayersScreen: showAnimationScreen(); break;
+        case Cmd::GameSet: showGameSetScreen(); break;
+        case Cmd::MapProperties: showMapPropertiesScreen(); break;
     }
 }
 

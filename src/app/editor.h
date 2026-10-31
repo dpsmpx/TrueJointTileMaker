@@ -429,6 +429,23 @@ private:
     int edgeStartY_ = 0;
     bool edgeArmed_ = false;
 
+    // --- строка меню и строка состояния (bars.cpp, C2) ---
+    struct MenuSlot {
+        int menu, x0, x1;
+    };
+    /// Полосы над холстом и под ним — по теме: у «Классики» их нет.
+    void applyBars() const;
+    [[nodiscard]] bool menuShown(int i) const;
+    [[nodiscard]] std::vector<MenuSlot> menuSlots() const;
+    [[nodiscard]] int menuSlotAt(int x, int y) const;
+    void drawMenuBar(int open = -1);
+    [[nodiscard]] bool cmdChecked(Cmd c) const;
+    void handleMenuBarClick();
+    void openMenu(int menu);
+    std::string statusInfo();
+    void drawStatusBar();
+    int menuHover_ = -1;
+
     // --- клавиатура (keys.cpp): таблица сочетаний, шпаргалка ---
     void handleEditorKey(int key);
     /// Разбор клавиш 1.6 для «Классики»: Ctrl с буквой — та же буква, если

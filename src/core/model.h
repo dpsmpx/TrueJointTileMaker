@@ -53,12 +53,21 @@ inline constexpr int WIN_H = CANVAS_H;
 struct WindowLayout {
     int w = WIN_W;
     int h = WIN_H;
+    /// Полосы над холстом (строка меню, параметры инструмента) и под ним
+    /// (строка состояния) — в новых темах (C2); у «Классики» их нет.
+    int top = 0;
+    int bottom = 0;
 };
 inline WindowLayout gLayout;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 /// Левый край панели.
 inline int panelX() {
     return gLayout.w - PANEL_W;
 }
+
+/// Строка меню над холстом и строка состояния под ним (план «Интерфейс»,
+/// C2) — в новых темах.
+inline constexpr int MENU_BAR_H = 26;
+inline constexpr int STATUS_BAR_H = 24;
 
 /// Ширина линеек слева и сверху холста (этап 5).
 inline constexpr int RULER_SIZE = 20;

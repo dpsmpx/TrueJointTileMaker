@@ -100,6 +100,14 @@ enum class Cmd {
     Help,
     Cheatsheet,
     SwitchMode,
+    // Только из строки меню: своих клавиш нет
+    Recent,
+    Settings,
+    Exit,
+    ColorOps,
+    LayersScreen,
+    GameSet,
+    MapProperties,
 };
 
 struct Shortcut {
@@ -134,5 +142,25 @@ std::string keyName(int key, int mods);
 /// Подпись строки шпаргалки: label либо имя клавиши, а у сочетаний той же
 /// команды, что идут следом без текста, — через запятую.
 std::string shortcutKeys(std::span<const Shortcut> all, std::size_t i);
+
+/// Строка меню (план «Интерфейс», C2, UX-05): у 1.6 команды жили в меню
+/// во всё окно и на экранах со стенами кнопок. Пункт — команда из той же
+/// таблицы; клавиша справа от пункта берётся из таблицы сочетаний, так что
+/// меню не разойдётся с клавиатурой.
+struct MenuItem {
+    const char* menu = "";
+    /// nullptr — разделитель.
+    const char* text = nullptr;
+    Cmd cmd = Cmd::MainMenu;
+    int arg = 0;
+    KeyWhere where = KeyWhere::Both;
+};
+
+/// Названия меню в порядке строки.
+std::span<const char* const> menuTitles();
+std::span<const MenuItem> menuItems();
+/// Клавиша команды для пункта меню: первое её сочетание в таблице; пусто —
+/// клавиши нет.
+std::string commandKeys(Cmd c, int arg, bool tile);
 
 }  // namespace tjtm

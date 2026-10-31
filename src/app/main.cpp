@@ -46,6 +46,7 @@ void Editor::applyTheme() {
     theme::active = classicUi_ ? theme::classicTheme() : theme::themeByName(cfg.theme);
     m.checkerA = theme::active.checkA;
     m.checkerB = theme::active.checkB;
+    applyBars();
     m.tileBmpDirty = true;
     m.overDirty = true;
     m.needRepaint = true;
@@ -313,7 +314,13 @@ void Editor::appStep() {
 
     if (frameClick_) {
         frameClick_ = false;
-        if (frameClickX_ < m.W && timelineShown() && frameClickY_ >= m.H) {
+        const bool aboveCanvas = frameClickY_ < gLayout.top;
+        const bool belowAll = frameClickY_ >= gLayout.h - gLayout.bottom;
+        if (frameClickX_ < m.W && aboveCanvas) {
+            handleMenuBarClick();
+        } else if (frameClickX_ < m.W && belowAll) {
+            // Строка состояния — только сведения.
+        } else if (frameClickX_ < m.W && timelineShown() && frameClickY_ >= m.H) {
             handleTimelineClick();
         } else if (frameClickX_ < m.W && (frameClickX_ < m.X0 || frameClickY_ < m.Y0)) {
             handleRulerPress();
@@ -342,8 +349,19 @@ void Editor::appStep() {
             ghostShown_ = brushGhostShown();
             cellFrameWas_ = frame;
             drawInfoSection();
+            drawStatusBar();
             // Метка курсора на линейках идёт за мышью.
             drawRulers();
+            redraw();
+        }
+    }
+    // Название меню под курсором подсвечено: строка меню отвечает на
+    // наведение, как кнопки.
+    if (gLayout.top > 0) {
+        const int hover = menuSlotAt(mouseX(), mouseY());
+        if (hover != menuHover_ && !m.needRepaint) {
+            menuHover_ = hover;
+            drawMenuBar();
             redraw();
         }
     }
