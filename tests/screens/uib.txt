@@ -43,3 +43,9 @@ key Return
 move 700 558
 sleep 0.3
 shot 06_new_tile
+# B6: ластик размера 3 — ] дважды; под курсором контур пятна.
+key 2 bracketright bracketright
+drag 120 200 480 200
+move 300 300
+sleep 0.2
+shot 07_brush

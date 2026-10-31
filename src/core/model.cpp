@@ -691,11 +691,34 @@ void Model::emitPixel(int x, int y) {
     } else if (strokeActive && toolTile == T_PEN && penMode == PEN_STAMP && !customBrush.empty()) {
         // Кисть из выделения (этап 9) ложится целиком в каждую точку пути.
         stampBrushAt(x, y);
+    } else if (strokeActive && brushSized()) {
+        forEachBrushCell(x, y, [this](int px, int py) { paintPixel(px, py); });
     } else if (strokeActive && pixelPerfect &&
                (toolTile == T_PEN || toolTile == T_ERASER || toolTile == T_DITHER)) {
         emitPixelPerfect(x, y);
     } else {
         paintPixel(x, y);
+    }
+}
+
+bool Model::brushSized() const {
+    if (docMode != DOC_TILE || brushSize <= 1) return false;
+    if (toolTile == T_ERASER || toolTile == T_DITHER) return true;
+    return toolTile == T_PEN && (penMode == PEN_PENCIL || penMode == PEN_SHADE);
+}
+
+void Model::forEachBrushCell(int x, int y, const std::function<void(int, int)>& fn) const {
+    const int n = std::max(1, brushSize);
+    const int o = (n - 1) / 2;
+    // Круг: клетки, чьи середины ближе n/2 − 1/4 к середине пятна, — у 3
+    // это «плюс», у 4 — квадрат без углов, как у кистей пиксель-арта.
+    const double c = (n - 1) / 2.0;
+    const double r = n / 2.0 - 0.25;
+    for (int j = 0; j < n; ++j) {
+        for (int i = 0; i < n; ++i) {
+            if (brushRound && n > 2 && (i - c) * (i - c) + (j - c) * (j - c) > r * r) continue;
+            fn(x - o + i, y - o + j);
+        }
     }
 }
 

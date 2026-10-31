@@ -121,6 +121,49 @@ TEST(UiPlan, UndoKeepsHundredsOfSteps) {
     EXPECT_EQ(m.undoDepth(), 1000) << "мелкий тайл — до верхнего предела";
 }
 
+// B6: пятно кисти — квадрат или круг; по умолчанию одна точка, как у
+// оригинала.
+TEST(UiPlan, BrushFootprint) {
+    Model m = tileModel();
+    auto count = [&](int size, bool round) {
+        m.brushSize = size;
+        m.brushRound = round;
+        int n = 0;
+        m.forEachBrushCell(5, 5, [&](int, int) { ++n; });
+        return n;
+    };
+    EXPECT_EQ(count(1, true), 1);
+    EXPECT_EQ(count(2, true), 4);
+    EXPECT_EQ(count(3, true), 5) << "у тройки круг — «плюс»";
+    EXPECT_EQ(count(3, false), 9);
+    EXPECT_EQ(count(4, true), 12) << "квадрат без углов";
+    EXPECT_EQ(count(5, false), 25);
+}
+
+TEST(UiPlan, SizedEraserStrokeIsWide) {
+    Model m = tileModel(16, 16);
+    m.transparentBlank = true;
+    for (Color& c : m.tile.d)
+        c = argb(255, 10, 20, 30);
+    m.setTool(T_ERASER);
+    m.brushSize = 3;
+    m.brushRound = false;
+    EXPECT_TRUE(m.brushSized());
+    m.pushUndo();
+    m.beginStroke();
+    m.emitPixel(4, 8);
+    m.shapeLine(4, 8, 11, 8);
+    m.endStroke();
+    for (int x = 3; x <= 12; ++x) {
+        for (int y = 7; y <= 9; ++y)
+            EXPECT_EQ(m.tile.at(x, y).a, 0) << x << "," << y;
+    }
+    EXPECT_EQ(m.tile.at(8, 6).a, 255) << "выше пятна не стёрто";
+    EXPECT_EQ(m.tile.at(8, 10).a, 255);
+    m.brushSize = 1;
+    EXPECT_FALSE(m.brushSized()) << "одна точка — путь оригинала";
+}
+
 // A6: контраст по WCAG 2.1 — относительная яркость и отношение (L1 + 0,05) /
 // (L2 + 0,05).
 double luminance(Color c) {

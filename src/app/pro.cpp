@@ -450,6 +450,13 @@ bool Editor::handleProKey(int key) {
         case KEY_U: showPaletteScreen(); return true;
         case KEY_LBRACKET:
         case KEY_RBRACKET: {
+            // [ и ] — размер кисти, как в Photoshop и Krita (UX-38); узоры
+            // ушли на Shift.
+            if (!classicUi_ && !shift) {
+                m.brushSize = std::clamp(m.brushSize + (key == KEY_RBRACKET ? 1 : -1), 1, 64);
+                m.needRepaint = true;
+                return true;
+            }
             const int n = img::ditherPatternCount();
             m.ditherPattern = (m.ditherPattern + (key == KEY_RBRACKET ? 1 : n - 1)) % n;
             m.needRepaint = true;
@@ -495,11 +502,25 @@ void Editor::showToolOptions() {
         }
 
         // --- узоры ---
-        uiLabelLeft(LX, 186, 24, "Узор инструмента «Узор»  ([ и ] — листать)", cTextDim);
+        // Размер кисти (UX-38): строкой над узорами, сетка узоров ниже.
+        int patY = 186;
+        int patRow = 38;
+        if (active.modern) {
+            uiLabelLeft(LX, 186, 30, "Размер  [ ]", cText);
+            uiNumber(LX + 90, 186, 70, 30, m.brushSize, 1, 64, 1, 4);
+            if (uiToggle(LX + 168, 186, 76, 30, "Круг", m.brushRound)) m.brushRound = true;
+            if (uiToggle(LX + 250, 186, 80, 30, "Квадрат", !m.brushRound)) m.brushRound = false;
+            patY = 224;
+            patRow = 36;
+        }
+        uiLabelLeft(LX, patY, 24,
+                    classicUi_ ? "Узор инструмента «Узор»  ([ и ] — листать)"
+                               : "Узор инструмента «Узор»  (Shift+[ и ] — листать)",
+                    cTextDim);
         const int n = img::ditherPatternCount();
         for (int p = 0; p < n; ++p) {
             const int cx = LX + (p % 2) * 170;
-            const int cy = 212 + (p / 2) * 38;
+            const int cy = patY + 26 + (p / 2) * patRow;
             if (uiToggle(cx, cy, 160, 34, "", m.ditherPattern == p)) m.ditherPattern = p;
             // Образец узора первым и вторым цветом, по две точки экрана на точку.
             for (int py = 0; py < 12; ++py) {

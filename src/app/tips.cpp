@@ -88,15 +88,15 @@ std::string Editor::toolTip(int i) const {
     }
     switch (i) {
         case T_PEN:
-            return "Карандаш · 1\nЛевая — рисовать, правая или Alt — взять цвет\nПравая по "
-                   "кнопке — вид: точки, аэрограф, кисть, затенение";
-        case T_ERASER: return "Ластик · 2\nСтирает до прозрачного";
+            return "Карандаш · 1\nЛевая — рисовать, правая или Alt — взять цвет; [ и ] — "
+                   "размер\nПравая по кнопке — вид: точки, аэрограф, кисть, затенение";
+        case T_ERASER: return "Ластик · 2\nСтирает до прозрачного; [ и ] — размер";
         case T_FILL: return "Заливка · 3\nПравая по кнопке — градиент узором";
         case T_PICK: return "Пипетка · 4\nБерёт цвет из картинки";
         case T_LINE: return "Линия · 5\nПравая по кнопке — параметры фигур";
         case T_RECT: return "Прямоугольник · 6\nCtrl — залитый, Shift — квадрат";
         case T_ELLIPSE: return "Овал · 7\nCtrl — залитый, Shift — круг";
-        case T_DITHER: return "Узор · 8\n[ и ] — сменить узор";
+        case T_DITHER: return "Узор · 8\n[ и ] — размер, Shift+[ и ] — сменить узор";
         default:
             return "Выделение · 9\nПротяжка — выделить, по выделенному — перенести\nВид "
                    "выделения — в параметрах (O)";
@@ -115,7 +115,8 @@ void Editor::registerEditorTips() {
             } else if (m.docMode == DOC_TILE) {
                 static const char* const kChips[] = {
                     "Замена цвета или смешивание · E",
-                    "Пиксель-перфект · Q\nУбирает углы «Г» в мазке", "Параметры инструментов · O"};
+                    "Пиксель-перфект · Q\nУбирает углы «Г» в мазке; только при размере кисти 1",
+                    "Параметры инструментов · O"};
                 const int chip = chipHit(px, py);
                 if (chip >= 0 && chip < 3) tipCand_ = kChips[chip];
             }

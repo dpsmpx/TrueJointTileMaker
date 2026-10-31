@@ -1,6 +1,7 @@
 // Отрисовка холста (TJTM.pas: «Отрисовка холста»).
 
 #include <algorithm>
+#include <set>
 
 #include "app/editor.h"
 #include "core/pmath.h"
@@ -270,7 +271,9 @@ void Editor::drawCanvas() {
 }
 
 bool Editor::cellFrameShown() {
-    if (classicUi_ || !cfg.cellFrame || m.pixelSize < 4 || !overCanvas(mouseX(), mouseY()))
+    // Пятно кисти видно с любого масштаба: без контура размер не угадать.
+    const int minZoom = m.brushSized() ? 1 : 4;
+    if (classicUi_ || !cfg.cellFrame || m.pixelSize < minZoom || !overCanvas(mouseX(), mouseY()))
         return false;
     if (!m.inDoc(m.screenToTileX(mouseX()), m.screenToTileY(mouseY()))) return false;
     if (m.docMode == DOC_MAP) return m.toolMap != M_SELECT;
@@ -284,6 +287,36 @@ void Editor::drawCellFrame() {
     if (!cellFrameShown()) return;
     const int tx = m.screenToTileX(mouseX());
     const int ty = m.screenToTileY(mouseY());
+    if (m.brushSized()) {
+        // Контур пятна кисти: края клеток пятна, за которыми клеток пятна
+        // нет, — тёмной линией снаружи и светлой внутри.
+        std::set<std::pair<int, int>> cells;
+        m.forEachBrushCell(tx, ty, [&](int x, int y) { cells.emplace(x, y); });
+        const int ps = m.pixelSize;
+        fb_.setClip(canvasRect());
+        for (const auto& [x, y] : cells) {
+            const int sx = m.tileToScreenX(x);
+            const int sy = m.tileToScreenY(y);
+            if (cells.count({x, y - 1}) == 0) {
+                fb_.fillRect(sx, sy - 1, sx + ps, sy, active.antsDark);
+                fb_.fillRect(sx, sy, sx + ps, sy + 1, active.antsLight);
+            }
+            if (cells.count({x, y + 1}) == 0) {
+                fb_.fillRect(sx, sy + ps, sx + ps, sy + ps + 1, active.antsDark);
+                fb_.fillRect(sx, sy + ps - 1, sx + ps, sy + ps, active.antsLight);
+            }
+            if (cells.count({x - 1, y}) == 0) {
+                fb_.fillRect(sx - 1, sy, sx, sy + ps, active.antsDark);
+                fb_.fillRect(sx, sy, sx + 1, sy + ps, active.antsLight);
+            }
+            if (cells.count({x + 1, y}) == 0) {
+                fb_.fillRect(sx + ps, sy, sx + ps + 1, sy + ps, active.antsDark);
+                fb_.fillRect(sx + ps - 1, sy, sx + ps, sy + ps, active.antsLight);
+            }
+        }
+        fb_.resetClip();
+        return;
+    }
     const int x0 = m.tileToScreenX(tx);
     const int y0 = m.tileToScreenY(ty);
     const int x1 = x0 + m.pixelSize;
