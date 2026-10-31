@@ -61,8 +61,9 @@ fs::path makeBase(const std::string& name, const std::string& scenario = {}) {
     // добавка сценария в конце: последнее значение ключа побеждает.
     fs::copy_file(src / "tests" / "screens" / "Config.txt", base / "Config.txt");
     {
-        std::ifstream add(src / "tests" / "screens" / ((scenario.empty() ? name : scenario) + ".config"),
-                          std::ios::binary);
+        std::ifstream add(
+            src / "tests" / "screens" / ((scenario.empty() ? name : scenario) + ".config"),
+            std::ios::binary);
         if (add) {
             std::ofstream out(base / "Config.txt", std::ios::binary | std::ios::app);
             out << add.rdbuf();
@@ -109,8 +110,8 @@ std::string prepareDialogs(const std::string& scenario, const fs::path& base) {
 /// Сценарии оригинала: их эталон снят с 0.6.0, и перенос идёт с жестами и
 /// видом оригинала (--classic), а не с правилами плана «Интерфейс».
 bool isOriginalScenario(const std::string& scenario) {
-    return scenario == "tile" || scenario == "map" || scenario == "draw" ||
-           scenario == "mapedit" || scenario == "menu";
+    return scenario == "tile" || scenario == "map" || scenario == "draw" || scenario == "mapedit" ||
+           scenario == "menu";
 }
 
 /// Пройти сценарий; снимки — в base/shots.
@@ -189,7 +190,7 @@ TEST_P(AppScreens, MatchOriginal) {
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
                                            "anim4", "prec5", "layers6", "game7", "fx8", "art9",
-                                           "map10"));
+                                           "map10", "uia"));
 
 /// Настройки выпуска (Config.txt в корне): при запуске — сразу редактор с
 /// последним файлом, без меню во всё окно (план «Интерфейс», A9).
@@ -217,7 +218,8 @@ TEST(AppScreens, ReleaseConfigOpensLastFile) {
     for (int y = 0; y < img.h; ++y) {
         for (int x = 0; x < img.w; ++x) {
             const tjtm::Color c = img.at(x, y);
-            if (c.a == 255 && shot.at(ox + x * ps + ps / 2, oy + y * ps + ps / 2).argb() == c.argb())
+            if (c.a == 255 &&
+                shot.at(ox + x * ps + ps / 2, oy + y * ps + ps / 2).argb() == c.argb())
                 ++same;
         }
     }

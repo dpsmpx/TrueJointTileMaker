@@ -616,9 +616,7 @@ void Editor::showMainMenu() {
         if (uiButton(bx, y, bw, bh, "Выход", true)) commandExit();
 
         uiLabel(0, WIN_H - 26, WIN_W, 22,
-                std::string("версия ") + kAppVersion +
-                    "   ·   Escape закрывает меню",
-                cTextDim);
+                std::string("версия ") + kAppVersion + "   ·   Escape закрывает меню", cTextDim);
         redraw();
         if (takeKey() == KEY_ESC) done = true;
         idle();
@@ -854,7 +852,8 @@ bool Editor::showTilesetScreen() {
                 const std::string path = askOpenFile("Выберите любой тайл в нужной папке");
                 if (!path.empty()) picked = pathDirName(path);
             } else {
-                picked = askFolder(tsetKind_ == TS_ICON ? "Папка значков" : "Папка набора тайлов", cur);
+                picked =
+                    askFolder(tsetKind_ == TS_ICON ? "Папка значков" : "Папка набора тайлов", cur);
             }
             if (!picked.empty()) {
                 if (tsetKind_ == TS_ICON) {

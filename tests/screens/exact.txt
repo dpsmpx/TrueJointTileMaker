@@ -125,3 +125,15 @@ map10      03_mix           0    0  780  560
 map10      04_mixed         0    0  780  560
 map10      05_find          0    0  780  560
 map10      06_jump          0    0  780  560
+# Интерфейс, этап A — эталон со снимков переноса в светлой теме: окно целиком.
+uia        01_palette_pick  0    0  780  560
+uia        02_palette_write 0    0  780  560
+uia        03_palette_undo  0    0  780  560
+uia        04_keys          0    0  780  560
+uia        05_object_form   0    0  780  560
+uia        06_unsaved       0    0  780  560
+uia        07_theme         0    0  780  560
+uia        08_wheel_part    0    0  780  560
+uia        09_wheel_zoom    0    0  780  560
+uia        10_hand          0    0  780  560
+uia        11_fit           0    0  780  560

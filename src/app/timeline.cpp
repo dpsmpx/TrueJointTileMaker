@@ -164,8 +164,7 @@ void Editor::drawTimeline() {
         if (a > b) continue;
         const int x0 = TL_NAME_W + (a - tlFirstFrame_) * TL_CELL_W + 1;
         const int x1 = TL_NAME_W + (b - tlFirstFrame_ + 1) * TL_CELL_W - 1;
-        fb_.fillRect(x0, TL_TAG_Y + 1, x1, TL_HEAD_Y - 1,
-                     active.tag[i % active.tag.size()]);
+        fb_.fillRect(x0, TL_TAG_Y + 1, x1, TL_HEAD_Y - 1, active.tag[i % active.tag.size()]);
         if (static_cast<int>(i) == playTag_)
             fb_.frameRect(x0, TL_TAG_Y + 1, x1, TL_HEAD_Y - 1, cAccent);
         fb_.setClip(gfx::Rect{x0 + 1, TL_TAG_Y, x1 - 1, TL_HEAD_Y});

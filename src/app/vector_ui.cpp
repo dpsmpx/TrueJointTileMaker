@@ -391,9 +391,9 @@ void Editor::showTilePickerScreen() {
             m.tilemapPixels = true;
         }
         if (uiButton(GX + 216, b2, 210, 32, "Тайл из выделения", m.hasSelection)) {
-            m.addTileToActiveSet(tmap::cellImage(img::crop(m.compositeFrame(m.activeFrame), m.selX,
-                                                           m.selY, ts.tw, ts.th, kClear),
-                                                 0, 0, ts.tw, ts.th));
+            m.addTileToActiveSet(tmap::cellImage(
+                img::crop(m.compositeFrame(m.activeFrame), m.selX, m.selY, ts.tw, ts.th, kClear), 0,
+                0, ts.tw, ts.th));
         }
         if (uiButton(GX + 432, b2, 240, 32, "Тайлы из набора игры", true)) importGameTiles();
         if (uiButton(WIN_W / 2 - 90, WIN_H - 52, 180, 36, "Закрыть", true)) done = true;

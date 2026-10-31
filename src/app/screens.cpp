@@ -71,6 +71,16 @@ void Editor::showTextScreen(const std::string& title, const std::vector<std::str
     m.needRepaint = true;
 }
 
+/// Подпись под кнопками вопроса: какую нажимает Enter, какую — Escape.
+std::string Editor::keysHint(const std::string& enter, const std::string& escape) {
+    std::string s = "Enter — «";
+    s += enter;
+    s += "»,   Escape — «";
+    s += escape;
+    s += "»";
+    return s;
+}
+
 void Editor::showMessage(const std::string& title, const std::string& text) {
     showTextScreen(title, {text});
 }
@@ -102,8 +112,7 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
         }
         // Главная кнопка — первая: Enter её нажимает (UX-19).
         if (!classicUi_)
-            textCentered(0, H / 2 + 72, WIN_W, H / 2 + 92,
-                         "Enter — «" + yes + "»,   Escape — «" + cancel + "»", cTextDim);
+            textCentered(0, H / 2 + 72, WIN_W, H / 2 + 92, keysHint(yes, cancel), cTextDim);
         redraw();
         const int key = takeKey();
         if (key == KEY_ESC) {
@@ -142,8 +151,7 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
             done = true;
         }
         if (!classicUi_)
-            textCentered(0, H / 2 + 72, WIN_W, H / 2 + 92,
-                         "Enter — «" + yes + "»,   Escape — «" + no + "»", cTextDim);
+            textCentered(0, H / 2 + 72, WIN_W, H / 2 + 92, keysHint(yes, no), cTextDim);
         redraw();
         const int key = takeKey();
         if (key == KEY_ESC) {

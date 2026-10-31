@@ -170,8 +170,7 @@ void Editor::drawMapCells() {
                 fb_.drawImage(*img, m.tileToScreenX(j), m.tileToScreenY(i), ps - g, ps - g);
                 if (sel)
                     fb_.fillRect(m.tileToScreenX(j), m.tileToScreenY(i), m.tileToScreenX(j + 1) - g,
-                                 m.tileToScreenY(i + 1) - g,
-                                 accentAlpha(active.mapSelectionAlpha));
+                                 m.tileToScreenY(i + 1) - g, accentAlpha(active.mapSelectionAlpha));
                 continue;
             }
             Color c = mapTileColor(m.map.at(j, i));

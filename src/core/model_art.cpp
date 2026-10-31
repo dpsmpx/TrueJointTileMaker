@@ -17,7 +17,6 @@ namespace tjtm {
 
 namespace {
 
-
 int luma(Color c) {
     return 299 * c.r + 587 * c.g + 114 * c.b;
 }

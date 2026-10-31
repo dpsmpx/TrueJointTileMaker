@@ -31,8 +31,9 @@ namespace tjtm {
 inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
-// 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.6.0";
+// 1.1 и дальше — разделы плана сверх них, 1.7 и дальше — этапы плана
+// «Интерфейс» (docs/roadmap.md).
+inline constexpr const char* kAppVersion = "1.7.0";
 
 // --- раскладка окна ---------------------------------------------------------
 

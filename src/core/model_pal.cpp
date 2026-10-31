@@ -17,7 +17,6 @@ namespace tjtm {
 
 namespace {
 
-
 std::vector<int> identity(int n) {
     std::vector<int> v(static_cast<std::size_t>(std::max(0, n)));
     std::iota(v.begin(), v.end(), 0);

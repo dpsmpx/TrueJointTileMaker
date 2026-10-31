@@ -248,8 +248,7 @@ void Editor::drawOverviewSection() {
     int vy0 = 0;
     int vx1 = 0;
     int vy1 = 0;
-    if (m.overviewViewport(vx0, vy0, vx1, vy1))
-        fb_.frameRect(vx0, vy0, vx1, vy1, active.viewport);
+    if (m.overviewViewport(vx0, vy0, vx1, vy1)) fb_.frameRect(vx0, vy0, vx1, vy1, active.viewport);
 }
 
 /// Сетка цветов, вписанная в квадрат: перебор по точкам приёмника, поэтому

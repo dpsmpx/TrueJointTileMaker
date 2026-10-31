@@ -15,7 +15,6 @@ namespace tjtm {
 
 namespace {
 
-
 bool blankCel(const Grid<Color>& img, const Grid<PalIndex>& idx) {
     for (const Color c : img.d) {
         if (c.a != 0) return false;

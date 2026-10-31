@@ -16,7 +16,6 @@ namespace tjtm {
 
 namespace {
 
-
 /// Слой документа по номеру; один шаблон и для чтения, и для правки.
 template <class Doc>
 auto& layerAt(Doc& d, int l) {

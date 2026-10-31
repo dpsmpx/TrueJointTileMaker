@@ -161,7 +161,7 @@ std::vector<std::uint8_t> makeThumbRaw(const Grid<Color>& g, int size) {
             // Шахматка по точкам миниатюры, а не по пикселям тайла: клетки
             // шахматки одинаковы при любом размере исходника.
             const Color c = blendOver(g.at(sx, sy), checkerAt(px, py, theme::classicTheme().checkA,
-                                                                   theme::classicTheme().checkB));
+                                                              theme::classicTheme().checkB));
             putBgra(raw,
                     (static_cast<std::size_t>(py) * static_cast<std::size_t>(size) +
                      static_cast<std::size_t>(px)) *
@@ -362,7 +362,8 @@ void Model::paletteFromGrid(const Grid<Color>& g) {
 int Model::undoDepth() const {
     const std::int64_t per =
         std::max<std::int64_t>(1, static_cast<std::int64_t>(docW()) * docH() * undoBytesPerPx);
-    const std::int64_t steps = std::clamp<std::int64_t>(undoBudget / per, undoMinSteps, undoMaxSteps);
+    const std::int64_t steps =
+        std::clamp<std::int64_t>(undoBudget / per, undoMinSteps, undoMaxSteps);
     return static_cast<int>(steps);
 }
 

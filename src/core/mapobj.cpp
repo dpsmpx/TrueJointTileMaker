@@ -16,7 +16,8 @@ struct Spec {
 
 /// Поля вида — в порядке разбора world.cpp игры.
 std::vector<Spec> specOf(const std::string& kind) {
-    if (kind == "npc") return {{"Житель", false, false, false, "имя жителя, как в игре: elder, smith"}};
+    if (kind == "npc")
+        return {{"Житель", false, false, false, "имя жителя, как в игре: elder, smith"}};
     if (kind == "item")
         return {{"Предмет", false, false, false, "id предмета"},
                 {"Количество", true, true, false, "пусто — один"}};

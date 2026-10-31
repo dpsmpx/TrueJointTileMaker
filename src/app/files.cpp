@@ -474,8 +474,7 @@ void Editor::exportSheetAsk() {
     o.spacing = spacing;
     o.padding = padding;
     o.scale = scale;
-    o.background =
-        sheetBg_ == 1 ? m.secondColor : (sheetBg_ == 2 ? m.firstColor : kClear);
+    o.background = sheetBg_ == 1 ? m.secondColor : (sheetBg_ == 2 ? m.firstColor : kClear);
     const SpriteSheet sheet = buildSheet(m.animationFrames(first - 1, last - 1), o);
     std::string err;
     if (!pngSave(path, sheet.image, err)) {
@@ -678,8 +677,7 @@ std::string Editor::unsavedText(int mode) const {
     if (classicUi_) return "В документе есть изменения, которых нет в файле.";
     const bool map = mode == DOC_MAP;
     const std::string& file = map ? m.currentMapFile : m.currentFile;
-    const std::string where =
-        file.empty() ? (map ? "новой карте" : "новом тайле") : docName(mode);
+    const std::string where = file.empty() ? (map ? "новой карте" : "новом тайле") : docName(mode);
     return "В " + where + " есть изменения, которых нет в файле.";
 }
 

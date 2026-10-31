@@ -163,6 +163,7 @@ private:
     // --- экраны ---
     void showTextScreen(const std::string& title, const std::vector<std::string>& paragraphs);
     void showMessage(const std::string& title, const std::string& text);
+    static std::string keysHint(const std::string& enter, const std::string& escape);
     int ask3(const std::string& title, const std::string& text, const std::string& yes,
              const std::string& no, const std::string& cancel);
     bool askYesNo(const std::string& title, const std::string& text, const std::string& yes,
