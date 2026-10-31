@@ -405,9 +405,22 @@ void Editor::showSettingsScreen() {
     dropInput();
     pf_.input().keys.clear();
 
-    auto toggleRow = [&](int x, int ry, const std::string& caption, bool value) {
+    // Логическая настройка: в новых темах — тумблер (UX-28), у «Классики» —
+    // кнопка «да/нет», как в 1.6.
+    auto toggleRow = [&](int x, int ry, const std::string& caption, bool& value) {
+        if (active.modern) {
+            uiSwitch(x, ry, 340, caption, value);
+            return;
+        }
         uiLabelLeft(x, ry, 30, caption, cText);
-        return uiButton(x + 250, ry, 90, 30, ruBool(value), true);
+        if (uiButton(x + 250, ry, 90, 30, ruBool(value), true)) value = !value;
+    };
+    // Размер «ширина × высота» полями числа (UX-26).
+    auto sizeRow = [&](int ry, const std::string& caption, int& w, int& h, int lo, int hi) {
+        uiLabelLeft(30, ry, 30, caption, cText);
+        uiNumber(230, ry, 110, 30, w, lo, hi, 1, 8);
+        uiLabel(340, ry, 30, 30, "×", cTextDim);
+        uiNumber(370, ry, 110, 30, h, lo, hi, 1, 8);
     };
     auto stepRow = [&](int ry, const std::string& caption, int& value, int lo, int hi) {
         uiLabelLeft(60, ry, 30, caption, cText);
@@ -436,38 +449,47 @@ void Editor::showSettingsScreen() {
         uiLabel(0, 46, WIN_W, 20, "Сохраняются в Config.txt рядом с программой", cTextDim);
 
         int y = 76;
-        if (toggleRow(30, y, "Справка при запуске", v.showHelpOnStart))
-            v.showHelpOnStart = !v.showHelpOnStart;
-        if (toggleRow(410, y, "Меню при запуске", v.showMenuOnStart))
-            v.showMenuOnStart = !v.showMenuOnStart;
+        toggleRow(30, y, "Справка при запуске", v.showHelpOnStart);
+        toggleRow(410, y, "Меню при запуске", v.showMenuOnStart);
         y += 36;
-        if (toggleRow(30, y, "Сетка между пикселями", v.showGrid)) v.showGrid = !v.showGrid;
-        if (toggleRow(410, y, "Шахматка прозрачности", v.showChecker))
-            v.showChecker = !v.showChecker;
+        toggleRow(30, y, "Сетка между пикселями", v.showGrid);
+        toggleRow(410, y, "Шахматка прозрачности", v.showChecker);
         y += 36;
-        if (toggleRow(30, y, "Бесшовный предпросмотр", v.showSeamless))
-            v.showSeamless = !v.showSeamless;
-        if (toggleRow(410, y, "Открывать последний файл", v.autoLoadLast))
-            v.autoLoadLast = !v.autoLoadLast;
+        toggleRow(30, y, "Бесшовный предпросмотр", v.showSeamless);
+        toggleRow(410, y, "Открывать последний файл", v.autoLoadLast);
         y += 36;
-        if (toggleRow(30, y, "Запускаться в режиме карты", v.startInMapMode))
-            v.startInMapMode = !v.startInMapMode;
+        toggleRow(30, y, "Запускаться в режиме карты", v.startInMapMode);
         // Облик 1.6 остаётся выбором: «Классика» — те же цвета точка в точку.
-        uiLabelLeft(410, y, 30, "Оформление", cText);
+        const int ox = active.modern ? 30 : 410;
+        if (active.modern) {
+            toggleRow(410, y, "Подсказки при наведении", v.tooltips);
+            y += 36;
+            toggleRow(410, y, "Рамка клетки под курсором", v.cellFrame);
+        }
+        uiLabelLeft(ox, y, 30, "Оформление", cText);
         const bool dark = v.theme == "тёмная";
         const bool classic = v.theme == "классика";
-        if (uiToggle(410 + 104, y, 80, 30, "Светлое", !dark && !classic)) v.theme = "светлая";
-        if (uiToggle(410 + 188, y, 80, 30, "Тёмное", dark)) v.theme = "тёмная";
-        if (uiToggle(410 + 272, y, 80, 30, "Классика", classic)) v.theme = "классика";
+        const int tx = active.modern ? 130 : 410 + 104;
+        if (uiToggle(tx, y, 80, 30, "Светлое", !dark && !classic)) v.theme = "светлая";
+        if (uiToggle(tx + 84, y, 80, 30, "Тёмное", dark)) v.theme = "тёмная";
+        if (uiToggle(tx + 168, y, 80, 30, "Классика", classic)) v.theme = "классика";
 
         y += 40;
-        stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
-        y += 36;
-        stepRow(y, "Высота нового тайла", v.defaultHeight, MIN_TILE, MAX_TILE);
-        y += 36;
-        stepRow(y, "Ширина новой карты", v.defaultMapWidth, kMapMinSide, kMapMaxSide);
-        y += 36;
-        stepRow(y, "Высота новой карты", v.defaultMapHeight, kMapMinSide, kMapMaxSide);
+        if (active.modern) {
+            sizeRow(y, "Новый тайл", v.defaultWidth, v.defaultHeight, MIN_TILE, MAX_TILE);
+            y += 36;
+            sizeRow(y, "Новая карта", v.defaultMapWidth, v.defaultMapHeight, kMapMinSide,
+                    kMapMaxSide);
+            y += 36;
+        } else {
+            stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
+            y += 36;
+            stepRow(y, "Высота нового тайла", v.defaultHeight, MIN_TILE, MAX_TILE);
+            y += 36;
+            stepRow(y, "Ширина новой карты", v.defaultMapWidth, kMapMinSide, kMapMaxSide);
+            y += 36;
+            stepRow(y, "Высота новой карты", v.defaultMapHeight, kMapMinSide, kMapMaxSide);
+        }
 
         y += 38;
         pathRow(y, "Стартовое изображение", v.startupImage,
@@ -489,7 +511,7 @@ void Editor::showSettingsScreen() {
             return path.empty() ? std::string() : pathDirName(path);
         });
 
-        if (uiButton(WIN_W / 2 - 190, WIN_H - 52, 180, 36, "Сохранить", true)) {
+        if (uiPrimary(WIN_W / 2 - 190, WIN_H - 52, 180, 36, "Сохранить", true)) {
             // Поля «заполняется программой» могли поменяться, пока экран был
             // открыт (выбор файла запоминает папку): берутся свежие.
             v.lastFile = cfg.lastFile;

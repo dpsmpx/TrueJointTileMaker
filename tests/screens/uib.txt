@@ -25,3 +25,21 @@ sleep 0.3
 shot 04_card
 key Escape
 sleep 0.2
+# B5: новый тайл 200×120 — числа набираются с клавиатуры, фон — вторым
+# цветом (у 1.6 это стоило бы около тридцати щелчков по «+8»).
+key ctrl+n
+sleep 0.3
+click 390 312               # «Не сохранять»
+sleep 0.3
+click 300 179               # ширина: набрать
+key 2 0 0 Tab
+click 300 221               # высота
+key 1 2 0 Tab
+click 550 358               # фон — второй цвет
+move 700 558
+sleep 0.2
+shot 05_new_size
+key Return
+move 700 558
+sleep 0.3
+shot 06_new_tile

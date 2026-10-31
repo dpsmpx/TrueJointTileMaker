@@ -14,6 +14,7 @@
 #include "core/anim.h"
 #include "core/fsutil.h"
 #include "core/gif.h"
+#include "core/pmath.h"
 #include "core/png.h"
 #include "core/project.h"
 #include "core/rasterfmt.h"
@@ -709,7 +710,14 @@ void Editor::commandNew() {
         if (!confirmDiscard("Создать новый тайл?")) return;
         int nw = cfg.defaultWidth;
         int nh = cfg.defaultHeight;
-        if (askNewSize("Создать новый тайл", nw, nh, MIN_TILE, MAX_TILE)) m.newTileOfSize(nw, nh);
+        int bg = m.blankColor().a == 0 ? 0 : 1;
+        if (askNewSize("Создать новый тайл", nw, nh, MIN_TILE, MAX_TILE, &bg)) {
+            // Фон, выбранный при создании, — часть нового документа, а не
+            // правка: истории и пометки «изменён» он не даёт.
+            const Color c = bg == 0 ? kClear : bg == 1 ? kWhite : m.secondColor;
+            m.setTile(
+                Grid<Color>(clampI(nw, MIN_TILE, MAX_TILE), clampI(nh, MIN_TILE, MAX_TILE), c), "");
+        }
     }
 }
 

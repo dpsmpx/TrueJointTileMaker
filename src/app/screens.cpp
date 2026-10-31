@@ -133,6 +133,87 @@ void Editor::showMessage(const std::string& title, const std::string& text) {
     m.needRepaint = true;
 }
 
+/// Новый документ карточкой (UX-26): у 1.6 число набиралось только кнопками
+/// ±1 и ±8 — тайл 200×120 из 32×32 стоил около тридцати щелчков, — размеры
+/// были только квадратными, а фон — только белым или прозрачным по
+/// настройке.
+bool Editor::askNewSizeCard(const std::string& title, int& nw, int& nh, int lo, int hi,
+                            int* background) {
+    static constexpr int kSizes[][2] = {{16, 16}, {16, 32},   {32, 32},  {48, 48},
+                                        {64, 64}, {128, 128}, {256, 256}};
+    static const char* const kBg[] = {"Прозрачный", "Белый", "Второй цвет"};
+    const auto backdrop = cardBackdrop();
+    const int h = background != nullptr ? 380 : 300;
+    const int x0 = (WIN_W - 600) / 2;
+    const int y0 = (WIN_H - h) / 2;
+    bool lock = false;
+    int ratioW = nw;
+    int ratioH = nh;
+    bool done = false;
+    bool ok = false;
+    dropInput();
+    pf_.input().keys.clear();
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        dialogBack(backdrop, x0, y0, x0 + 600, y0 + h);
+        textCentered(x0, y0 + 12, x0 + 600, y0 + 40, title, cText);
+        uiLabel(x0, y0 + 38, 600, 20,
+                "Размер от " + std::to_string(lo) + " до " + std::to_string(hi) + " точек",
+                cTextDim);
+        const int pw = nw;
+        const int ph = nh;
+        uiLabelLeft(x0 + 40, y0 + 72, 34, "Ширина", cText);
+        uiNumber(x0 + 140, y0 + 72, 140, 34, nw, lo, hi, 1, 8);
+        uiLabelLeft(x0 + 40, y0 + 114, 34, "Высота", cText);
+        uiNumber(x0 + 140, y0 + 114, 140, 34, nh, lo, hi, 1, 8);
+        // Замок пропорций: вторая сторона идёт за первой.
+        if (uiSwitch(x0 + 320, y0 + 92, 240, "Сохранять пропорции", lock) && lock) {
+            ratioW = nw;
+            ratioH = nh;
+        }
+        if (lock && nw != pw) nh = clampI((nw * ratioH + ratioW / 2) / ratioW, lo, hi);
+        if (lock && nh != ph && nw == pw) nw = clampI((nh * ratioW + ratioH / 2) / ratioH, lo, hi);
+
+        uiLabelLeft(x0 + 24, y0 + 158, 20, "Готовые размеры", cTextDim);
+        for (int i = 0; i < static_cast<int>(std::size(kSizes)); ++i) {
+            const int sw = kSizes[i][0];
+            const int sh = kSizes[i][1];
+            if (sw > hi || sh > hi) continue;
+            const bool cur = nw == sw && nh == sh;
+            if (uiToggle(x0 + 24 + i * 79, y0 + 182, 73, 30,
+                         std::to_string(sw) + "×" + std::to_string(sh), cur)) {
+                nw = sw;
+                nh = sh;
+                ratioW = sw;
+                ratioH = sh;
+            }
+        }
+        if (background != nullptr) {
+            uiLabelLeft(x0 + 24, y0 + 228, 20, "Фон", cTextDim);
+            for (int i = 0; i < 3; ++i) {
+                if (uiToggle(x0 + 24 + i * 186, y0 + 252, 180, 32, kBg[i], *background == i))
+                    *background = i;
+            }
+        }
+        if (uiPrimary(x0 + 300 - 180, y0 + h - 56, 170, 36, "Создать", true)) {
+            ok = true;
+            done = true;
+        }
+        if (uiButton(x0 + 310, y0 + h - 56, 170, 36, "Отмена", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC) done = true;
+        if (key == KEY_ENTER) {
+            ok = true;
+            done = true;
+        }
+        idle();
+    }
+    waitMouseRelease();
+    m.needRepaint = true;
+    return ok;
+}
+
 /// Вопрос с тремя вариантами: 1 — да, 0 — нет, -1 — отмена.
 int Editor::ask3(const std::string& title, const std::string& text, const std::string& yes,
                  const std::string& no, const std::string& cancel) {
@@ -224,12 +305,14 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
 /// Экран размера нового документа. Оригинал звал его и для карты — с
 /// заголовком «Создать новый тайл» и пределами тайла 4..512, хотя карта
 /// не бывает больше 256; здесь у каждого режима свои заголовок и пределы.
-bool Editor::askNewSize(const std::string& title, int& nw, int& nh, int lo, int hi) {
+bool Editor::askNewSize(const std::string& title, int& nw, int& nh, int lo, int hi,
+                        int* background) {
     static const int kPresets[] = {8, 16, 32, 64, 128, 256};
     nw = clampI(nw, lo, hi);
     nh = clampI(nh, lo, hi);
     bool done = false;
     bool ok = false;
+    if (active.modern) return askNewSizeCard(title, nw, nh, lo, hi, background);
     dropInput();
     pf_.input().keys.clear();
 
@@ -697,20 +780,37 @@ void Editor::showMapPropertiesScreen() {
 
         int y = 110;
         uiLabelLeft(bx, y, 30, "Название", cText);
-        fb_.fillRoundRect(bx + 160, y, WIN_W - 220, y + 30, 4, 4, cFace);
-        uiLabelLeft(bx + 168, y, 30, fitText(m.map.name, WIN_W - 400), cText);
-        if (uiButton(WIN_W - 210, y, 150, 30, "Изменить", true)) {
+        if (active.modern) {
+            // Название правится на месте, а не отдельным экраном (UX-28).
             std::string nm = m.map.name;
-            if (askText("Название локации", "Строка name в файле карты", nm, nm)) {
+            if (uiTextLine(bx + 160, y, WIN_W - bx - 220, 30, nm)) {
                 m.pushUndo();
                 m.map.name = netTrim(nm);
+            }
+        } else {
+            fb_.fillRoundRect(bx + 160, y, WIN_W - 220, y + 30, 4, 4, cFace);
+            uiLabelLeft(bx + 168, y, 30, fitText(m.map.name, WIN_W - 400), cText);
+            if (uiButton(WIN_W - 210, y, 150, 30, "Изменить", true)) {
+                std::string nm = m.map.name;
+                if (askText("Название локации", "Строка name в файле карты", nm, nm)) {
+                    m.pushUndo();
+                    m.map.name = netTrim(nm);
+                }
             }
         }
 
         y += 56;
-        sizeRow(y, "Ширина", nw);
-        y += 42;
-        sizeRow(y, "Высота", nh);
+        if (active.modern) {
+            uiLabelLeft(bx, y, 30, "Размер", cText);
+            uiNumber(bx + 160, y, 110, 30, nw, kMapMinSide, kMapMaxSide, 1, 8);
+            uiLabel(bx + 270, y, 30, 30, "×", cTextDim);
+            uiNumber(bx + 300, y, 110, 30, nh, kMapMinSide, kMapMaxSide, 1, 8);
+            y += 42;
+        } else {
+            sizeRow(y, "Ширина", nw);
+            y += 42;
+            sizeRow(y, "Высота", nh);
+        }
         nw = clampI(nw, kMapMinSide, kMapMaxSide);
         nh = clampI(nh, kMapMinSide, kMapMaxSide);
 

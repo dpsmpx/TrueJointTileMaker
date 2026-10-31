@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "app/textfield.h"
 #include "core/config.h"
 #include "core/grid.h"
 #include "core/model.h"
@@ -143,6 +144,30 @@ private:
                           bool on, bool over, bool down, Btn kind);
     /// Щелчок по прямоугольнику кнопки в этом кадре; забирает его.
     bool takeButtonClick(int x, int y, int bw, int bh, bool enabled);
+    /// Поле числа (UX-26): щелчок — набрать с клавиатуры (Enter, Tab или
+    /// щелчок мимо — принять, Escape — отменить), ролик и стрелки над полем
+    /// — шаг, Shift — крупный шаг, протяжка по полю — быстро. true —
+    /// значение изменилось.
+    bool uiNumber(int x, int y, int w, int h, int& v, int lo, int hi, int step = 1, int big = 10,
+                  const std::string& unit = "");
+    /// Тумблер «вкл/выкл» с подписью слева (UX-28): у 1.6 — кнопка с
+    /// надписью «да» или «нет», и было не ясно, состояние это или действие.
+    bool uiSwitch(int x, int y, int w, const std::string& caption, bool& on);
+    /// Поле строки на месте (UX-28): щелчок — править, Enter или щелчок
+    /// мимо — принять (true), Escape — отменить. Работают выделение и буфер
+    /// обмена, как в askText.
+    bool uiTextLine(int x, int y, int w, int h, std::string& value);
+    std::uintptr_t textEditId_ = 0;
+    TextField textEdit_;
+    /// Поле, которое сейчас набирают, и поле, по которому нажали; номер —
+    /// адрес числа.
+    std::uintptr_t numEdit_ = 0;
+    std::uintptr_t numPress_ = 0;
+    std::string numText_;
+    /// Число только что открыто для набора: первая цифра заменяет его.
+    bool numFresh_ = false;
+    int numPressX_ = 0, numPressV_ = 0;
+    bool numDragged_ = false;
     void uiLabel(int x, int y, int bw, int bh, const std::string& caption, Color c);
     /// Число со ступенями: подпись, −big, −1, значение, +1, +big. Ширина
     /// 358 точек, высота 30. true — значение изменилось.
@@ -212,7 +237,12 @@ private:
              const std::string& no, const std::string& cancel);
     bool askYesNo(const std::string& title, const std::string& text, const std::string& yes,
                   const std::string& no);
-    bool askNewSize(const std::string& title, int& nw, int& nh, int lo, int hi);
+    /// background — фон нового тайла: 0 прозрачный, 1 белый, 2 второй цвет;
+    /// nullptr — без выбора (карта).
+    bool askNewSize(const std::string& title, int& nw, int& nh, int lo, int hi,
+                    int* background = nullptr);
+    bool askNewSizeCard(const std::string& title, int& nw, int& nh, int lo, int hi,
+                        int* background);
     void showColorScreen();
     bool askText(const std::string& title, const std::string& prompt, const std::string& initial,
                  std::string& value);
