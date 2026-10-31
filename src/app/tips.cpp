@@ -107,9 +107,9 @@ void Editor::registerEditorTips() {
     if (classicUi_ || !cfg.tooltips) return;
     const int px = mouseX();
     const int py = mouseY();
-    int idx = 0;
     if (px >= PANEL_X) {
         if (py >= TOOLS_Y0 && py < TOOLS_Y1) {
+            int idx = 0;
             if (m.toolHit(px, py, idx)) {
                 tipCand_ = toolTip(idx);
             } else if (m.docMode == DOC_TILE) {
@@ -125,6 +125,7 @@ void Editor::registerEditorTips() {
         } else if (py >= MENU_Y0 && py < MENU_Y1) {
             tipCand_ = "Главное меню · Escape";
         } else if (m.docMode == DOC_MAP) {
+            int idx = 0;
             if (py >= SLOT1_Y0 && py < SLOT1_Y1 && Model::terrHit(px, py, idx)) {
                 tipCand_ = "Местность «" + mapTileName(idx) + "»\nКисть, заливка и прямоугольник";
             } else if (py >= SLOT2_Y0 && py < ALPHA_Y1 && Model::objHit(px, py, idx)) {

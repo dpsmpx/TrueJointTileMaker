@@ -263,6 +263,12 @@ private:
     bool askNewSizeCard(const std::string& title, int& nw, int& nh, int lo, int hi,
                         int* background);
     void showColorScreen();
+    /// Выбор цвета карточкой (color_ui.cpp, UX-27): квадрат и полосы, поля
+    /// RGBA, HSV и HEX, было и стало, недавние цвета, «в палитру».
+    void showColorPicker();
+    /// Цвет, выбранный в карточке, — первым в недавних (не больше 12).
+    void rememberColor(Color c);
+    std::vector<Color> recentColors_;
     bool askText(const std::string& title, const std::string& prompt, const std::string& initial,
                  std::string& value);
     void showColorOpsScreen();
@@ -315,7 +321,7 @@ private:
     /// несохранённом в нём.
     bool openAnyFile(const std::string& path);
     /// Файл, брошенный в окно (UX-14): открыть, с Shift — слоем-образцом.
-    void openDropped(const std::string& path, bool asReference);
+    void openDropped(const std::string& raw, bool asReference);
     /// Выделение — и в системный буфер обмена картинкой (UX-14).
     void exportBufferToClipboard();
     /// Картинка из системного буфера, положенная другой программой, —

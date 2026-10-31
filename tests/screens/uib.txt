@@ -69,3 +69,17 @@ click 390 312               # «Не сохранять»
 move 700 558
 sleep 0.3
 shot 10_dropped
+# B10: выбор цвета — HEX набирается, было и стало рядом. Сперва даём
+# догореть уведомлению шага B7.
+sleep 3
+key p
+sleep 0.3
+click 450 281               # поле HEX
+key ctrl+a
+type 3A7BD5
+key Return
+move 700 558
+sleep 0.2
+shot 11_color
+key Return
+sleep 0.2

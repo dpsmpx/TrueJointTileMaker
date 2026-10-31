@@ -787,10 +787,10 @@ void Editor::autosave() {
     }
     const std::string dir = autosaveDir();
     if (!makeDirs(dir)) return;
-    std::string err;
     const std::string tile = pathCombine(dir, "tile.tjt");
     const std::string map = pathCombine(dir, "map.map");
     if (m.tileModified) {
+        std::string err;
         projectSave(tile, m, err);
     } else {
         removeFile(tile);
@@ -887,6 +887,7 @@ bool Editor::importClipboardImage() {
 
 bool Editor::openRecentAsk() {
     std::vector<std::string> items;
+    items.reserve(cfg.recentFiles.size());
     for (const std::string& f : cfg.recentFiles)
         items.push_back(fileNameOnly(f) + "   —   " + pathDirName(f));
     const int k = askChoice("Недавние файлы", "Щелчок — открыть; последний — сверху", items);

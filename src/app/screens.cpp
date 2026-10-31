@@ -474,6 +474,10 @@ bool Editor::askNewSize(const std::string& title, int& nw, int& nh, int lo, int 
 /// Точная настройка цвета по каналам ARGB. Положение ползунка и разбор
 /// щелчка — одна пара формул: маркер встаёт ровно под курсор.
 void Editor::showColorScreen() {
+    if (active.modern) {
+        showColorPicker();
+        return;
+    }
     constexpr int SX0 = 70;
     constexpr int SX1 = WIN_W - 70;
     auto valueToX = [](int v) {

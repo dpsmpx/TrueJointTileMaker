@@ -369,8 +369,8 @@ bool Platform::scriptedDialog(std::string& answer) {
 std::string Platform::runDialog(int kind, const std::string& title,
                                 const std::vector<FileFilter>& filters,
                                 const std::string& location) {
-    std::string scripted;
-    if (scriptedDialog(scripted)) return scripted;
+    std::string answer;
+    if (scriptedDialog(answer)) return answer;
 
     std::vector<SDL_DialogFileFilter> f;
     f.reserve(filters.size());
@@ -424,6 +424,8 @@ std::string Platform::openFolderDialog(const std::string& title, const std::stri
 
 namespace {
 
+// Подпись задана SDL (SDL_ClipboardDataCallback): userdata без const.
+// cppcheck-suppress constParameterCallback
 const void* SDLCALL clipboardImageData(void* userdata, const char* mime, std::size_t* size) {
     const auto* png = static_cast<const std::vector<std::uint8_t>*>(userdata);
     if (mime == nullptr || std::string_view(mime) != "image/png" || png->empty()) {
