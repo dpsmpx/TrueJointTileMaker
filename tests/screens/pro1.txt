@@ -28,7 +28,7 @@ shot 03_rotated
 key ctrl+d
 key q 1                    # «пиксель-перфект» и карандаш
 drag 60 470 260 520
-key 8 bracketright         # узор «Точки 25%»
+key 8 shift+bracketright   # узор «Точки 25%» (Shift+] — узоры, ] — размер)
 drag 300 470 500 470
 move 700 300
 sleep 0.2
