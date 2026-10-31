@@ -75,6 +75,7 @@ add_library(tjtm_core STATIC
     src/core/png.cpp
     src/core/project.cpp
     src/core/rasterfmt.cpp
+    src/core/shortcuts.cpp
     src/core/text.cpp
     src/core/tilemap.cpp
     src/core/vector.cpp
@@ -108,6 +109,7 @@ if(TJTM_BUILD_APP)
         src/app/map_ui.cpp
         src/app/tips.cpp
         src/app/color_ui.cpp
+        src/app/keys.cpp
         src/app/menu.cpp
         src/app/palette_ui.cpp
         src/app/panel.cpp

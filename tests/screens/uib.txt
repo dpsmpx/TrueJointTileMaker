@@ -83,3 +83,17 @@ sleep 0.2
 shot 11_color
 key Return
 sleep 0.2
+# B11: шпаргалка по F1 — из той же таблицы, что разбирает клавиши; поиск
+# и по делу, и по клавише.
+key F1
+sleep 0.3
+move 700 558
+sleep 0.2
+shot 12_keys
+click 630 35                # поле поиска
+type слой
+sleep 0.2
+shot 13_keys_find
+key Escape
+key Escape
+sleep 0.2

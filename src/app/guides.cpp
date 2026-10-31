@@ -262,22 +262,6 @@ void Editor::handleRulerPress() {
     m.needRepaint = true;
 }
 
-bool Editor::handleGuideKey(int key) {
-    if (!lastKey_.ctrl) return false;
-    switch (key) {
-        case KEY_R:
-            m.rulersOn = !m.rulersOn;
-            m.needRepaint = true;
-            return true;
-        case KEY_SEMICOLON:
-            m.guidesOn = !m.guidesOn;
-            m.needRepaint = true;
-            return true;
-        case KEY_G: showGridScreen(); return true;
-        default: return false;
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Экран «Сетка и направляющие»
 // ---------------------------------------------------------------------------

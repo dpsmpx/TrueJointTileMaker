@@ -434,50 +434,6 @@ void Editor::handleTimelineClick() {
     }
 }
 
-bool Editor::handleTimelineKey(int key) {
-    if (m.docMode != DOC_TILE) return false;
-    const int nf = m.doc.frameCount();
-    const int nl = m.doc.layerCount();
-    switch (key) {
-        case KEY_J:
-            timelineOn_ = !timelineOn_;
-            if (!timelineOn_) stopPlayback();
-            m.needRepaint = true;
-            return true;
-        case KEY_ENTER: togglePlayback(); return true;
-        case KEY_COMMA:
-            stopPlayback();
-            m.setActiveCel(m.activeLayer, (m.activeFrame + nf - 1) % std::max(1, nf));
-            return true;
-        case KEY_PERIOD:
-            stopPlayback();
-            m.setActiveCel(m.activeLayer, (m.activeFrame + 1) % std::max(1, nf));
-            return true;
-        case KEY_HOME:
-            stopPlayback();
-            m.setActiveCel(m.activeLayer, 0);
-            return true;
-        case KEY_END:
-            stopPlayback();
-            m.setActiveCel(m.activeLayer, nf - 1);
-            return true;
-        case KEY_PGUP:
-            stopPlayback();
-            m.setActiveCel(std::min(nl - 1, m.activeLayer + 1), m.activeFrame);
-            return true;
-        case KEY_PGDN:
-            stopPlayback();
-            m.setActiveCel(std::max(0, m.activeLayer - 1), m.activeFrame);
-            return true;
-        case KEY_F3:
-            m.onionSkin = !m.onionSkin;
-            m.tileBmpDirty = true;
-            m.needRepaint = true;
-            return true;
-        default: return false;
-    }
-}
-
 void Editor::timelineWheel(int wheel) {
     // Над слоями ролик листает слои, над кадрами — кадры.
     if (mouseX() < TL_NAME_W) {

@@ -2,10 +2,12 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 
 #include "core/config.h"
 #include "core/model.h"
+#include "core/shortcuts.h"
 #include "core/theme.h"
 
 namespace tjtm {
@@ -261,6 +263,97 @@ TEST(UiTheme, ClassicKeepsTheLookOf16) {
     EXPECT_EQ(t.checkA.argb(), rgb(214, 214, 218).argb());
     EXPECT_EQ(t.radius, 7);
     EXPECT_LT(contrast(t.textDim, t.window), 4.5) << "в 1.6 подсказки были бледнее нормы";
+}
+
+// --- B11: сочетания одной таблицей -----------------------------------------
+
+TEST(UiShortcuts, NoConflicts) {
+    // Два сочетания на одно нажатие — второе никогда не сработает, а
+    // шпаргалка его покажет.
+    const auto all = shortcuts();
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        for (std::size_t j = i + 1; j < all.size(); ++j) {
+            const Shortcut& a = all[i];
+            const Shortcut& b = all[j];
+            const bool overlap =
+                a.where == KeyWhere::Both || b.where == KeyWhere::Both || a.where == b.where;
+            EXPECT_FALSE(a.key == b.key && a.mods == b.mods && overlap)
+                << keyName(a.key, a.mods) << " — дважды";
+        }
+    }
+}
+
+TEST(UiShortcuts, EveryCommandHasKeyAndName) {
+    const auto all = shortcuts();
+    for (int c = 0; c <= static_cast<int>(Cmd::SwitchMode); ++c) {
+        const bool found = std::any_of(all.begin(), all.end(), [&](const Shortcut& s) {
+            return static_cast<int>(s.cmd) == c;
+        });
+        EXPECT_TRUE(found) << "команда " << c << " без клавиши";
+    }
+    for (const Shortcut& s : all)
+        EXPECT_NE(keyName(s.key, s.mods)[0], '#') << "клавиша без имени: " << s.key;
+}
+
+TEST(UiShortcuts, HiddenRowsFollowTheirLine) {
+    // Сочетание без текста дописывается к строке над ним: та же команда
+    // или своя подпись у строки (цифры, стрелки, [ ]).
+    const auto all = shortcuts();
+    const Shortcut* line = nullptr;
+    for (const Shortcut& s : all) {
+        if (s.text != nullptr) {
+            line = &s;
+            EXPECT_STRNE(s.group, "");
+            continue;
+        }
+        ASSERT_NE(line, nullptr);
+        EXPECT_TRUE(line->cmd == s.cmd || line->label != nullptr) << keyName(s.key, s.mods);
+        EXPECT_EQ(line->where, s.where) << keyName(s.key, s.mods);
+    }
+}
+
+TEST(UiShortcuts, ShiftFallsBackAndModesSplit) {
+    auto cmd = [](int key, int mods, bool tile) {
+        const Shortcut* s = findShortcut(key, mods, tile);
+        return s == nullptr ? -1 : static_cast<int>(s->cmd);
+    };
+    auto is = [](Cmd c) { return static_cast<int>(c); };
+    // Shift без своего сочетания — как без Shift, как в 1.6.
+    EXPECT_EQ(cmd(KEY_G, MOD_SHIFT, true), is(Cmd::Grid));
+    EXPECT_EQ(cmd(KEY_A, MOD_CTRL | MOD_SHIFT, true), is(Cmd::SelectAll));
+    // Своё сочетание с Shift — важнее.
+    EXPECT_EQ(cmd(KEY_S, MOD_CTRL | MOD_SHIFT, true), is(Cmd::SaveAs));
+    EXPECT_EQ(cmd(KEY_Z, MOD_CTRL | MOD_SHIFT, false), is(Cmd::Redo));
+    EXPECT_EQ(cmd(KEY_SLASH, MOD_SHIFT, true), is(Cmd::Cheatsheet));
+    // Ctrl с буквой без сочетания и Alt ничего не делают (UX-16).
+    EXPECT_EQ(cmd(KEY_Q, MOD_CTRL, true), -1);
+    EXPECT_EQ(cmd(KEY_G, MOD_ALT, true), -1);
+    EXPECT_EQ(cmd(KEY_A, MOD_CTRL, false), -1);
+    // Одна клавиша — разное в тайле и на карте.
+    EXPECT_EQ(cmd(KEY_ENTER, 0, true), is(Cmd::Play));
+    EXPECT_EQ(cmd(KEY_ENTER, 0, false), is(Cmd::ObjectForm));
+    EXPECT_EQ(cmd(KEY_B, MOD_SHIFT, true), is(Cmd::MapContext));
+    EXPECT_EQ(cmd(KEY_B, MOD_SHIFT, false), is(Cmd::MapTiles));
+    // Однобуквенные команды файла — только с Ctrl (UX-17).
+    EXPECT_EQ(cmd(KEY_N, 0, true), -1);
+    EXPECT_EQ(cmd(KEY_S, 0, true), -1);
+    EXPECT_EQ(cmd(KEY_R, 0, true), -1);
+}
+
+TEST(UiShortcuts, SheetLabels) {
+    const auto all = shortcuts();
+    auto row = [&](Cmd c) {
+        for (std::size_t i = 0; i < all.size(); ++i) {
+            if (all[i].cmd == c && all[i].text != nullptr) return shortcutKeys(all, i);
+        }
+        return std::string();
+    };
+    EXPECT_EQ(row(Cmd::Undo), "Ctrl+Z, Z");
+    EXPECT_EQ(row(Cmd::Redo), "Ctrl+Shift+Z, Ctrl+Y, Y");
+    EXPECT_EQ(row(Cmd::Cheatsheet), "F1, ?");
+    EXPECT_EQ(row(Cmd::MainMenu), "Esc, M");
+    EXPECT_EQ(row(Cmd::Tool), "1 … 9");
+    EXPECT_EQ(keyName(KEY_SEMICOLON, MOD_CTRL), "Ctrl+;");
 }
 
 }  // namespace

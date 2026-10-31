@@ -18,6 +18,7 @@
 #include "core/config.h"
 #include "core/grid.h"
 #include "core/model.h"
+#include "core/shortcuts.h"
 #include "gfx/font.h"
 #include "gfx/surface.h"
 #include "platform/platform.h"
@@ -374,7 +375,15 @@ private:
     void handlePaletteClick();
     void doOverviewDrag();
     void handlePanelClick();
+    // --- клавиатура (keys.cpp): таблица сочетаний, шпаргалка ---
     void handleEditorKey(int key);
+    /// Разбор клавиш 1.6 для «Классики»: Ctrl с буквой — та же буква, если
+    /// у неё нет своего сочетания с Ctrl.
+    void handleClassicKey(int key);
+    /// Команда из таблицы сочетаний; arg — номер инструмента у Cmd::Tool.
+    void runCommand(Cmd c, int arg = 0);
+    /// Шпаргалка клавиш поверх холста (F1, ?), из той же таблицы.
+    void showCheatsheet();
 
     // --- этап 1 RoadToProLevel (pro.cpp) ---
     /// Три ячейки третьего ряда инструментов тайла: режим кисти,
@@ -387,14 +396,8 @@ private:
     void definePolygonSelection(int ax, int ay, int op);
     void moveSelectionPro(int mx, int my, bool copy);
     void drawSelectionMask();
-    bool handleProKey(int key);
-    /// Сочетания с Ctrl режима тайла: выделение, буфер, кисть из выделения.
-    bool handleProCtrlKey(int key);
     /// Вставка буфера плавающим выделением под курсором.
     void pasteBufferHere();
-    /// Клавиша с Ctrl или Alt в интерфейсе 1.7: только сочетания из таблицы,
-    /// буква без своего сочетания ничего не делает (UX-16).
-    void handleModifiedKey(int key);
     void showToolOptions();
     void showImageScreen();
     void showRotateDialog();
@@ -537,7 +540,6 @@ private:
     void drawRadialAxes();
     void drawRulers();
     void handleRulerPress();
-    bool handleGuideKey(int key);
     void showGridScreen();
 
     // --- этап 4: лента слоёв и кадров (timeline.cpp) ---
@@ -567,7 +569,6 @@ private:
     std::vector<int> timelineRows() const;
     void drawLayerKindMark(int x, int cy, const Layer& layer);
     void handleTimelineClick();
-    bool handleTimelineKey(int key);
     void timelineWheel(int wheel);
     void togglePlayback();
     void stopPlayback();
