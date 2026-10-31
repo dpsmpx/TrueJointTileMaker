@@ -445,7 +445,7 @@ void Editor::showSettingsScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 14, WIN_W, 46, "Настройки", cText);
+        uiTitle(0, 14, WIN_W, 46, "Настройки");
         uiLabel(0, 46, WIN_W, 20, "Сохраняются в Config.txt рядом с программой", cTextDim);
 
         int y = 76;
@@ -476,6 +476,17 @@ void Editor::showSettingsScreen() {
 
         y += 40;
         if (active.modern) {
+            // Масштаб интерфейса (UX-02): по экрану или ступенью.
+            uiLabelLeft(500, y, 30, "Масштаб интерфейса", cText);
+            static constexpr int kScales[] = {0, 100, 125, 150, 200};
+            int sx = 500;
+            for (const int sc : kScales) {
+                const int bw = sc == 0 ? 50 : 42;
+                if (uiToggle(sx, y + 36, bw, 30, sc == 0 ? "Авто" : std::to_string(sc),
+                             v.uiScale == sc))
+                    v.uiScale = sc;
+                sx += bw + 4;
+            }
             sizeRow(y, "Новый тайл", v.defaultWidth, v.defaultHeight, MIN_TILE, MAX_TILE);
             y += 36;
             sizeRow(y, "Новая карта", v.defaultMapWidth, v.defaultMapHeight, kMapMinSide,
@@ -518,8 +529,12 @@ void Editor::showSettingsScreen() {
             v.lastMapFile = cfg.lastMapFile;
             v.lastFolder = cfg.lastFolder;
             v.iconsFolder = cfg.iconsFolder;
+            v.windowW = cfg.windowW;
+            v.windowH = cfg.windowH;
+            v.windowMaximized = cfg.windowMaximized;
             cfg = v;
             applyTheme();
+            if (!classicUi_) pf_.setUiScale(cfg.uiScale);
             m.gridOn = v.showGrid;
             m.checkerOn = v.showChecker;
             m.seamlessOn = v.showSeamless;
@@ -583,7 +598,7 @@ void Editor::showMainMenu() {
         if (m.isModified()) info += "   есть несохранённые изменения";
 
         fb_.clear(cWindow);
-        textCentered(0, 16, WIN_W, 52, kAppTitle, cText);
+        uiHeadline(0, 16, WIN_W, 52, kAppTitle);
         uiLabel(0, 52, WIN_W, 22, isMap ? "режим карты локации" : "режим тайла", cAccent);
         uiLabel(0, 74, WIN_W, 22, info, cTextDim);
 
@@ -644,7 +659,17 @@ void Editor::showMainMenu() {
         y += stp;
         if (uiButton(bx, y, bw, bh, "Справка и благодарности", true)) showHelpScreen();
         y += stp;
-        if (uiButton(bx, y, bw, bh, "Выход", true)) commandExit();
+        if (classicUi_) {
+            if (uiButton(bx, y, bw, bh, "Выход", true)) commandExit();
+        } else {
+            // Во весь экран — кнопкой и F11, не Escape: он — это меню.
+            const int hw = (bw - 4) / 2;
+            if (uiButton(bx, y, hw, bh,
+                         pf_.fullscreen() ? "Обычное окно  F11" : "Во весь экран  F11", true)) {
+                pf_.setFullscreen(!pf_.fullscreen());
+            }
+            if (uiButton(bx + hw + 4, y, bw - hw - 4, bh, "Выход", true)) commandExit();
+        }
 
         uiLabel(0, WIN_H - 26, WIN_W, 22,
                 std::string("версия ") + kAppVersion + "   ·   Escape закрывает меню", cTextDim);
@@ -821,7 +846,7 @@ bool Editor::showTilesetScreen() {
         beginFrameInput();
         const std::string dir = tsetDirOf(tsetKind_);
         fb_.clear(cWindow);
-        textCentered(0, 6, WIN_W, 40, "Наборы тайлов", cText);
+        uiTitle(0, 6, WIN_W, 40, "Наборы тайлов");
 
         // Переключатель наборов — вкладки: открытая видна сразу.
         for (int i = 0; i < TS_KINDS; ++i) {

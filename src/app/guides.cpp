@@ -305,7 +305,7 @@ void Editor::showGridScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 12, WIN_W, 40, "Сетка и направляющие", cText);
+        uiTitle(0, 12, WIN_W, 40, "Сетка и направляющие");
         const int dw = m.docW();
         const int dh = m.docH();
 

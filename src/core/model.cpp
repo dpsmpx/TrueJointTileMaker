@@ -1230,7 +1230,7 @@ void Model::setTool(int i) {
 }
 
 int Model::toolCellX(int i) {
-    return PANEL_X + 2 + (i % TOOL_COLS) * TOOL_CW;
+    return panelX() + 2 + (i % TOOL_COLS) * TOOL_CW;
 }
 
 int Model::toolCellY(int i) {
@@ -1302,7 +1302,7 @@ int Model::overPixH() const {
 }
 
 int Model::overOriginX() const {
-    return PANEL_X + 2 + (OVER_W - overPixW()) / 2;
+    return panelX() + 2 + (OVER_W - overPixW()) / 2;
 }
 
 int Model::overOriginY() const {

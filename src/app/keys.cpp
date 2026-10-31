@@ -212,6 +212,7 @@ void Editor::runCommand(Cmd c, int arg) {
             m.needRepaint = true;
             break;
         case Cmd::Zoom100: m.setZoom(1, 1, (m.X0 + m.W) / 2, (m.Y0 + m.H) / 2); break;
+        case Cmd::Fullscreen: pf_.setFullscreen(!pf_.fullscreen()); break;
         case Cmd::Hand: spaceHand(); break;
         case Cmd::Pan:
         case Cmd::Nudge: {
@@ -508,9 +509,9 @@ void Editor::showCheatsheet() {
     while (!done && !quitNow_) {
         beginFrameInput();
         dialogBack(backdrop, kX0, kY0, kX1, kY1);
-        textOut(kX0 + 14, kY0 + 15, "Клавиши", cText);
-        textOut(kX0 + 14 + textWidth("Клавиши") + 10, kY0 + 15,
-                tile ? "режим тайла" : "режим карты", cTextDim);
+        const int tw = titleFont_.textWidth("Клавиши");
+        uiTitle(kX0 + 14, kY0 + 8, kX0 + 14 + tw, kY0 + 40, "Клавиши");
+        textOut(kX0 + 14 + tw + 10, kY0 + 16, tile ? "режим тайла" : "режим карты", cTextDim);
         // Поиск: и по делу («слой»), и по клавише («ctrl+d»).
         const int sx = kX1 - 14 - 110 - 8 - 230;
         uiTextLine(sx, kY0 + 8, 230, 32, query);

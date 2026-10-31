@@ -37,7 +37,7 @@ void Editor::showTextScreen(const std::string& title, const std::vector<std::str
         top = clampI(top, 0, maxTop);
 
         fb_.clear(cWindow);
-        textCentered(0, 14, WIN_W, 44, title, cText);
+        uiTitle(0, 14, WIN_W, 44, title);
         fb_.fillRoundRect(24, 52, WIN_W - 24, WIN_H - 56, BTN_R, BTN_R, cBorder);
         fb_.fillRoundRect(25, 53, WIN_W - 25, WIN_H - 57, BTN_R, BTN_R, cBack);
         for (int i = 0; i < visible; ++i) {
@@ -84,7 +84,9 @@ std::string Editor::keysHint(const std::string& enter, const std::string& escape
 std::optional<Editor::CardBack> Editor::cardBackdrop() {
     if (!active.modern) return std::nullopt;
     CardBack b{fb_, fb_};
-    b.dim.fillRect(0, 0, WIN_W, WIN_H, active.scrim);
+    // Притушить всё окно, а не одну страницу.
+    b.dim.setOrigin(0, 0);
+    b.dim.fillRect(0, 0, b.dim.width(), b.dim.height(), active.scrim);
     return b;
 }
 
@@ -98,6 +100,7 @@ void Editor::dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0,
         return;
     }
     fb_ = backdrop->dim;
+    fb_.setOrigin(pageX_, pageY_);
     const int r = active.radius * 4;
     fb_.fillRoundRect(x0, y0, x1, y1, r, r, cBorder);
     fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 2, r - 2, cFace);
@@ -127,10 +130,15 @@ void Editor::drawToast() {
     // и не поверх панели с инструментами.
     const int x = std::max(8, (m.W - w) / 2);
     const int y = m.H - h - 14;
+    // Место — на холсте окна, и поверх экрана-страницы тоже.
+    const int ox = fb_.originX();
+    const int oy = fb_.originY();
+    fb_.setOrigin(0, 0);
     fb_.fillRoundRect(x, y, x + w, y + h, 12, 12, active.inverseSurface);
     textOut(x + 14, y + 8, toastTitle_, active.inverseOnSurface);
     for (std::size_t i = 0; i < lines.size(); ++i)
         textOut(x + 14, y + 10 + static_cast<int>(i + 1) * lh, lines[i], active.inverseOnSurface);
+    fb_.setOrigin(ox, oy);
 }
 
 void Editor::showError(const std::string& title, const std::string& human,
@@ -156,7 +164,7 @@ void Editor::showError(const std::string& title, const std::string& human,
         const int x0 = (WIN_W - kW) / 2;
         const int y0 = std::max(8, (WIN_H - h) / 2);
         dialogBack(backdrop, x0, y0, x0 + kW, y0 + h);
-        textCentered(x0, y0 + 12, x0 + kW, y0 + 40, title, cWarn);
+        uiTitle(x0, y0 + 12, x0 + kW, y0 + 40, title, cWarn);
         int y = y0 + 48;
         for (const std::string& l : lines) {
             textOut(x0 + 24, y, l, cText);
@@ -219,7 +227,7 @@ void Editor::showMessage(const std::string& title, const std::string& text) {
     while (!done && !quitNow_) {
         beginFrameInput();
         dialogBack(backdrop, x0, y0, x0 + kW, y0 + h);
-        textCentered(x0, y0 + 12, x0 + kW, y0 + 40, title, cText);
+        uiTitle(x0, y0 + 12, x0 + kW, y0 + 40, title);
         for (std::size_t i = 0; i < lines.size(); ++i)
             textOut(x0 + 24, y0 + 48 + static_cast<int>(i) * lh, lines[i], cText);
         if (uiPrimary(x0 + kW / 2 - 70, y0 + h - 50, 140, 34, "Закрыть", true)) done = true;
@@ -256,7 +264,7 @@ bool Editor::askNewSizeCard(const std::string& title, int& nw, int& nh, int lo, 
     while (!done && !quitNow_) {
         beginFrameInput();
         dialogBack(backdrop, x0, y0, x0 + 600, y0 + h);
-        textCentered(x0, y0 + 12, x0 + 600, y0 + 40, title, cText);
+        uiTitle(x0, y0 + 12, x0 + 600, y0 + 40, title);
         uiLabel(x0, y0 + 38, 600, 20,
                 "Размер от " + std::to_string(lo) + " до " + std::to_string(hi) + " точек",
                 cTextDim);
@@ -329,7 +337,7 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
     while (!done && !quitNow_) {
         beginFrameInput();
         dialogBack(backdrop, WIN_W / 2 - 300, H / 2 - 104, WIN_W / 2 + 300, H / 2 + 104);
-        textCentered(0, H / 2 - 90, WIN_W, H / 2 - 50, title, cText);
+        uiTitle(0, H / 2 - 90, WIN_W, H / 2 - 50, title);
         textCentered(tx, H / 2 - 46, WIN_W - tx, H / 2 + 10, text, cText);
         if (uiPrimary(WIN_W / 2 - 270, H / 2 + 30, 170, 34, yes, true)) {
             res = 1;
@@ -376,7 +384,7 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
     while (!done && !quitNow_) {
         beginFrameInput();
         dialogBack(backdrop, WIN_W / 2 - 250, H / 2 - 104, WIN_W / 2 + 250, H / 2 + 104);
-        textCentered(0, H / 2 - 90, WIN_W, H / 2 - 50, title, cText);
+        uiTitle(0, H / 2 - 90, WIN_W, H / 2 - 50, title);
         textCentered(tx, H / 2 - 46, WIN_W - tx, H / 2 + 10, text, cText);
         if (uiPrimary(WIN_W / 2 - 180, H / 2 + 30, 170, 34, yes, true)) {
             res = true;
@@ -432,7 +440,7 @@ bool Editor::askNewSize(const std::string& title, int& nw, int& nh, int lo, int 
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 30, WIN_W, 66, title, cText);
+        uiTitle(0, 30, WIN_W, 66, title);
         uiLabel(0, 70, WIN_W, 26,
                 "Размер от " + std::to_string(lo) + " до " + std::to_string(hi) + " пикселей",
                 cTextDim);
@@ -504,7 +512,7 @@ void Editor::showColorScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 16, WIN_W, 50, "Точный выбор цвета", cText);
+        uiTitle(0, 16, WIN_W, 50, "Точный выбор цвета");
         for (int i = 0; i < 4; ++i) {
             const int y = 74 + i * 54;
             uiLabel(0, y - 22, WIN_W, 20, std::string(kNames[i]) + ": " + std::to_string(ch[i]),
@@ -701,7 +709,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
         if (cx - tf.scroll < 0) tf.scroll = cx;
 
         dialogBack(backdrop, fx - 24, fy - 120, fx + fw + 24, fy + 110);
-        textCentered(0, fy - 110, WIN_W, fy - 74, title, cText);
+        uiTitle(0, fy - 110, WIN_W, fy - 74, title);
         uiLabel(0, fy - 70, WIN_W, 24, prompt, cTextDim);
         uiLabel(0, fy + 34, WIN_W, 20,
                 "Enter — готово, Escape — отмена. Работают выделение и буфер обмена", cTextDim);
@@ -752,7 +760,7 @@ void Editor::showColorOpsScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 24, WIN_W, 60, "Операции с цветом", cText);
+        uiTitle(0, 24, WIN_W, 60, "Операции с цветом");
         uiLabel(0, 62, WIN_W, 22, "Первый и второй цвет берутся из панели справа", cTextDim);
         // Образцы обоих рабочих цветов, чтобы не гадать, что с чем меняется.
         fb_.fillRect(bx, 92, bx + 60, 122, blendOver(m.firstColor, cCheckA));
@@ -883,7 +891,7 @@ void Editor::showMapPropertiesScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 24, WIN_W, 60, "Свойства локации", cText);
+        uiTitle(0, 24, WIN_W, 60, "Свойства локации");
         uiLabel(0, 62, WIN_W, 22, "Название и размер попадут в файл карты как есть", cTextDim);
 
         int y = 110;

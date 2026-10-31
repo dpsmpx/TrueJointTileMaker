@@ -44,6 +44,14 @@ private:
     gfx::Surface fb_;
     gfx::Font font_;
     gfx::Font mono_;
+    /// Шрифт по ролям (C1, ДС-4, UX-30): заголовок экрана и карточки —
+    /// полужирный 15 точек, заголовок главного меню — 18. У «Классики» —
+    /// один шрифт на всё, как у 1.6.
+    gfx::Font titleFont_;
+    gfx::Font headFont_;
+    void uiTitle(int x0, int y0, int x1, int y1, const std::string& s);
+    void uiTitle(int x0, int y0, int x1, int y1, const std::string& s, Color c);
+    void uiHeadline(int x0, int y0, int x1, int y1, const std::string& s);
     std::string configPath_;
     std::string baseDir_;
     bool quitNow_ = false;
@@ -106,8 +114,16 @@ private:
     // --- утилиты (TJTM.pas: «Мелкие утилиты», «Ввод») ---
     void idle();
     /// screen = false — кадр главного окна: там Tab переключает режим, а
-    /// не фокус.
+    /// не фокус, и нет страницы по середине окна.
     void beginFrameInput(bool screen = true);
+    /// Экраны свёрстаны под окно 780×560: в большом окне они — страница по
+    /// середине, со своим началом координат и мыши (план «Интерфейс», C1).
+    int pageX_ = 0;
+    int pageY_ = 0;
+    bool screenFrame_ = false;
+    void setPage(bool screen);
+    /// Окно сменило размер: кадр и раскладка — под него.
+    void syncFrameSize();
     void dropInput();
 
     // --- фокус с клавиатуры (план «Интерфейс», B14, UX-19) ---
@@ -139,8 +155,9 @@ private:
     void waitMouseRelease();
     [[nodiscard]] bool isKeyPressed(int key) const { return pf_.keyHeld(key); }
     static bool isMiddle(int b) { return b != MB_LEFT && b != MB_RIGHT; }
-    int mouseX() { return pf_.input().mouseX; }
-    int mouseY() { return pf_.input().mouseY; }
+    // Мышь — в координатах кадра, а на экране — страницы (C1).
+    int mouseX() { return pf_.input().mouseX - pageX_; }
+    int mouseY() { return pf_.input().mouseY - pageY_; }
     bool mousePressed() { return pf_.input().mousePressed; }
     void redraw();
     /// Окно закрывают крестиком: оригинал выходил молча, перенос

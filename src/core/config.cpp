@@ -83,6 +83,21 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             tooltips = parseBool(val, tooltips);
         } else if (key == "cellframe") {
             cellFrame = parseBool(val, cellFrame);
+        } else if (key == "windowsize") {
+            // «1280x800»: как пишет программа.
+            const std::size_t x = netToLower(val).find('x');
+            if (x != std::string::npos) {
+                windowW = parseInt(val.substr(0, x), 0, 0, 16384);
+                windowH = parseInt(val.substr(x + 1), 0, 0, 16384);
+            }
+        } else if (key == "windowmaximized") {
+            windowMaximized = parseBool(val, windowMaximized);
+        } else if (key == "uiscale") {
+            const std::string v = netToLower(netTrim(val));
+            uiScale = v == "авто" || v == "auto" ? 0 : parseInt(val, 0, 0, 300);
+            if (uiScale != 0 && uiScale != 100 && uiScale != 125 && uiScale != 150 &&
+                uiScale != 200)
+                uiScale = 0;
         } else if (key == "recentfiles") {
             // Пути через «|»: в путях Windows и Linux его не бывает.
             recentFiles.clear();
@@ -209,6 +224,17 @@ std::string Config::serialize() const {
     if (cellFrame != def.cellFrame) {
         add("# Рамка клетки под курсором на холсте.");
         add(std::string("CellFrame = ") + ruBool(cellFrame));
+        add("");
+    }
+    if (uiScale != def.uiScale) {
+        add("# Масштаб интерфейса: авто (по экрану), 100, 125, 150 или 200.");
+        add("UiScale = " + std::to_string(uiScale));
+        add("");
+    }
+    if (windowW > 0 && windowH > 0) {
+        add("# Размер окна и развёрнуто ли оно. Заполняется программой.");
+        add("WindowSize = " + std::to_string(windowW) + "x" + std::to_string(windowH));
+        add(std::string("WindowMaximized = ") + ruBool(windowMaximized));
         add("");
     }
     add("# Заполняется программой.");

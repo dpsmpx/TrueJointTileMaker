@@ -441,7 +441,7 @@ TEST(Model, ViewAndOverviewMath) {
                     break;
                 }
                 case 3: {
-                    const int px = hs.nextIn(PANEL_X - 10, PANEL_X + PANEL_W + 10);
+                    const int px = hs.nextIn(panelX() - 10, panelX() + PANEL_W + 10);
                     const int py = hs.nextIn(OVER_Y0 - 10, OVER_Y1 + 10);
                     m.overviewCenterOn(px, py);
                     break;

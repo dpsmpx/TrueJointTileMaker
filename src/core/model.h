@@ -38,13 +38,27 @@ inline constexpr const char* kAppVersion = "1.8.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
-/// Холст редактирования и панель справа от него.
+/// Холст редактирования и панель справа от него — окно оригинала. Под
+/// этот размер свёрстаны экраны: в большом окне они — страница по
+/// середине.
 inline constexpr int CANVAS_W = 600;
 inline constexpr int CANVAS_H = 560;
-inline constexpr int PANEL_X = CANVAS_W;
 inline constexpr int PANEL_W = 180;
 inline constexpr int WIN_W = CANVAS_W + PANEL_W;
 inline constexpr int WIN_H = CANVAS_H;
+
+/// Размер кадра главного окна (план «Интерфейс», C1): окно растягивается,
+/// панель прижата к правому краю, холст — всё, что слева от неё. У 1.6 и
+/// у «Классики» — 780×560. Одна на окно, поэтому общая.
+struct WindowLayout {
+    int w = WIN_W;
+    int h = WIN_H;
+};
+inline WindowLayout gLayout;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+/// Левый край панели.
+inline int panelX() {
+    return gLayout.w - PANEL_W;
+}
 
 /// Ширина линеек слева и сверху холста (этап 5).
 inline constexpr int RULER_SIZE = 20;
@@ -88,8 +102,12 @@ inline constexpr int BAR_H = 12;
 inline constexpr int OVER_W = PANEL_W - 4;
 inline constexpr int OVER_H = OVER_Y1 - OVER_Y0;
 inline constexpr int PAL_CELL = 16;
-inline constexpr int PAL_X0 = PANEL_X + (PANEL_W - PAL_COLS * PAL_CELL) / 2;
-inline constexpr int HSV_X0 = PANEL_X + (PANEL_W - BAR_SIZE) / 2;
+inline int palX0() {
+    return panelX() + (PANEL_W - PAL_COLS * PAL_CELL) / 2;
+}
+inline int hsvX0() {
+    return panelX() + (PANEL_W - BAR_SIZE) / 2;
+}
 /// Виды местности и объектов раскладываются в две колонки.
 inline constexpr int MSEL_COLS = 2;
 inline constexpr int MSEL_CW = 88;
@@ -592,10 +610,10 @@ public:
     static int toolCellX(int i);
     static int toolCellY(int i);
     bool toolHit(int px, int py, int& idx) const;
-    static int palCellX(int j) { return PAL_X0 + j * PAL_CELL; }
+    static int palCellX(int j) { return palX0() + j * PAL_CELL; }
     static int palCellY(int i) { return PAL_Y0 + i * PAL_CELL; }
     static bool palHit(int px, int py, int& cj, int& ci);
-    static int mselX(int i) { return PANEL_X + 2 + (i % MSEL_COLS) * MSEL_CW; }
+    static int mselX(int i) { return panelX() + 2 + (i % MSEL_COLS) * MSEL_CW; }
     static int terrCellY(int i) { return SLOT1_Y0 + (i / MSEL_COLS) * MTERR_CH; }
     static int objCellY(int i) { return SLOT2_Y0 + (i / MSEL_COLS) * MOBJ_CH; }
     static bool terrHit(int px, int py, int& idx);

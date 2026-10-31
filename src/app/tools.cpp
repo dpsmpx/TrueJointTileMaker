@@ -540,7 +540,7 @@ void Editor::handleCanvasClick() {
 
 void Editor::dragHSVSquare() {
     while (mousePressed() && !quitNow_) {
-        m.sat = axisToPercent(mouseX() - HSV_X0, BAR_SIZE);
+        m.sat = axisToPercent(mouseX() - hsvX0(), BAR_SIZE);
         m.val = axisToValue(mouseY() - HSV_Y0, BAR_SIZE);
         m.applyHSVToColor();
         repaintColorOnly();
@@ -551,7 +551,7 @@ void Editor::dragHSVSquare() {
 
 void Editor::dragHueBar() {
     while (mousePressed() && !quitNow_) {
-        m.hue = axisToHue(mouseX() - HSV_X0, BAR_SIZE);
+        m.hue = axisToHue(mouseX() - hsvX0(), BAR_SIZE);
         m.applyHSVToColor();
         repaintColorOnly();
         idle();
@@ -561,8 +561,8 @@ void Editor::dragHueBar() {
 
 void Editor::dragAlphaBar() {
     while (mousePressed() && !quitNow_) {
-        m.firstColor = argb(axisToByte(mouseX() - HSV_X0, BAR_SIZE), m.firstColor.r, m.firstColor.g,
-                            m.firstColor.b);
+        m.firstColor = argb(axisToByte(mouseX() - hsvX0(), BAR_SIZE), m.firstColor.r,
+                            m.firstColor.g, m.firstColor.b);
         repaintColorOnly();
         idle();
     }

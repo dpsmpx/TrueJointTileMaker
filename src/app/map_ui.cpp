@@ -37,7 +37,7 @@ int Editor::askChoice(const std::string& title, const std::string& hint,
         beginFrameInput();
         focusArrows_ = true;  // список: стрелки ходят по строкам (UX-19)
         fb_.clear(cWindow);
-        textCentered(0, 8, WIN_W, 36, title, cText);
+        uiTitle(0, 8, WIN_W, 36, title);
         uiLabel(0, 36, WIN_W, 20, hint, cTextDim);
         if (items.empty()) uiLabel(0, 200, WIN_W, 24, "Список пуст", cTextDim);
         for (int r = 0; r < ROWS; ++r) {
@@ -203,7 +203,7 @@ void Editor::showObjectForm(int idx) {
         if (changed) next.rest = mapobj::restOf(f);
 
         fb_.clear(cWindow);
-        textCentered(0, 8, WIN_W, 36, "Объект «" + orig.kind + "»", cText);
+        uiTitle(0, 8, WIN_W, 36, "Объект «" + orig.kind + "»");
         uiLabel(0, 36, WIN_W, 20,
                 "Поля — как их читает игра. Tab и стрелки — между полями, Enter — готово",
                 cTextDim);
@@ -304,7 +304,7 @@ void Editor::showMapBrushOptions() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 12, WIN_W, 40, "Кисть карты", cText);
+        uiTitle(0, 12, WIN_W, 40, "Кисть карты");
         if (uiToggle(LX, 60, 300, 34, "Одной местностью", !m.mapMix)) m.mapMix = false;
         if (uiToggle(LX + 310, 60, 300, 34, "Смесью местностей", m.mapMix)) {
             m.mapMix = true;
@@ -374,7 +374,7 @@ void Editor::showMapFindScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 8, WIN_W, 36, "Найти и заменить", cText);
+        uiTitle(0, 8, WIN_W, 36, "Найти и заменить");
 
         // --- местность ---
         uiLabelLeft(LX, 44, 22, "Заменить местность", cTextDim);

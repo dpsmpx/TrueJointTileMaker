@@ -36,7 +36,7 @@ void Editor::showBrushOptions() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 12, WIN_W, 40, "Карандаш", cText);
+        uiTitle(0, 12, WIN_W, 40, "Карандаш");
         for (int k = 0; k < PEN_MODES; ++k) {
             if (uiToggle(LX + k * 170, 70, 164, 34, penModeName(k), m.penMode == k)) m.penMode = k;
         }
@@ -158,7 +158,7 @@ void Editor::showFillOptions() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 12, WIN_W, 40, "Заливка", cText);
+        uiTitle(0, 12, WIN_W, 40, "Заливка");
         if (uiToggle(LX, 70, 250, 34, "Цветом", !m.fillGradient)) m.fillGradient = false;
         if (uiToggle(LX + 260, 70, 250, 34, "Градиентом узором", m.fillGradient))
             m.fillGradient = true;

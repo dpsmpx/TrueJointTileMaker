@@ -51,6 +51,14 @@ struct Config {
     bool tooltips = true;
     /// Рамка клетки под курсором на холсте.
     bool cellFrame = true;
+    /// Размер окна в точках кадра (C1); 0 — не запоминался: при первом
+    /// запуске окно берёт большую часть экрана.
+    int windowW = 0;
+    int windowH = 0;
+    /// Окно было развёрнуто.
+    bool windowMaximized = false;
+    /// Масштаб интерфейса в процентах: 100, 125, 150, 200; 0 — по экрану.
+    int uiScale = 0;
     /// Недавние файлы, последний — первым; не больше kRecentMax (UX-24).
     std::vector<std::string> recentFiles;
     static constexpr std::size_t kRecentMax = 10;

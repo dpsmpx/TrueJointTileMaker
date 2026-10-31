@@ -67,6 +67,9 @@ constexpr std::array kTable = {
     Shortcut{KEY_MINUS, kCtrl, kBoth, ZoomOut},
     Shortcut{KEY_0, kCtrl, kBoth, ZoomFit, 0, kView, "Вписать картинку"},
     Shortcut{KEY_1, kCtrl, kBoth, Zoom100, 0, kView, "Масштаб 100 %"},
+    // Полноэкранный — только F11 и кнопка в меню: Escape остаётся меню
+    // (решение владельца).
+    Shortcut{KEY_F11, 0, kBoth, Fullscreen, 0, kView, "Во весь экран"},
     Shortcut{KEY_SPACE, 0, kBoth, Hand, 0, kView, "Рука; коротко — вписать"},
     // Стрелки по правилу владельца (#16): с инструментом выделения и
     // выделением они двигают выделенное, иначе — холст; Ctrl+стрелки —

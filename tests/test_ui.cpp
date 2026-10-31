@@ -514,5 +514,40 @@ TEST(UiColors, ResetToBlackAndWhite) {
     EXPECT_EQ(m.secondColor, kWhite);
 }
 
+// --- C1: окно с изменяемым размером -----------------------------------------
+
+TEST(UiWindow, ConfigKeys) {
+    // Не запоминалось — в файле ни строки: файл по умолчанию как у
+    // оригинала.
+    Config c;
+    EXPECT_EQ(c.serialize().find("WindowSize"), std::string::npos);
+    EXPECT_EQ(c.serialize().find("UiScale"), std::string::npos);
+    Config back;
+    back.applyLines({"WindowSize = 1280x800", "WindowMaximized = да", "UiScale = 150"});
+    EXPECT_EQ(back.windowW, 1280);
+    EXPECT_EQ(back.windowH, 800);
+    EXPECT_TRUE(back.windowMaximized);
+    EXPECT_EQ(back.uiScale, 150);
+    const std::string text = back.serialize();
+    EXPECT_NE(text.find("WindowSize = 1280x800"), std::string::npos);
+    EXPECT_NE(text.find("UiScale = 150"), std::string::npos);
+    // Масштаб не из ступеней — по экрану.
+    Config odd;
+    odd.applyLines({"UiScale = 133"});
+    EXPECT_EQ(odd.uiScale, 0);
+}
+
+TEST(UiWindow, PanelFollowsWindow) {
+    const WindowLayout saved = gLayout;
+    gLayout = {1100, 700};
+    EXPECT_EQ(panelX(), 1100 - PANEL_W);
+    Model m = tileModel();
+    int idx = -1;
+    // Инструменты — у правого края окна, а не на месте 1.6.
+    EXPECT_TRUE(m.toolHit(panelX() + 10, TOOLS_Y0 + 10, idx));
+    EXPECT_FALSE(m.toolHit(CANVAS_W + 10, TOOLS_Y0 + 10, idx));
+    gLayout = saved;
+}
+
 }  // namespace
 }  // namespace tjtm

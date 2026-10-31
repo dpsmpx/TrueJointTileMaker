@@ -91,8 +91,29 @@ public:
     void shutdown();
 
     void setTitle(const std::string& title);
-    /// Вывести кадр в окно (Redraw оригинала).
+    /// Вывести кадр в окно (Redraw оригинала). Кадр любого размера: окно
+    /// растягивается, и кадр следует за ним.
     void present(const gfx::Surface& frame);
+
+    // --- окно с изменяемым размером (план «Интерфейс», C1) ---
+    // У 1.6 окно 780×560 нельзя было ни растянуть, ни развернуть (UX-01).
+    // Кадр — размер окна в точках экрана, делённый на масштаб интерфейса
+    // (UX-02), и не меньше minW×minH: меньшее окно показывает его уменьшенным.
+    void setResizable(int minW, int minH);
+    /// Масштаб интерфейса, %: 100, 125, 150, 200; 0 — по экрану.
+    void setUiScale(int pct);
+    [[nodiscard]] int uiScale() const { return scale_; }
+    /// Размер окна в точках кадра.
+    void setWindowSize(int w, int h);
+    /// Окно — большая часть экрана: первый запуск, размера ещё не знаем.
+    void fitToDisplay();
+    void setMaximized(bool on);
+    [[nodiscard]] bool maximized() const;
+    void setFullscreen(bool on);
+    [[nodiscard]] bool fullscreen() const;
+    /// Размер кадра, под который рисовать; true — он сменился с прошлого
+    /// вопроса.
+    bool takeFrameSize(int& w, int& h);
 
     /// Разобрать накопившиеся события в Input.
     void pump();
@@ -162,6 +183,17 @@ private:
     SDL_Texture* texture_ = nullptr;
     int w_ = 0;
     int h_ = 0;
+    bool resizable_ = false;
+    int minW_ = 0;
+    int minH_ = 0;
+    int scalePref_ = 100;
+    int scale_ = 100;
+    int frameW_ = 0;
+    int frameH_ = 0;
+    bool frameChanged_ = false;
+    int texW_ = 0;
+    int texH_ = 0;
+    void updateFrame();
     Input in_;
     bool textInputOn_ = false;
     std::array<SDL_Cursor*, CURSOR_COUNT> cursors_{};

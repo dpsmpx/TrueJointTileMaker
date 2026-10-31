@@ -254,6 +254,14 @@ bool Script::parse(const std::string& text, std::string& error) {
             e.y = mouseY_;
             push(e);
             pause(0.05);
+        } else if (cmd == "window") {
+            if (a.size() < 2) return fail("window W H");
+            ScriptEvent e;
+            e.kind = ScriptEvent::WINDOW;
+            e.winW = num(0, 780);
+            e.winH = num(1, 560);
+            push(e);
+            pause(0.1);
         } else if (cmd == "drag") {
             if (a.size() < 4) return fail("drag X0 Y0 X1 Y1 [КНОПКА]");
             const int x0 = num(0, 0);

@@ -47,6 +47,7 @@ enum class Cmd {
     ZoomOut,
     ZoomFit,
     Zoom100,
+    Fullscreen,
     Hand,
     Pan,    // arg: 0 влево, 1 вправо, 2 вверх, 3 вниз
     Nudge,  // то же, +4 — на 8 точек

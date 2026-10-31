@@ -65,8 +65,11 @@ void Editor::drawTip() {
     // Под курсором и правее, а у края окна — с другой стороны.
     int x = tipX_ + 14;
     int y = tipY_ + 20;
-    if (x + w > WIN_W - 4) x = std::max(4, WIN_W - 4 - w);
-    if (y + h > WIN_H - 4) y = std::max(4, tipY_ - h - 8);
+    // Край — страницы на экране, окна в редакторе.
+    const int maxX = screenFrame_ ? WIN_W : gLayout.w;
+    const int maxY = screenFrame_ ? WIN_H : gLayout.h;
+    if (x + w > maxX - 4) x = std::max(4, maxX - 4 - w);
+    if (y + h > maxY - 4) y = std::max(4, tipY_ - h - 8);
     fb_.fillRoundRect(x, y, x + w, y + h, 8, 8, active.inverseSurface);
     for (std::size_t i = 0; i < lines.size(); ++i)
         textOut(x + 8, y + 5 + static_cast<int>(i) * lh, lines[i], active.inverseOnSurface);
@@ -107,7 +110,7 @@ void Editor::registerEditorTips() {
     if (classicUi_ || !cfg.tooltips) return;
     const int px = mouseX();
     const int py = mouseY();
-    if (px >= PANEL_X) {
+    if (px >= panelX()) {
         if (py >= TOOLS_Y0 && py < TOOLS_Y1) {
             int idx = 0;
             if (m.toolHit(px, py, idx)) {
@@ -136,9 +139,9 @@ void Editor::registerEditorTips() {
             tipCand_ =
                 "Палитра\nЛевая — первый цвет, правая — второй, Ctrl+щелчок — записать\nU "
                 "или средняя — экран палитры, I — индексный режим";
-        } else if (py >= SLOT2_Y0 && py < SLOT2_Y0 + 64 && px < PANEL_X + 36) {
+        } else if (py >= SLOT2_Y0 && py < SLOT2_Y0 + 64 && px < panelX() + 36) {
             tipCand_ = "Первый и второй цвет · X — поменять";
-        } else if (py >= HSV_Y0 && py < HSV_Y1 && px >= HSV_X0) {
+        } else if (py >= HSV_Y0 && py < HSV_Y1 && px >= hsvX0()) {
             tipCand_ = "Насыщенность и яркость\nP или средняя — точный выбор цвета";
         } else if (py >= HUE_Y0 && py < HUE_Y1) {
             tipCand_ = "Тон первого цвета";

@@ -49,6 +49,8 @@ void Surface::resize(int w, int h, Color fill) {
 }
 
 Color Surface::pixel(int x, int y) const {
+    x += ox_;
+    y += oy_;
     if (x < 0 || y < 0 || x >= w_ || y >= h_) return {};
     return Color::fromArgb(px_[static_cast<std::size_t>(y) * static_cast<std::size_t>(w_) +
                                static_cast<std::size_t>(x)]);
@@ -57,12 +59,11 @@ Color Surface::pixel(int x, int y) const {
 void Surface::setPixel(int x, int y, Color c) {
     const Rect b = bounds();
     if (x < b.x0 || y < b.y0 || x >= b.x1 || y >= b.y1) return;
-    px_[static_cast<std::size_t>(y) * static_cast<std::size_t>(w_) + static_cast<std::size_t>(x)] =
-        pack(c);
+    at(x, y) = pack(c);
 }
 
 void Surface::setClip(Rect r) {
-    clip_ = r;
+    clip_ = Rect{r.x0 + ox_, r.y0 + oy_, r.x1 + ox_, r.y1 + oy_};
     clipOn_ = !r.empty();
 }
 
@@ -79,7 +80,7 @@ Rect Surface::bounds() const {
         b.x1 = std::min(b.x1, clip_.x1);
         b.y1 = std::min(b.y1, clip_.y1);
     }
-    return b;
+    return Rect{b.x0 - ox_, b.y0 - oy_, b.x1 - ox_, b.y1 - oy_};
 }
 
 void Surface::clear(Color c) {
@@ -89,8 +90,7 @@ void Surface::clear(Color c) {
 void Surface::blendPixel(int x, int y, Color c) {
     const Rect b = bounds();
     if (x < b.x0 || y < b.y0 || x >= b.x1 || y >= b.y1 || c.a == 0) return;
-    std::uint32_t& d = px_[static_cast<std::size_t>(y) * static_cast<std::size_t>(w_) +
-                           static_cast<std::size_t>(x)];
+    std::uint32_t& d = at(x, y);
     d = c.a == 255 ? pack(c) : over(d, c);
 }
 
@@ -115,8 +115,7 @@ void Surface::fillRect(int x1, int y1, int x2, int y2, Color c) {
     y2 = std::min(y2, b.y1);
     if (x2 <= x1 || y2 <= y1 || c.a == 0) return;
     for (int y = y1; y < y2; ++y) {
-        std::uint32_t* row =
-            px_.data() + static_cast<std::size_t>(y) * static_cast<std::size_t>(w_);
+        std::uint32_t* row = &at(0, y);
         if (c.a == 255) {
             std::fill(row + x1, row + x2, pack(c));
         } else {

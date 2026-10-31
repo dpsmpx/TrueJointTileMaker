@@ -135,6 +135,10 @@ bool Editor::appInit(int argc, char** argv) {
         return false;
     }
     if (mono.empty() || !mono_.open(mono, 11.0F)) mono_.open(ui, 11.0F);
+    // 15 и 18 точек при 96 dpi; нет полужирного — тот же шрифт крупнее.
+    const std::string bold = gfx::findUiBoldFont(resources);
+    if (bold.empty() || !titleFont_.open(bold, 11.25F)) titleFont_.open(ui, 11.25F);
+    if (bold.empty() || !headFont_.open(bold, 13.5F)) headFont_.open(ui, 13.5F);
 
     // Отсутствующий файл настроек — не ошибка: берутся значения по
     // умолчанию, и файл создаётся, чтобы его было легко найти и поправить.
@@ -161,6 +165,23 @@ bool Editor::appInit(int argc, char** argv) {
     m.keepSelectionPerDoc = !classic;
     m.zoomSteps = !classic;
     pf_.input().fineWheel = !classic;
+    // Окно растягивается, разворачивается и бывает во весь экран (C1,
+    // dpsmpx/TrueJointTileMaker#13); «Классика» — окно 780×560 оригинала.
+    // Сценарии задают размер сами (window W H): их снимки не должны
+    // зависеть от экрана машины.
+    if (!classic) {
+        pf_.setUiScale(cfg.uiScale);
+        pf_.setResizable(WIN_W, WIN_H);
+        if (!pf_.scripted()) {
+            if (cfg.windowW > 0 && cfg.windowH > 0) {
+                pf_.setWindowSize(cfg.windowW, cfg.windowH);
+            } else {
+                pf_.fitToDisplay();
+            }
+            if (cfg.windowMaximized) pf_.setMaximized(true);
+        }
+    }
+    syncFrameSize();
     if (!classic) {
         m.undoBudget = std::int64_t{256} * 1024 * 1024;
         m.undoBytesPerPx = 6;
@@ -274,7 +295,7 @@ void Editor::appStep() {
         timelineWheel(wheel);
         wheel = 0;
     }
-    if (wheel != 0 && m.docMode == DOC_TILE && m.palMaxScroll() > 0 && mouseX() >= PANEL_X &&
+    if (wheel != 0 && m.docMode == DOC_TILE && m.palMaxScroll() > 0 && mouseX() >= panelX() &&
         mouseY() >= PAL_Y0 && mouseY() < PAL_Y1) {
         m.scrollPalette(-wheel);
         wheel = 0;
@@ -286,6 +307,9 @@ void Editor::appStep() {
 
     const int key = takeKey();
     if (key != 0) handleEditorKey(key);
+    // Клавиша могла открыть экран: дальше снова кадр главного окна, без
+    // страницы по середине.
+    setPage(false);
 
     if (frameClick_) {
         frameClick_ = false;
@@ -301,6 +325,7 @@ void Editor::appStep() {
         } else {
             handlePanelClick();
         }
+        setPage(false);
     }
 
     // Координаты курсора обновляются точечно, без полной перерисовки окна.

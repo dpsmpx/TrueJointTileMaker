@@ -410,7 +410,7 @@ void Editor::exportSheetAsk() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 16, WIN_W, 48, "Лист спрайтов", cText);
+        uiTitle(0, 16, WIN_W, 48, "Лист спрайтов");
         uiLabel(0, 46, WIN_W, 22, "Рядом ляжет описание .json в виде Aseprite — его читают движки",
                 cTextDim);
         uiStepper(24, 90, "С кадра", first, 1, nf, 10);
@@ -769,6 +769,15 @@ void Editor::commandSaveSelection() {
 }
 
 void Editor::quitApp() {
+    // Размер окна — к следующему запуску; у развёрнутого и полноэкранного
+    // остаётся прежний обычный размер.
+    if (!classicUi_ && !pf_.scripted()) {
+        cfg.windowMaximized = pf_.maximized();
+        if (!cfg.windowMaximized && !pf_.fullscreen()) {
+            cfg.windowW = gLayout.w;
+            cfg.windowH = gLayout.h;
+        }
+    }
     saveConfig();
     // Выход чистый: всё сохранено или отброшено сознательно.
     clearAutosave();

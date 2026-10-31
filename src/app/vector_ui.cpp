@@ -220,7 +220,7 @@ void Editor::doVectorTool(int mx, int my) {
         bool cancelled = false;
         int lastMs = pf_.milliseconds();
         while (!finished && !cancelled && !quitNow_) {
-            beginFrameInput();
+            beginFrameInput(false);  // холст, а не экран
             const int cx = std::clamp(m.screenToTileX(mouseX()), 0, m.docW() - 1);
             const int cy = std::clamp(m.screenToTileY(mouseY()), 0, m.docH() - 1);
             VecShape show = s;
@@ -286,7 +286,7 @@ void Editor::showShapeOptions() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 12, WIN_W, 40, "Параметры фигур", cText);
+        uiTitle(0, 12, WIN_W, 40, "Параметры фигур");
         uiLabelLeft(LX, 46, 24, "Вид линии (инструмент «Линия»)", cTextDim);
         for (int k = 0; k < LINE_KINDS; ++k) {
             if (uiToggle(LX + (k % 3) * 236, 72 + (k / 3) * 38, 230, 30, lineKindName(k),
@@ -349,7 +349,7 @@ void Editor::showTilePickerScreen() {
         const int pages = std::max(1, (n + COLS * ROWS - 1) / (COLS * ROWS));
         page = std::clamp(page, 0, pages - 1);
         fb_.clear(cWindow);
-        textCentered(0, 12, WIN_W, 40, "Тайлы слоя «" + ts.name + "»", cText);
+        uiTitle(0, 12, WIN_W, 40, "Тайлы слоя «" + ts.name + "»");
         uiLabel(0, 40, WIN_W, 22,
                 std::to_string(n - 1) + " тайлов " + std::to_string(ts.tw) + "×" +
                     std::to_string(ts.th) + "   ·   щелчок выбирает, правая кнопка удаляет",
