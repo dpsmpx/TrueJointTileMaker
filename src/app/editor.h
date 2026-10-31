@@ -170,6 +170,12 @@ private:
     void drawMapCells();
     void drawAnts(int x0, int y0, int x1, int y1);
     void drawCanvas();
+    /// Рамка клетки под курсором (UX-13): нужна ли она сейчас и сама рамка.
+    bool cellFrameShown();
+    void drawCellFrame();
+    bool cellFrameWas_ = false;
+    /// Курсор по месту и инструменту.
+    Platform::Cursor cursorWanted();
 
     // --- панель ---
     void ensureHSVBitmap();

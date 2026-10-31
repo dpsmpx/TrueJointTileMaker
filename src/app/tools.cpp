@@ -224,6 +224,7 @@ void Editor::doMiddleDrag() {
     while (mousePressed() && !quitNow_) {
         if (std::abs(mouseX() - sx) > 2 || std::abs(mouseY() - sy) > 2) moved = true;
         if (moved) {
+            if (!classicUi_) pf_.setCursor(Platform::CURSOR_MOVE);
             m.viewX = vx + (mouseX() - sx);
             m.viewY = vy + (mouseY() - sy);
             m.clampView();
@@ -244,6 +245,7 @@ void Editor::doMiddleDrag() {
 /// без протяжки вписывает и теперь.
 void Editor::spaceHand() {
     bool used = false;
+    pf_.setCursor(Platform::CURSOR_MOVE);
     while (isKeyPressed(KEY_SPACE) && !quitNow_) {
         if (mousePressed()) {
             used = true;

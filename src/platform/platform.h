@@ -23,6 +23,7 @@
 struct SDL_Window;
 struct SDL_Renderer;
 struct SDL_Texture;
+struct SDL_Cursor;
 union SDL_Event;
 
 namespace tjtm {
@@ -200,6 +201,11 @@ public:
     std::string clipboardText() const;
     void setClipboardText(const std::string& s);
 
+    /// Курсор мыши: обычная стрелка, перекрестье рисования, перенос (рука
+    /// и перемещение выделения), запрет.
+    enum Cursor { CURSOR_ARROW, CURSOR_CROSSHAIR, CURSOR_MOVE, CURSOR_NOT_ALLOWED, CURSOR_COUNT };
+    void setCursor(Cursor c);
+
     void startTextInput(int x, int y, int w, int h);
     void stopTextInput();
 
@@ -227,6 +233,8 @@ private:
     int h_ = 0;
     Input in_;
     bool textInputOn_ = false;
+    std::array<SDL_Cursor*, CURSOR_COUNT> cursors_{};
+    Cursor cursor_ = CURSOR_ARROW;
     /// Нажатые кнопки мыши битами: «нажата» — пока нажата хоть одна.
     unsigned buttons_ = 0;
 

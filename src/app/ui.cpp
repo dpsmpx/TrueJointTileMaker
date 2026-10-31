@@ -43,6 +43,8 @@ void Editor::beginFrameInput() {
 void Editor::dropInput() {
     pf_.input().clickPending = false;
     frameClick_ = false;
+    // Экраны открываются отсюда: на них — обычная стрелка.
+    pf_.setCursor(Platform::CURSOR_ARROW);
 }
 
 int Editor::takeKey() {

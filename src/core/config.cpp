@@ -81,6 +81,8 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             iconsFolder = val;
         } else if (key == "tooltips") {
             tooltips = parseBool(val, tooltips);
+        } else if (key == "cellframe") {
+            cellFrame = parseBool(val, cellFrame);
         } else if (key == "theme") {
             const std::string t = netToLower(val);
             if (t == "classic") {
@@ -180,6 +182,11 @@ std::string Config::serialize() const {
     if (tooltips != def.tooltips) {
         add("# Всплывающие подсказки при наведении.");
         add(std::string("Tooltips = ") + ruBool(tooltips));
+        add("");
+    }
+    if (cellFrame != def.cellFrame) {
+        add("# Рамка клетки под курсором на холсте.");
+        add(std::string("CellFrame = ") + ruBool(cellFrame));
         add("");
     }
     add("# Заполняется программой.");

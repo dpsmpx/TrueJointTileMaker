@@ -49,6 +49,8 @@ struct Config {
     std::string theme = "светлая";
     /// Всплывающие подсказки при наведении.
     bool tooltips = true;
+    /// Рамка клетки под курсором на холсте.
+    bool cellFrame = true;
 
     /// Применяет строки файла. Возвращает число распознанных параметров.
     int applyLines(const std::vector<std::string>& lines);

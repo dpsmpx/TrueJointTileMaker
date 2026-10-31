@@ -13,3 +13,7 @@ shot 02_tip_timeline
 key j
 move 300 280
 sleep 0.3
+# B3: рамка клетки под курсором — светлая в тёмной, видна на любом цвете.
+move 302 282
+sleep 0.2
+shot 03_cell_frame

@@ -106,6 +106,10 @@ bool Platform::init(const std::string& title, int w, int h, std::string& error) 
 }
 
 void Platform::shutdown() {
+    for (SDL_Cursor*& c : cursors_) {
+        if (c != nullptr) SDL_DestroyCursor(c);
+        c = nullptr;
+    }
     if (texture_ != nullptr) SDL_DestroyTexture(texture_);
     if (renderer_ != nullptr) SDL_DestroyRenderer(renderer_);
     if (window_ != nullptr) SDL_DestroyWindow(window_);
@@ -113,6 +117,18 @@ void Platform::shutdown() {
     renderer_ = nullptr;
     if (window_ != nullptr || SDL_WasInit(SDL_INIT_VIDEO) != 0) SDL_Quit();
     window_ = nullptr;
+}
+
+void Platform::setCursor(Cursor c) {
+    if (c == cursor_ || window_ == nullptr) return;
+    cursor_ = c;
+    static constexpr SDL_SystemCursor kSystem[CURSOR_COUNT] = {
+        SDL_SYSTEM_CURSOR_DEFAULT, SDL_SYSTEM_CURSOR_CROSSHAIR, SDL_SYSTEM_CURSOR_MOVE,
+        SDL_SYSTEM_CURSOR_NOT_ALLOWED};
+    SDL_Cursor*& slot = cursors_[static_cast<std::size_t>(c)];
+    if (slot == nullptr) slot = SDL_CreateSystemCursor(kSystem[c]);
+    // Без своего курсора (бывает без экрана) остаётся прежний.
+    if (slot != nullptr) SDL_SetCursor(slot);
 }
 
 void Platform::setTitle(const std::string& title) {

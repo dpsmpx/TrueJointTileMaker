@@ -200,6 +200,7 @@ void Editor::appStep() {
     // долгой, и щелчок во время неё не должен пропасть.
     beginFrameInput();
     editorTipFrame();
+    pf_.setCursor(cursorWanted());
 
     // Значки перечитываются здесь, а не там, где их правят: правка приходит
     // из экрана наборов, а он в это время сам занимает окно.
@@ -272,9 +273,12 @@ void Editor::appStep() {
         lastStatX_ = tx;
         lastStatY_ = ty;
         if (!m.needRepaint) {
-            // Кисть из выделения (этап 9) идёт за курсором по холсту.
-            if (brushGhostShown() || ghostShown_) drawCanvas();
+            // Кисть из выделения (этап 9) и рамка клетки идут за курсором
+            // по холсту.
+            const bool frame = cellFrameShown();
+            if (brushGhostShown() || ghostShown_ || frame || cellFrameWas_) drawCanvas();
             ghostShown_ = brushGhostShown();
+            cellFrameWas_ = frame;
             drawInfoSection();
             // Метка курсора на линейках идёт за мышью.
             drawRulers();
