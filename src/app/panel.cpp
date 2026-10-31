@@ -74,15 +74,28 @@ void Editor::drawToolsSection() {
     for (int i = 0; i < m.toolCount(); ++i) {
         const int x0 = Model::toolCellX(i);
         const int y0 = Model::toolCellY(i);
-        fb_.fillRoundRect(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, 5, 5, cBorder);
-        Color face = cBack;
-        if (m.curTool() == i) {
-            face = cAccent;
-        } else if (mouseX() >= x0 && mouseX() < x0 + TOOL_CW - 2 && mouseY() >= y0 &&
-                   mouseY() < y0 + TOOL_CH - 2) {
-            face = cHover;
+        const bool over = mouseX() >= x0 && mouseX() < x0 + TOOL_CW - 2 && mouseY() >= y0 &&
+                          mouseY() < y0 + TOOL_CH - 2;
+        if (active.modern) {
+            // Выбранный инструмент — контейнером акцента, как всё выбранное
+            // (UX-33); значок на нём читается, а не тонет в заливке.
+            const int r = active.radius * 2;
+            if (m.curTool() == i) {
+                fb_.fillRoundRect(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, r, r,
+                                  active.accentContainer);
+            } else if (over) {
+                fb_.fillRoundRect(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, r, r, cHover);
+            }
+        } else {
+            fb_.fillRoundRect(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, 5, 5, cBorder);
+            Color face = cBack;
+            if (m.curTool() == i) {
+                face = cAccent;
+            } else if (over) {
+                face = cHover;
+            }
+            fb_.fillRoundRect(x0 + 1, y0 + 1, x0 + TOOL_CW - 3, y0 + TOOL_CH - 3, 5, 5, face);
         }
-        fb_.fillRoundRect(x0 + 1, y0 + 1, x0 + TOOL_CW - 3, y0 + TOOL_CH - 3, 5, 5, face);
         // Нарисованный значок заменяет подпись, ненарисованный — нет: набор
         // делается по одному, и пока значка нет, кнопка выглядит как раньше.
         const int ic = m.docMode == DOC_MAP ? T_TILE_COUNT + i : i;
@@ -96,8 +109,9 @@ void Editor::drawToolsSection() {
             const Grid<Color>& icon = iconBmp_[static_cast<std::size_t>(ic)];
             fb_.drawImage(icon, x0 + (TOOL_CW - 2 - icon.w) / 2, y0 + (TOOL_CH - 2 - icon.h) / 2);
         } else {
+            const Color sel = active.modern ? active.onAccentContainer : active.onAccent;
             textCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, toolLabel(i),
-                         m.curTool() == i ? active.onAccent : cText);
+                         m.curTool() == i ? sel : cText);
         }
     }
     drawToolChips();

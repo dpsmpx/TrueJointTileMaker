@@ -454,8 +454,11 @@ void Editor::showSettingsScreen() {
             v.startInMapMode = !v.startInMapMode;
         // Облик 1.6 остаётся выбором: «Классика» — те же цвета точка в точку.
         uiLabelLeft(410, y, 30, "Оформление", cText);
-        if (uiToggle(410 + 130, y, 96, 30, "Светлое", v.theme != "классика")) v.theme = "светлая";
-        if (uiToggle(410 + 232, y, 96, 30, "Классика", v.theme == "классика")) v.theme = "классика";
+        const bool dark = v.theme == "тёмная";
+        const bool classic = v.theme == "классика";
+        if (uiToggle(410 + 104, y, 80, 30, "Светлое", !dark && !classic)) v.theme = "светлая";
+        if (uiToggle(410 + 188, y, 80, 30, "Тёмное", dark)) v.theme = "тёмная";
+        if (uiToggle(410 + 272, y, 80, 30, "Классика", classic)) v.theme = "классика";
 
         y += 40;
         stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
@@ -676,7 +679,22 @@ void Editor::ensureIcons() {
             px = size <= ICON_MAX_PX ? size * (ICON_MAX_PX / size)
                                      : size / ((size + ICON_MAX_PX - 1) / ICON_MAX_PX);
         }
-        iconBmp_[static_cast<std::size_t>(i)] = gridFromBgra(makeThumbAlphaRaw(g, px), px);
+        Grid<Color> icon = gridFromBgra(makeThumbAlphaRaw(g, px), px);
+        // Значки нарисованы чёрным по светлому. В новых темах серые точки
+        // берут цвет текста темы, от светлых к фону панели, а цветные
+        // акценты остаются: в тёмной теме чёрные линии иначе не видны
+        // (docs/ui-design-system.md, «Значки»).
+        if (active.modern) {
+            for (Color& c : icon.d) {
+                if (c.a == 0) continue;
+                const int hi = std::max({c.r, c.g, c.b});
+                const int lo = std::min({c.r, c.g, c.b});
+                if (hi - lo > 48) continue;
+                const Color t = theme::mix(cText, cPanel, (c.r * 77 + c.g * 150 + c.b * 29) / 256);
+                c = argb(c.a, t.r, t.g, t.b);
+            }
+        }
+        iconBmp_[static_cast<std::size_t>(i)] = std::move(icon);
     }
     m.needRepaint = true;
 }
@@ -777,11 +795,9 @@ bool Editor::showTilesetScreen() {
         fb_.clear(cWindow);
         textCentered(0, 6, WIN_W, 40, "Наборы тайлов", cText);
 
-        // Переключатель наборов. Открытый помечен точкой: кнопка не умеет
-        // показывать нажатое состояние, а знать, где находишься, нужно.
+        // Переключатель наборов — вкладки: открытая видна сразу.
         for (int i = 0; i < TS_KINDS; ++i) {
-            const std::string cap = i == tsetKind_ ? "• " + tsetKindName(i) : tsetKindName(i);
-            if (uiButton(TSET_X0 + i * 192, 46, 184, 28, cap, i != tsetKind_)) {
+            if (uiTab(TSET_X0 + i * 192, 46, 184, 28, tsetKindName(i), i == tsetKind_)) {
                 tsetKind_ = i;
                 tsetPage_ = 0;
                 tsetBuild();

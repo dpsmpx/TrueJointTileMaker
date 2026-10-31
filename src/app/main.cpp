@@ -36,13 +36,14 @@ Editor::Editor() {
 
 void Editor::applyTheme() {
     // Сценарии оригинала сверяются с обликом 1.6 — «Классикой».
-    theme::active =
-        classicUi_ || cfg.theme == "классика" ? theme::classicTheme() : theme::lightTheme();
+    theme::active = classicUi_ ? theme::classicTheme() : theme::themeByName(cfg.theme);
     m.checkerA = theme::active.checkA;
     m.checkerB = theme::active.checkB;
     m.tileBmpDirty = true;
     m.overDirty = true;
     m.needRepaint = true;
+    // Значки перекрашиваются под тему при загрузке.
+    iconsDirty_ = true;
 }
 
 void Editor::syncTitle() {

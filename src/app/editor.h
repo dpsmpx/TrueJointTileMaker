@@ -107,10 +107,23 @@ private:
     void saveConfig();
 
     // --- примитивы интерфейса ---
+    /// Вид кнопки в новых темах (docs/ui-design-system.md, «Компоненты»):
+    /// с рамкой — обычная, залитая — главное действие экрана, тональная —
+    /// второстепенное, текстовая — третье. «Классика» рисует все одинаково.
+    enum class Btn { Outlined, Filled, Tonal, Text };
     bool uiButton(int x, int y, int bw, int bh, const std::string& caption, bool enabled);
+    /// Главная кнопка экрана: залитая акцентом, её же нажимает Enter.
+    bool uiPrimary(int x, int y, int bw, int bh, const std::string& caption, bool enabled);
     bool uiToggle(int x, int y, int bw, int bh, const std::string& caption, bool on);
-    bool uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
-                    bool on);
+    bool uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled, bool on,
+                    Btn kind = Btn::Outlined);
+    /// Вкладка: открытая подчёркнута акцентом (UX-33). У 1.6 открытая
+    /// рисовалась выключенной кнопкой с точкой и казалась недоступной.
+    bool uiTab(int x, int y, int bw, int bh, const std::string& caption, bool open);
+    void drawButtonModern(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
+                          bool on, bool over, bool down, Btn kind);
+    /// Щелчок по прямоугольнику кнопки в этом кадре; забирает его.
+    bool takeButtonClick(int x, int y, int bw, int bh, bool enabled);
     void uiLabel(int x, int y, int bw, int bh, const std::string& caption, Color c);
     /// Число со ступенями: подпись, −big, −1, значение, +1, +big. Ширина
     /// 358 точек, высота 30. true — значение изменилось.

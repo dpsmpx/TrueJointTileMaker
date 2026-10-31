@@ -67,15 +67,25 @@ void Editor::drawToolChips() {
         // инструмент, но не залит им: это режим, а не инструмент.
         const bool on = (c == 0 && !m.brushReplace) || (c == 1 && m.pixelPerfect);
         const bool over = mouseX() >= x0 && mouseX() < x1 && mouseY() >= y0 && mouseY() < y1;
-        fb_.fillRoundRect(x0, y0, x1, y1, 5, 5, on ? cAccent : cBorder);
-        fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 5, 5, (on || over) ? cHover : cBack);
+        if (active.modern) {
+            const int r = active.radius * 2;
+            if (on) {
+                fb_.fillRoundRect(x0, y0, x1, y1, r, r, active.accentContainer);
+            } else if (over) {
+                fb_.fillRoundRect(x0, y0, x1, y1, r, r, cHover);
+            }
+            fb_.strokeRoundRect(x0, y0, x1, y1, r, r, cBorder);
+        } else {
+            fb_.fillRoundRect(x0, y0, x1, y1, 5, 5, on ? cAccent : cBorder);
+            fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 5, 5, (on || over) ? cHover : cBack);
+        }
         std::string label;
         switch (c) {
             case 0: label = m.brushReplace ? "Зам." : "Смесь"; break;
             case 1: label = "ПП"; break;
             default: label = "…"; break;
         }
-        textCentered(x0, y0, x1, y1, label, cText);
+        textCentered(x0, y0, x1, y1, label, on && active.modern ? active.onAccentContainer : cText);
     }
 }
 

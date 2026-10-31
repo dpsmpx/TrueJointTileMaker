@@ -98,7 +98,7 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
         fb_.clear(cWindow);
         textCentered(0, H / 2 - 90, WIN_W, H / 2 - 50, title, cText);
         textCentered(40, H / 2 - 46, WIN_W - 40, H / 2 + 10, text, cText);
-        if (uiButton(WIN_W / 2 - 270, H / 2 + 30, 170, 34, yes, true)) {
+        if (uiPrimary(WIN_W / 2 - 270, H / 2 + 30, 170, 34, yes, true)) {
             res = 1;
             done = true;
         }
@@ -142,7 +142,7 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
         fb_.clear(cWindow);
         textCentered(0, H / 2 - 90, WIN_W, H / 2 - 50, title, cText);
         textCentered(40, H / 2 - 46, WIN_W - 40, H / 2 + 10, text, cText);
-        if (uiButton(WIN_W / 2 - 180, H / 2 + 30, 170, 34, yes, true)) {
+        if (uiPrimary(WIN_W / 2 - 180, H / 2 + 30, 170, 34, yes, true)) {
             res = true;
             done = true;
         }

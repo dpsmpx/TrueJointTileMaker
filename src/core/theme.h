@@ -1,11 +1,11 @@
 // Цвета и форма интерфейса — тема окна.
 //
 // Роли названы по смыслу, а не по цвету: «подпись на акценте» в другой теме
-// может стать другой, а место в коде то же. Нынешний облик — тема
-// «Классика»: на ней сверяются сценарии оригинала (--classic), и её значения
-// не меняются. Тема по умолчанию — «Светлая»: тот же облик, но подсказки,
-// обводка кнопок и наведение — по контрасту WCAG 2.1 (docs/ui-ux-audit.md,
-// UX-29; план тем — docs/ui-design-system.md).
+// может стать другой, а место в коде то же. Облик 1.6 — тема «Классика»: на
+// ней сверяются сценарии оригинала (--classic), и её значения не меняются.
+// «Светлая» (по умолчанию) и «Тёмная» — схемы Material 3 из одного акцента,
+// рассчитанные и проверенные на контраст WCAG 2.1 в docs/ui-design-system.md
+// (приложение А), с современным видом элементов (modern).
 //
 // Оттенки «Классики» уведены в холодную сторону и разведены по светлоте:
 // панель, кнопка и фон иначе сливались, а рамка, тёмнее подписи,
@@ -16,14 +16,19 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 
 #include "core/color.h"
 
 namespace tjtm::theme {
 
 struct Theme {
-    /// Имя в Config.txt: «классика», «светлая».
+    /// Имя в Config.txt: «классика», «светлая», «тёмная».
     const char* name;
+    /// Вид элементов: кнопки по видам с прозрачным слоем состояния и
+    /// выбранное — контейнером акцента (docs/ui-design-system.md,
+    /// «Состояния»). false — как в 1.6.
+    bool modern;
 
     // --- окно, кнопки, текст ---
     Color window;  // фон окна: страница
@@ -37,6 +42,14 @@ struct Theme {
     Color panel;    // подложка панели
     Color accent;
     Color onAccent;  // подпись на залитом акцентом
+    /// Выбранное: инструмент, сегмент, вкладка, включённый переключатель.
+    Color accentContainer;
+    Color onAccentContainer;
+    /// Всплывающее поверх окна: подсказки и уведомления.
+    Color inverseSurface;
+    Color inverseOnSurface;
+    /// Затемнение окна под диалогом.
+    Color scrim;
     Color warn;
     /// Тень под кнопкой и тонкие разделители — отдельные цвета, не оттенки
     /// обводки: обводка очерчивает, тень отделяет, линия делит.
@@ -102,6 +115,7 @@ struct Theme {
 constexpr Theme classicTheme() {
     Theme t{};
     t.name = "классика";
+    t.modern = false;
     t.window = rgb(240, 242, 246);
     t.back = rgb(253, 253, 254);
     t.face = rgb(237, 239, 243);
@@ -113,6 +127,11 @@ constexpr Theme classicTheme() {
     t.panel = rgb(243, 245, 248);
     t.accent = rgb(36, 104, 216);
     t.onAccent = rgb(255, 255, 255);
+    t.accentContainer = rgb(231, 240, 253);
+    t.onAccentContainer = rgb(28, 32, 38);
+    t.inverseSurface = rgb(47, 49, 52);
+    t.inverseOnSurface = rgb(238, 241, 245);
+    t.scrim = argb(82, 0, 0, 0);
     t.warn = rgb(198, 58, 46);
     t.shadow = rgb(219, 222, 229);
     t.line = rgb(230, 233, 238);
@@ -155,17 +174,90 @@ constexpr Theme classicTheme() {
     return t;
 }
 
-/// «Классика» с контрастом по WCAG 2.1 (приложение А аудита): подсказки
-/// 5:1 к фону окна вместо 3,5:1, обводка нажимаемого 3,2:1 вместо 1,4:1,
-/// наведение заметнее. Рамки подложек остаются мягкими: они ничего не
-/// нажимают, а тёмные они перетягивали бы взгляд с картинки.
+/// Смесь a и b: доля b — share из 255. Слой состояния и приглушённое.
+constexpr Color mix(Color a, Color b, int share) {
+    auto ch = [share](int x, int y) { return (x * (255 - share) + y * share + 127) / 255; };
+    return rgb(ch(a.r, b.r), ch(a.g, b.g), ch(a.b, b.b));
+}
+
+/// Светлая схема Material 3 из акцента #2468D8 (ui-design-system.md,
+/// приложение А): тон поверхностей вместо теней, серый холст без оттенка.
 constexpr Theme lightTheme() {
     Theme t = classicTheme();
     t.name = "светлая";
-    t.textDim = rgb(96, 104, 116);
-    t.outline = rgb(128, 136, 148);
-    t.hover = rgb(219, 232, 252);
+    t.modern = true;
+    t.window = rgb(0xF7, 0xF9, 0xFE);   // surface
+    t.back = rgb(0xFF, 0xFF, 0xFF);     // surface_container_lowest
+    t.panel = rgb(0xF1, 0xF4, 0xF8);    // surface_container_low
+    t.face = rgb(0xE6, 0xE8, 0xEC);     // surface_container_high
+    t.text = rgb(0x1A, 0x1B, 0x1E);     // on_surface
+    t.textDim = rgb(0x43, 0x47, 0x4D);  // on_surface_variant
+    t.outline = rgb(0x73, 0x78, 0x7F);  // outline
+    t.border = rgb(0xC2, 0xC6, 0xCE);   // outline_variant
+    t.line = rgb(0xDD, 0xE1, 0xE6);
+    t.accent = rgb(0x12, 0x59, 0xC7);  // primary
+    t.onAccent = rgb(0xFF, 0xFF, 0xFF);
+    t.accentContainer = rgb(0xD3, 0xE3, 0xFF);
+    t.onAccentContainer = rgb(0x00, 0x18, 0x47);
+    t.inverseSurface = rgb(0x2F, 0x31, 0x34);
+    t.inverseOnSurface = rgb(0xEE, 0xF1, 0xF5);
+    t.scrim = argb(82, 0, 0, 0);
+    t.warn = rgb(0xB1, 0x2C, 0x28);     // error
+    t.hover = mix(t.back, t.text, 20);  // слой наведения 8 %
+    t.shadow = t.window;                // высота — тоном, не тенью
+    t.field = t.back;
+    t.fieldSelection = t.accentContainer;
+    t.noteBack = argb(220, 0xF7, 0xF9, 0xFE);
+    t.canvas = rgb(0x77, 0x77, 0x77);
+    t.checkA = rgb(0xD4, 0xD4, 0xD4);
+    t.checkB = rgb(0xB9, 0xB9, 0xB9);
+    t.curveBack = t.back;
+    t.radius = 6;
     return t;
+}
+
+/// Тёмная схема той же системы. Холст темнее, но по-прежнему серый: тон
+/// вокруг картинки не должен врать о её цветах.
+constexpr Theme darkTheme() {
+    Theme t = lightTheme();
+    t.name = "тёмная";
+    t.window = rgb(0x12, 0x14, 0x16);
+    t.back = rgb(0x1E, 0x20, 0x22);  // surface_container: лицо кнопки
+    t.panel = rgb(0x1A, 0x1B, 0x1E);
+    t.face = rgb(0x28, 0x2A, 0x2D);
+    t.text = rgb(0xE0, 0xE3, 0xE6);
+    t.textDim = rgb(0xC2, 0xC6, 0xCE);
+    t.outline = rgb(0x8D, 0x91, 0x98);
+    t.border = rgb(0x43, 0x47, 0x4D);
+    t.line = rgb(0x33, 0x34, 0x38);
+    t.accent = rgb(0xA7, 0xC8, 0xFF);
+    t.onAccent = rgb(0x00, 0x2C, 0x72);
+    t.accentContainer = rgb(0x01, 0x41, 0xA0);
+    t.onAccentContainer = rgb(0xD3, 0xE3, 0xFF);
+    t.inverseSurface = rgb(0xE0, 0xE3, 0xE6);
+    t.inverseOnSurface = rgb(0x2F, 0x31, 0x34);
+    t.scrim = argb(120, 0, 0, 0);
+    t.warn = rgb(0xFF, 0xB4, 0xAB);
+    t.hover = mix(t.back, t.text, 20);
+    t.shadow = t.window;
+    t.field = rgb(0x0D, 0x0E, 0x11);  // surface_container_lowest
+    t.fieldSelection = t.accentContainer;
+    t.noteBack = argb(220, 0x12, 0x14, 0x16);
+    t.canvas = rgb(0x35, 0x35, 0x35);
+    t.checkA = rgb(0x5E, 0x5E, 0x5E);
+    t.checkB = rgb(0x4B, 0x4B, 0x4B);
+    t.curveBack = t.field;
+    t.curveChannel[0] = t.text;  // общая кривая светлой линией
+    t.mapLabelBack = argb(210, 0x28, 0x2A, 0x2D);
+    t.mapLabelText = t.text;
+    return t;
+}
+
+/// Тема по имени из Config.txt; неизвестное имя — светлая.
+inline Theme themeByName(const std::string& name) {
+    if (name == "классика") return classicTheme();
+    if (name == "тёмная") return darkTheme();
+    return lightTheme();
 }
 
 /// Тема окна. Ставится при запуске (Editor::appInit) и в настройках; до

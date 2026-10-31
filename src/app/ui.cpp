@@ -128,17 +128,93 @@ bool Editor::uiButton(int x, int y, int bw, int bh, const std::string& caption, 
     return uiButtonEx(x, y, bw, bh, caption, enabled, false);
 }
 
+bool Editor::uiPrimary(int x, int y, int bw, int bh, const std::string& caption, bool enabled) {
+    return uiButtonEx(x, y, bw, bh, caption, enabled, false, Btn::Filled);
+}
+
 /// Кнопка-переключатель: включённая обведена цветом выделения и подсвечена,
 /// как выбранный инструмент, — чтобы состояние читалось без подписи «вкл».
 bool Editor::uiToggle(int x, int y, int bw, int bh, const std::string& caption, bool on) {
     return uiButtonEx(x, y, bw, bh, caption, true, on);
 }
 
+bool Editor::uiTab(int x, int y, int bw, int bh, const std::string& caption, bool open) {
+    if (!active.modern) {
+        // Как в 1.6: открытая — выключенной кнопкой с точкой.
+        return uiButton(x, y, bw, bh, open ? "• " + caption : caption, !open);
+    }
+    const bool over = mouseX() >= x && mouseX() < x + bw && mouseY() >= y && mouseY() < y + bh;
+    if (over && !open) fb_.fillRoundRect(x, y, x + bw, y + bh, BTN_R * 2, BTN_R * 2, cHover);
+    textCentered(x + 4, y, x + bw - 4, y + bh, fitTextEnd(caption, bw - 8),
+                 open ? cAccent : cTextDim);
+    fb_.fillRect(x, y + bh - 1, x + bw, y + bh, cBorder);
+    if (open) fb_.fillRect(x + 6, y + bh - 3, x + bw - 6, y + bh, cAccent);
+    if (frameClick_ && frameClickX_ >= x && frameClickX_ < x + bw && frameClickY_ >= y &&
+        frameClickY_ < y + bh) {
+        frameClick_ = false;
+        return !open && frameClickButton_ == MB_LEFT;
+    }
+    return false;
+}
+
+void Editor::drawButtonModern(int x, int y, int bw, int bh, const std::string& caption,
+                              bool enabled, bool on, bool over, bool down, Btn kind) {
+    // Цвет поля и подписи по виду, состояние — прозрачным слоем цвета
+    // подписи поверх (наведение 8 %, нажатие 10 %), недоступное —
+    // приглушено (docs/ui-design-system.md, «Состояния»).
+    const theme::Theme& t = active;
+    const int r = t.radius * 2;
+    bool filled = true;
+    Color field = t.back;
+    Color content = t.text;
+    bool outlined = false;
+    switch (kind) {
+        case Btn::Filled:
+            field = t.accent;
+            content = t.onAccent;
+            break;
+        case Btn::Tonal:
+            field = t.accentContainer;
+            content = t.onAccentContainer;
+            break;
+        case Btn::Outlined:
+            filled = false;
+            outlined = true;
+            break;
+        case Btn::Text:
+            filled = false;
+            content = t.accent;
+            break;
+    }
+    if (on && kind != Btn::Filled) {
+        filled = true;
+        field = t.accentContainer;
+        content = t.onAccentContainer;
+    }
+    if (!enabled) {
+        field = argb(31, t.text.r, t.text.g, t.text.b);
+        content = argb(97, t.text.r, t.text.g, t.text.b);
+    }
+    if (filled) fb_.fillRoundRect(x, y, x + bw, y + bh, r, r, field);
+    if (enabled && over)
+        fb_.fillRoundRect(x, y, x + bw, y + bh, r, r,
+                          argb(down ? 26 : 20, content.r, content.g, content.b));
+    if (outlined)
+        fb_.strokeRoundRect(x, y, x + bw, y + bh, r, r,
+                            enabled ? t.outline : argb(31, t.text.r, t.text.g, t.text.b));
+    textCentered(x + 4, y, x + bw - 4, y + bh, fitTextEnd(caption, bw - 8), content);
+}
+
 bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption, bool enabled,
-                        bool on) {
+                        bool on, Btn kind) {
     const bool over =
         enabled && mouseX() >= x && mouseX() < x + bw && mouseY() >= y && mouseY() < y + bh;
     const bool down = over && mousePressed();
+
+    if (active.modern) {
+        drawButtonModern(x, y, bw, bh, caption, enabled, on, over, down, kind);
+        return takeButtonClick(x, y, bw, bh, enabled);
+    }
 
     // Мягкая тень на точку ниже отделяет кнопку от фона там, где тихая
     // обводка уже не справляется. У нажатой тени нет: она выглядит
@@ -166,6 +242,10 @@ bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption
     // (UX-32); полный текст покажет подсказка (этап B).
     const std::string shown = classicUi_ ? caption : fitTextEnd(caption, bw - 8);
     textCentered(x + 4, y, x + bw - 4, y + bh, shown, enabled ? cText : cTextDim);
+    return takeButtonClick(x, y, bw, bh, enabled);
+}
+
+bool Editor::takeButtonClick(int x, int y, int bw, int bh, bool enabled) {
     // Щелчок забирается кнопкой: одно нажатие приводит в действие ровно
     // одну кнопку, даже если экран сменился посреди кадра.
     if (enabled && frameClick_ && frameClickX_ >= x && frameClickX_ < x + bw && frameClickY_ >= y &&

@@ -137,6 +137,36 @@ double contrast(Color a, Color b) {
     return (std::max(la, lb) + 0.05) / (std::min(la, lb) + 0.05);
 }
 
+void expectWcag(const theme::Theme& t) {
+    SCOPED_TRACE(t.name);
+    EXPECT_GE(contrast(t.text, t.back), 4.5);
+    EXPECT_GE(contrast(t.text, t.window), 4.5);
+    EXPECT_GE(contrast(t.text, t.panel), 4.5);
+    EXPECT_GE(contrast(t.textDim, t.window), 4.5) << "подсказки — мелкий текст";
+    EXPECT_GE(contrast(t.textDim, t.face), 4.5);
+    EXPECT_GE(contrast(t.outline, t.window), 3.0) << "граница нажимаемого";
+    EXPECT_GE(contrast(t.onAccent, t.accent), 4.5) << "главная кнопка";
+    EXPECT_GE(contrast(t.accent, t.window), 4.5) << "акцентом пишут «режим тайла» и вкладки";
+    EXPECT_GE(contrast(t.onAccentContainer, t.accentContainer), 4.5) << "выбранное";
+    EXPECT_GE(contrast(t.inverseOnSurface, t.inverseSurface), 4.5) << "подсказки поверх окна";
+    EXPECT_GE(contrast(t.warn, t.window), 4.5);
+}
+
+// B1: светлая и тёмная схемы ui-design-system.md держат контраст WCAG.
+TEST(UiTheme, ModernThemesMeetWcag) {
+    expectWcag(theme::lightTheme());
+    expectWcag(theme::darkTheme());
+    EXPECT_TRUE(theme::lightTheme().modern);
+    EXPECT_TRUE(theme::darkTheme().modern);
+    EXPECT_FALSE(theme::classicTheme().modern);
+}
+
+TEST(UiTheme, ThemeByName) {
+    EXPECT_STREQ(theme::themeByName("классика").name, "классика");
+    EXPECT_STREQ(theme::themeByName("тёмная").name, "тёмная");
+    EXPECT_STREQ(theme::themeByName("что-то").name, "светлая");
+}
+
 TEST(UiTheme, LightThemeMeetsWcag) {
     const theme::Theme t = theme::lightTheme();
     EXPECT_GE(contrast(t.text, t.back), 4.5);
