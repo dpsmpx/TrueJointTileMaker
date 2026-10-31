@@ -189,7 +189,7 @@ void Editor::exportGameSheet() {
     }
     const std::string path = askExportFile("Лист 8×8 для игры", "tiles.png", "png", "PNG");
     if (path.empty()) return;
-    if (!pngSave(path, sheet, err)) showMessage("Не удалось сохранить лист", path + ": " + err);
+    if (!pngSave(path, sheet, err)) errorSave("Не удалось сохранить лист", path + ": " + err);
 }
 
 void Editor::exportGameAtlas() {
@@ -211,13 +211,13 @@ void Editor::exportGameAtlas() {
     if (path.empty()) return;
     std::string err;
     if (!pngSave(path, atlas, err)) {
-        showMessage("Не удалось сохранить атлас", path + ": " + err);
+        errorSave("Не удалось сохранить атлас", path + ": " + err);
         return;
     }
     const std::string json = game::atlasJson(places, pathFileName(path), atlas.w, atlas.h);
     const std::string jsonPath = path.substr(0, path.size() - pathExtLower(path).size()) + ".json";
     if (!writeFile(jsonPath, json))
-        showMessage("Не удалось сохранить описание", jsonPath + ": не удалось записать файл.");
+        errorSave("Не удалось сохранить описание", jsonPath + ": не удалось записать файл.");
 }
 
 void Editor::sliceGameSheetAsk() {
@@ -228,7 +228,7 @@ void Editor::sliceGameSheetAsk() {
     std::string err;
     std::vector<Grid<Color>> slots;
     if (!pngLoad(path, sheet, err) || !game::sliceSheet(sheet, slots, err)) {
-        showMessage("Лист не разрезан", path + ": " + err);
+        errorOpen("Лист не разрезан", path + ": " + err);
         return;
     }
     int n = 0;
@@ -243,7 +243,7 @@ void Editor::sliceGameSheetAsk() {
         const Grid<Color>& g = slots[static_cast<std::size_t>(i)];
         if (g.empty()) continue;
         if (!pngSave(tsetPathOf(TS_BASE, tsetBaseFile(i)), g, err)) {
-            showMessage("Не удалось записать тайл", tsetBaseFile(i) + ": " + err);
+            errorSave("Не удалось записать тайл", tsetBaseFile(i) + ": " + err);
             break;
         }
     }
@@ -301,13 +301,13 @@ void Editor::autotileSlice() {
     }
     gameTilesDirty_ = true;
     if (!failed.empty()) {
-        showMessage("Не удалось записать вариант", failed + ": " + err);
+        errorSave("Не удалось записать вариант", failed + ": " + err);
         return;
     }
     std::string text = "Шестнадцать файлов ";
     text += slot + "_0.png … " + slot;
     text += "_15.png — в папке набора. Карта картинками уже подбирает их по соседям.";
-    showMessage("Варианты стыков записаны", text);
+    notify("Варианты стыков записаны", text);
 }
 
 bool Editor::showGameSetScreen() {

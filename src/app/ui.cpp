@@ -84,6 +84,7 @@ void Editor::waitMouseRelease() {
 }
 
 void Editor::redraw() {
+    drawToast();
     if (!classicUi_) drawTip();
     pf_.present(fb_);
 }

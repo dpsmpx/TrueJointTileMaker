@@ -114,12 +114,12 @@ std::string Editor::askSaveMap(const std::string& title, const std::string& sugg
 /// открывал GDI+ (BMP, GIF, JPEG), — через SDL3_image.
 bool Editor::readImageGrid(const std::string& path, Grid<Color>& g, bool quiet) {
     if (!fileExists(path)) {
-        if (!quiet) showMessage("Файл не найден", path);
+        if (!quiet) errorOpen("Файл не найден", path);
         return false;
     }
     const auto data = readFile(path);
     if (!data) {
-        if (!quiet) showMessage("Не удалось открыть файл", path);
+        if (!quiet) errorOpen("Не удалось открыть файл", path);
         return false;
     }
     std::string err;
@@ -156,7 +156,7 @@ bool Editor::readImageGrid(const std::string& path, Grid<Color>& g, bool quiet) 
         if (!ok) err = SDL_GetError();
     }
     if (!ok) {
-        if (!quiet) showMessage("Не удалось открыть файл", err);
+        if (!quiet) errorOpen("Не удалось открыть файл", err);
         return false;
     }
     if (img.w > MAX_TILE || img.h > MAX_TILE) {
@@ -182,7 +182,7 @@ bool Editor::loadTileFrom(const std::string& path, bool quiet, bool remember) {
         std::string err;
         // Модель меняется, только если проект прочитан целиком.
         if (!projectLoad(path, m, err)) {
-            if (!quiet) showMessage("Проект не открыт", path + ": " + err);
+            if (!quiet) errorOpen("Проект не открыт", path + ": " + err);
             return false;
         }
         m.currentFile = path;
@@ -209,7 +209,7 @@ bool Editor::loadTileFrom(const std::string& path, bool quiet, bool remember) {
 bool Editor::saveProjectTo(const std::string& path) {
     std::string err;
     if (!projectSave(path, m, err)) {
-        showMessage("Не удалось сохранить проект", path + ": " + err);
+        errorSave("Не удалось сохранить проект", path + ": " + err);
         return false;
     }
     m.currentFile = path;
@@ -291,8 +291,8 @@ bool Editor::writeImageFile(const std::string& path, const std::vector<AnimFrame
     }
     if (!writeFile(path,
                    std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()))) {
-        showMessage("Не удалось сохранить файл",
-                    path + ": не удалось записать файл. Проверьте права на запись.");
+        errorSave("Не удалось сохранить файл",
+                  path + ": не удалось записать файл. Проверьте права на запись.");
         return false;
     }
     return true;
@@ -311,21 +311,21 @@ int Editor::tryLoadAnimation(const std::string& path, bool quiet) {
     std::vector<std::uint8_t> actl;
     if (isGif(bytes)) {
         if (!gifDecode(bytes, frames, err)) {
-            if (!quiet) showMessage("Не удалось открыть GIF", path + ": " + err);
+            if (!quiet) errorOpen("Не удалось открыть GIF", path + ": " + err);
             return -1;
         }
     } else if (isTiff(bytes)) {
         // Страницы TIFF — кадры; длительностей в TIFF нет.
         std::vector<Grid<Color>> pages;
         if (!tiffDecode(bytes, pages, err)) {
-            if (!quiet) showMessage("Не удалось открыть TIFF", path + ": " + err);
+            if (!quiet) errorOpen("Не удалось открыть TIFF", path + ": " + err);
             return -1;
         }
         for (Grid<Color>& g : pages)
             frames.push_back(AnimFrame{std::move(g), 100});
     } else if (pngFindChunk(bytes, "acTL", actl)) {
         if (!apngDecode(bytes, frames, err)) {
-            if (!quiet) showMessage("Не удалось открыть APNG", path + ": " + err);
+            if (!quiet) errorOpen("Не удалось открыть APNG", path + ": " + err);
             return -1;
         }
     } else {
@@ -479,7 +479,7 @@ void Editor::exportSheetAsk() {
     const SpriteSheet sheet = buildSheet(m.animationFrames(first - 1, last - 1), o);
     std::string err;
     if (!pngSave(path, sheet.image, err)) {
-        showMessage("Не удалось сохранить лист", path + ": " + err);
+        errorSave("Не удалось сохранить лист", path + ": " + err);
         return;
     }
     // Метки — в номерах кадров листа: отрезок, обрезанный по выгрузке.
@@ -492,7 +492,7 @@ void Editor::exportSheetAsk() {
     const std::string json = sheetJson(sheet, pathFileName(path), pathStem(path), tags);
     const std::string jsonPath = replaceExtension(path, ".json");
     if (!writeFile(jsonPath, json))
-        showMessage("Не удалось сохранить описание", jsonPath + ": не удалось записать файл.");
+        errorSave("Не удалось сохранить описание", jsonPath + ": не удалось записать файл.");
 }
 
 void Editor::exportAnimationAsk(bool gif) {
@@ -548,7 +548,7 @@ void Editor::exportFramesAsk() {
         name += num;
         if (!pngSave(name, frames[k].image, err)) failed = name;
     }
-    if (!failed.empty()) showMessage("Не удалось сохранить кадр", failed + ": " + err);
+    if (!failed.empty()) errorSave("Не удалось сохранить кадр", failed + ": " + err);
 }
 
 void Editor::exportToTilesetSlot() {
@@ -562,18 +562,18 @@ void Editor::exportToTilesetSlot() {
     }
     std::string err;
     if (!pngSave(path, m.compositeFrame(0), err)) {
-        showMessage("Не удалось записать тайл", path + ": " + err);
+        errorSave("Не удалось записать тайл", path + ": " + err);
         return;
     }
     if (kind == TS_ICON) iconsDirty_ = true;
-    showMessage("Тайл в наборе", "Первый кадр записан в " + path + ".");
+    notify("Тайл в наборе", "Первый кадр записан в " + path + ".");
 }
 
 bool Editor::saveGridTo(const Grid<Color>& g, const std::string& path) {
     if (path.empty() || g.empty()) return false;
     std::string err;
     if (!pngSave(path, g, err)) {
-        showMessage("Не удалось сохранить файл", path + ": " + err);
+        errorSave("Не удалось сохранить файл", path + ": " + err);
         return false;
     }
     return true;
@@ -593,12 +593,12 @@ void Editor::paletteIO() {
 
 bool Editor::loadMapFrom(const std::string& path, bool quiet, bool remember) {
     if (!fileExists(path)) {
-        if (!quiet) showMessage("Файл не найден", path);
+        if (!quiet) errorOpen("Файл не найден", path);
         return false;
     }
     const MapParseResult r = mapLoad(path, m.map);
     if (!r.ok) {
-        if (!quiet) showMessage("Карта не прочитана", r.error);
+        if (!quiet) errorOpen("Карта не прочитана", r.error);
         return false;
     }
     m.currentMapFile = path;
@@ -618,8 +618,8 @@ bool Editor::loadMapFrom(const std::string& path, bool quiet, bool remember) {
 bool Editor::saveMapTo(const std::string& path) {
     if (path.empty()) return false;
     if (!mapSave(path, m.map)) {
-        showMessage("Карта не сохранена",
-                    "Не удалось записать файл " + path + ". Проверьте права на запись.");
+        errorSave("Карта не сохранена",
+                  "Не удалось записать файл " + path + ". Проверьте права на запись.");
         return false;
     }
     m.currentMapFile = path;

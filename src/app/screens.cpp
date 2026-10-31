@@ -81,23 +81,122 @@ std::string Editor::keysHint(const std::string& enter, const std::string& escape
     return s;
 }
 
-std::optional<gfx::Surface> Editor::cardBackdrop() {
+std::optional<Editor::CardBack> Editor::cardBackdrop() {
     if (!active.modern) return std::nullopt;
-    gfx::Surface s = fb_;
-    s.fillRect(0, 0, WIN_W, WIN_H, active.scrim);
-    return s;
+    CardBack b{fb_, fb_};
+    b.dim.fillRect(0, 0, WIN_W, WIN_H, active.scrim);
+    return b;
 }
 
-void Editor::dialogBack(const std::optional<gfx::Surface>& backdrop, int x0, int y0, int x1,
-                        int y1) {
+void Editor::endCard(const std::optional<CardBack>& backdrop) {
+    if (backdrop) fb_ = backdrop->orig;
+}
+
+void Editor::dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0, int x1, int y1) {
     if (!backdrop) {
         fb_.clear(cWindow);
         return;
     }
-    fb_ = *backdrop;
+    fb_ = backdrop->dim;
     const int r = active.radius * 4;
     fb_.fillRoundRect(x0, y0, x1, y1, r, r, cBorder);
     fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 2, r - 2, cFace);
+}
+
+void Editor::notify(const std::string& title, const std::string& text) {
+    if (!active.modern) {
+        showMessage(title, text);
+        return;
+    }
+    toastTitle_ = title;
+    toastText_ = text;
+    toastUntil_ = pf_.milliseconds() + 4000;
+    m.needRepaint = true;
+}
+
+void Editor::drawToast() {
+    if (toastText_.empty()) return;
+    const std::vector<std::string> lines = layoutText({toastText_}, 460);
+    int w = textWidth(toastTitle_);
+    for (const std::string& l : lines)
+        w = std::max(w, textWidth(l));
+    w += 28;
+    const int lh = textHeight() + 2;
+    const int h = (static_cast<int>(lines.size()) + 1) * lh + 18;
+    // Внизу холста, над лентой кадров: там, куда смотрят после действия,
+    // и не поверх панели с инструментами.
+    const int x = std::max(8, (m.W - w) / 2);
+    const int y = m.H - h - 14;
+    fb_.fillRoundRect(x, y, x + w, y + h, 12, 12, active.inverseSurface);
+    textOut(x + 14, y + 8, toastTitle_, active.inverseOnSurface);
+    for (std::size_t i = 0; i < lines.size(); ++i)
+        textOut(x + 14, y + 10 + static_cast<int>(i + 1) * lh, lines[i], active.inverseOnSurface);
+}
+
+void Editor::showError(const std::string& title, const std::string& human,
+                       const std::string& details) {
+    if (!active.modern) {
+        showMessage(title, details.empty() ? human : details);
+        return;
+    }
+    constexpr int kW = 600;
+    const auto backdrop = cardBackdrop();
+    const int lh = textHeight() + 2;
+    bool more = false;
+    bool done = false;
+    dropInput();
+    pf_.input().keys.clear();
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        std::vector<std::string> lines = layoutText({human}, kW - 48);
+        std::vector<std::string> extra;
+        if (more) extra = layoutText({details}, kW - 48);
+        const int h =
+            116 + static_cast<int>(lines.size() + extra.size()) * lh + (extra.empty() ? 0 : 10);
+        const int x0 = (WIN_W - kW) / 2;
+        const int y0 = std::max(8, (WIN_H - h) / 2);
+        dialogBack(backdrop, x0, y0, x0 + kW, y0 + h);
+        textCentered(x0, y0 + 12, x0 + kW, y0 + 40, title, cWarn);
+        int y = y0 + 48;
+        for (const std::string& l : lines) {
+            textOut(x0 + 24, y, l, cText);
+            y += lh;
+        }
+        if (!extra.empty()) {
+            y += 10;
+            for (const std::string& l : extra) {
+                textOut(x0 + 24, y, l, cTextDim);
+                y += lh;
+            }
+        }
+        if (!details.empty() &&
+            uiButton(x0 + 24, y0 + h - 52, 150, 34, more ? "Скрыть" : "Подробнее", true))
+            more = !more;
+        if (uiPrimary(x0 + kW - 174, y0 + h - 52, 150, 34, "Закрыть", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC || key == KEY_ENTER) done = true;
+        idle();
+    }
+    waitMouseRelease();
+    endCard(backdrop);
+    m.needRepaint = true;
+}
+
+void Editor::errorOpen(const std::string& title, const std::string& details) {
+    showError(title,
+              "Файл не открылся: его нет на прежнем месте, это не картинка, которую редактор "
+              "читает (PNG, GIF, APNG, BMP, TIFF, JPEG, проект .tjt, карта .map), или он "
+              "повреждён. Проверьте путь или откройте другой файл (Ctrl+O).",
+              details);
+}
+
+void Editor::errorSave(const std::string& title, const std::string& details) {
+    showError(title,
+              "Записать не удалось: папка защищена от записи, диск заполнен или файл занят "
+              "другой программой. Сохраните в другую папку через «Сохранить как» "
+              "(Ctrl+Shift+S).",
+              details);
 }
 
 void Editor::showMessage(const std::string& title, const std::string& text) {
@@ -130,6 +229,7 @@ void Editor::showMessage(const std::string& title, const std::string& text) {
         idle();
     }
     waitMouseRelease();
+    endCard(backdrop);
     m.needRepaint = true;
 }
 
@@ -210,6 +310,7 @@ bool Editor::askNewSizeCard(const std::string& title, int& nw, int& nh, int lo, 
         idle();
     }
     waitMouseRelease();
+    endCard(backdrop);
     m.needRepaint = true;
     return ok;
 }
@@ -257,6 +358,7 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
         idle();
     }
     waitMouseRelease();
+    endCard(backdrop);
     m.needRepaint = true;
     return res;
 }
@@ -298,6 +400,7 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
         idle();
     }
     waitMouseRelease();
+    endCard(backdrop);
     m.needRepaint = true;
     return res;
 }
@@ -624,6 +727,7 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
     pf_.stopTextInput();
     if (ok) value = u32ToUtf8(tf.text);
     waitMouseRelease();
+    endCard(backdrop);
     m.needRepaint = true;
     return ok;
 }
@@ -660,7 +764,7 @@ void Editor::showColorOpsScreen() {
             const int n = m.replaceColorEverywhere(m.secondColor, m.firstColor);
             m.needRepaint = true;
             done = true;
-            showMessage("Замена цвета", "Заменено пикселей: " + std::to_string(n) + ".");
+            notify("Замена цвета", "Заменено пикселей: " + std::to_string(n) + ".");
         }
         y += stp;
         if (uiButton(bx, y, bw, bh, "Свести тайл к цветам палитры", true)) {

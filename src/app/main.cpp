@@ -200,6 +200,11 @@ void Editor::appStep() {
     // долгой, и щелчок во время неё не должен пропасть.
     beginFrameInput();
     editorTipFrame();
+    // Уведомление отслужило — стереть его полной перерисовкой.
+    if (!toastText_.empty() && pf_.milliseconds() >= toastUntil_) {
+        toastText_.clear();
+        m.needRepaint = true;
+    }
     pf_.setCursor(cursorWanted());
 
     // Значки перечитываются здесь, а не там, где их правят: правка приходит

@@ -227,11 +227,30 @@ private:
     /// Диалог карточкой над притушенным окном (UX-04): снимок того, что
     /// было на экране, с затемнением темы. Пусто — «Классика» рисует диалог
     /// страницей во всё окно, как 1.6.
-    std::optional<gfx::Surface> cardBackdrop();
+    struct CardBack {
+        gfx::Surface dim;  // снимок с затемнением — фон карточки
+        gfx::Surface orig;  // снимок как был — вернуть в кадр после диалога
+    };
+    std::optional<CardBack> cardBackdrop();
     /// Начало кадра диалога: притушенный снимок и карточка, или страница.
-    void dialogBack(const std::optional<gfx::Surface>& backdrop, int x0, int y0, int x1, int y1);
+    void dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0, int x1, int y1);
+    /// Конец диалога: в кадре снова то, что было под карточкой, — следующий
+    /// диалог снимет чистый кадр, а не прежнюю карточку.
+    void endCard(const std::optional<CardBack>& backdrop);
     void showTextScreen(const std::string& title, const std::vector<std::string>& paragraphs);
     void showMessage(const std::string& title, const std::string& text);
+    /// Уведомление в углу на несколько секунд (UX-45): успех и запреты не
+    /// закрывают окно страницей. «Классика» — страницей, как 1.6.
+    void notify(const std::string& title, const std::string& text);
+    void drawToast();
+    std::string toastTitle_, toastText_;
+    int toastUntil_ = 0;
+    /// Ошибка с объяснением для человека и следующим шагом; технические
+    /// подробности — по кнопке (UX-46).
+    void showError(const std::string& title, const std::string& human, const std::string& details);
+    /// Не открылся или не записался файл: объяснение — какое бывает чаще.
+    void errorOpen(const std::string& title, const std::string& details);
+    void errorSave(const std::string& title, const std::string& details);
     static std::string keysHint(const std::string& enter, const std::string& escape);
     int ask3(const std::string& title, const std::string& text, const std::string& yes,
              const std::string& no, const std::string& cancel);

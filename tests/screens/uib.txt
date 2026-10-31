@@ -49,3 +49,16 @@ drag 120 200 480 200
 move 300 300
 sleep 0.2
 shot 07_brush
+# B7: запрет — уведомлением внизу холста, а не страницей во всё окно.
+key ctrl+d ctrl+e
+move 700 558
+sleep 0.2
+shot 08_toast
+# B7: ошибка — объяснение и следующий шаг, подробности по кнопке.
+key ctrl+o
+sleep 0.3
+click 390 312               # «Не сохранять»
+sleep 0.4
+shot 09_error
+key Escape
+sleep 0.2

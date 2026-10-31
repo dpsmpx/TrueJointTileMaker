@@ -320,9 +320,9 @@ void Editor::showShapeOptions() {
 
 void Editor::showTilePickerScreen() {
     if (m.activeTileset() == nullptr) {
-        showMessage("Не тайлкарта",
-                    "Тайлы выбирают для слоя-тайлкарты. Создайте его на экране слоёв и кадров: "
-                    "«Новая тайлкарта» или «Слой → тайлкарта».");
+        notify("Не тайлкарта",
+               "Тайлы выбирают для слоя-тайлкарты. Создайте его на экране слоёв и кадров: "
+               "«Новая тайлкарта» или «Слой → тайлкарта».");
         return;
     }
     bool done = false;
@@ -425,7 +425,7 @@ void Editor::importGameTiles() {
         tiles.push_back(img::scaleNearest(g, cur->tw, cur->th));
     }
     const int added = m.addTilesToActiveSet(tiles);
-    showMessage("Тайлы из набора игры", "Добавлено тайлов: " + std::to_string(added) + ".");
+    notify("Тайлы из набора игры", "Добавлено тайлов: " + std::to_string(added) + ".");
 }
 
 }  // namespace tjtm

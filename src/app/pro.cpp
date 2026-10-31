@@ -397,8 +397,8 @@ bool Editor::handleProCtrlKey(int key) {
                 m.setTool(T_PEN);
                 m.needRepaint = true;
             } else {
-                showMessage("Кисть из выделения",
-                            "Выделите кусок активного слоя — он станет кистью карандаша.");
+                notify("Кисть из выделения",
+                       "Выделите кусок активного слоя — он станет кистью карандаша.");
             }
             return true;
         case KEY_A: m.selectAll(); return true;

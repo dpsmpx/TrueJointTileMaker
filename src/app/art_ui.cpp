@@ -84,7 +84,7 @@ void Editor::showBrushOptions() {
         } else if (mode == PEN_STAMP) {
             if (uiButton(LX, 130, 360, 30, "Взять из выделения   Ctrl+E", m.hasSelection)) {
                 if (!m.brushFromSelection())
-                    showMessage("Пустое выделение", "В выделении нет ни одной видимой точки.");
+                    notify("Пустое выделение", "В выделении нет ни одной видимой точки.");
             }
             uiLabelLeft(LX, 176, 22, "Кисть — выделенный кусок активного слоя, серединой",
                         cTextDim);
