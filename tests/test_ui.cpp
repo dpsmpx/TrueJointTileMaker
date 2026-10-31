@@ -335,6 +335,12 @@ TEST(UiShortcuts, ShiftFallsBackAndModesSplit) {
     EXPECT_EQ(cmd(KEY_ENTER, 0, false), is(Cmd::ObjectForm));
     EXPECT_EQ(cmd(KEY_B, MOD_SHIFT, true), is(Cmd::MapContext));
     EXPECT_EQ(cmd(KEY_B, MOD_SHIFT, false), is(Cmd::MapTiles));
+    // Стрелки: без Ctrl — сдвиг выделения (или холст), с Ctrl — холст.
+    EXPECT_EQ(cmd(KEY_LEFT, 0, true), is(Cmd::Nudge));
+    EXPECT_EQ(cmd(KEY_LEFT, MOD_SHIFT, false), is(Cmd::Nudge));
+    EXPECT_EQ(findShortcut(KEY_DOWN, MOD_SHIFT, true)->arg, 7);
+    EXPECT_EQ(cmd(KEY_RIGHT, MOD_CTRL, true), is(Cmd::Pan));
+    EXPECT_EQ(cmd(KEY_RIGHT, MOD_CTRL | MOD_SHIFT, true), is(Cmd::Pan));
     // Однобуквенные команды файла — только с Ctrl (UX-17).
     EXPECT_EQ(cmd(KEY_N, 0, true), -1);
     EXPECT_EQ(cmd(KEY_S, 0, true), -1);
@@ -458,6 +464,45 @@ TEST(UiZoom, FitShrinksBigSheet) {
     small.fitScale();
     EXPECT_EQ(small.zoomOut, 1);
     EXPECT_GT(small.pixelSize, 1);
+}
+
+// --- B13: стрелки двигают выделенное ---------------------------------------
+
+TEST(UiNudge, TileMovesPixelsAndKeepsUnder) {
+    Model m = tileModel(8, 8);
+    m.tile = Grid<Color>(8, 8, kWhite);
+    m.tile.at(2, 2) = kBlack;
+    m.selX = 2;
+    m.selY = 2;
+    m.selW = 1;
+    m.selH = 1;
+    m.hasSelection = true;
+    m.nudgeSelection(1, 0);
+    EXPECT_EQ(m.selX, 3);
+    EXPECT_EQ(m.tile.at(3, 2), kBlack);
+    EXPECT_EQ(m.tile.at(2, 2), kClear);
+    // Кусок ездит по картинке, ничего под собой не стирая.
+    m.nudgeSelection(1, 0);
+    EXPECT_EQ(m.tile.at(4, 2), kBlack);
+    EXPECT_EQ(m.tile.at(3, 2), kWhite);
+    m.nudgeSelection(0, 3);
+    EXPECT_EQ(m.tile.at(4, 5), kBlack);
+    EXPECT_EQ(m.tile.at(4, 2), kWhite);
+}
+
+TEST(UiNudge, MapMovesFrameOnly) {
+    Model m = tileModel();
+    m.switchMode(DOC_MAP);
+    const auto before = m.map.at(1, 1);
+    m.selX = 1;
+    m.selY = 1;
+    m.selW = 3;
+    m.selH = 2;
+    m.hasSelection = true;
+    m.nudgeSelection(-5, 1);
+    EXPECT_EQ(m.selX, 0);  // у края документа рамка встаёт
+    EXPECT_EQ(m.selY, 2);
+    EXPECT_EQ(m.map.at(1, 1), before);
 }
 
 }  // namespace

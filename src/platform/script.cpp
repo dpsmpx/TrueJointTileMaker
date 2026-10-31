@@ -243,6 +243,17 @@ bool Script::parse(const std::string& text, std::string& error) {
                 push(e);
             }
             pause(kAfterInput);
+        } else if (cmd == "mousedown" || cmd == "mouseup") {
+            // Кнопка нажата там, где курсор, и держится до mouseup: так
+            // проверяют то, что идёт, пока кнопку держат (автопрокрутка у
+            // края холста).
+            ScriptEvent e;
+            e.kind = cmd == "mousedown" ? ScriptEvent::BUTTON_DOWN : ScriptEvent::BUTTON_UP;
+            e.button = num(0, 1);
+            e.x = mouseX_;
+            e.y = mouseY_;
+            push(e);
+            pause(0.05);
         } else if (cmd == "drag") {
             if (a.size() < 4) return fail("drag X0 Y0 X1 Y1 [КНОПКА]");
             const int x0 = num(0, 0);

@@ -243,6 +243,7 @@ void Editor::appStep() {
     ensureIcons();
     applyLayout();
     stepPlayback();
+    stepArrowPan();
     if (m.needRepaint) repaint();
     syncTitle();
 

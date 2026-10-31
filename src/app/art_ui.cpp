@@ -223,10 +223,12 @@ void Editor::doGradientTool(int ax, int ay) {
     int by = ay;
     m.applyGradient(region, ax, ay, bx, by);
     bool first = true;
+    edgeScrollBegin();
     while ((mousePressed() || first) && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = m.screenToTileX(mouseX());
         const int ny = m.screenToTileY(mouseY());
-        if (first || nx != bx || ny != by) {
+        if (first || scrolled || nx != bx || ny != by) {
             first = false;
             bx = nx;
             by = ny;

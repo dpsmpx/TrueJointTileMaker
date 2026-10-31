@@ -208,7 +208,7 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
             in_.keyHeld[static_cast<std::size_t>(vk)] = true;
             const SDL_Keymod mod = e.key.mod;
             const KeyPress kp{vk, (mod & SDL_KMOD_SHIFT) != 0, (mod & SDL_KMOD_CTRL) != 0,
-                              (mod & SDL_KMOD_ALT) != 0};
+                              (mod & SDL_KMOD_ALT) != 0, e.key.repeat};
             in_.keys.push_back(kp);
             in_.presses.push_back(kp);
             // Очередь ограничена: если программа долго не разбирала ввод,

@@ -48,10 +48,8 @@ enum class Cmd {
     ZoomFit,
     Zoom100,
     Hand,
-    PanLeft,
-    PanRight,
-    PanUp,
-    PanDown,
+    Pan,    // arg: 0 влево, 1 вправо, 2 вверх, 3 вниз
+    Nudge,  // то же, +4 — на 8 точек
     Grid,
     Checker,
     Seamless,

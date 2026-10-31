@@ -105,3 +105,31 @@ sleep 0.2
 shot 14_zoom_out
 key ctrl+0
 sleep 0.2
+# B13: стрелки по правилу владельца. Зажатая Ctrl+стрелка плавно везёт
+# холст; с инструментом выделения и выделением стрелки двигают выделенное;
+# протяжка к краю холста его прокручивает.
+key plus plus               # 1600 %: картинка больше холста
+keydown ctrl Right
+sleep 0.6
+keyup Right ctrl
+move 700 558
+sleep 0.2
+shot 15_arrow_pan
+key 9                       # выделение
+drag 100 100 200 180
+key Right Right Right shift+Down
+move 700 558
+sleep 0.2
+shot 16_nudge
+key ctrl+d
+move 300 300
+mousedown
+move 330 330
+move 330 552                # у нижнего края холста
+sleep 0.5
+mouseup
+move 700 558
+sleep 0.2
+shot 17_edge_scroll
+key ctrl+d ctrl+0
+sleep 0.2

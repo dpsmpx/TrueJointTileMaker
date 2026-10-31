@@ -40,6 +40,9 @@ struct KeyPress {
     bool shift = false;
     bool ctrl = false;
     bool alt = false;
+    /// Автоповтор зажатой клавиши: холст стрелками едет плавно сам, и
+    /// повторы ему только мешают.
+    bool repeat = false;
 };
 
 struct Input {

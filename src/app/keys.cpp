@@ -9,6 +9,7 @@
 
 #include "app/editor.h"
 #include "core/imageops.h"
+#include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
 
@@ -123,10 +124,10 @@ void Editor::handleClassicKey(int key) {
         case KEY_NUMPLUS: return run(Cmd::ZoomIn);
         case KEY_MINUS:
         case KEY_NUMMINUS: return run(Cmd::ZoomOut);
-        case KEY_LEFT: return run(Cmd::PanLeft);
-        case KEY_RIGHT: return run(Cmd::PanRight);
-        case KEY_UP: return run(Cmd::PanUp);
-        case KEY_DOWN: return run(Cmd::PanDown);
+        case KEY_LEFT: return run(Cmd::Pan, 0);
+        case KEY_RIGHT: return run(Cmd::Pan, 1);
+        case KEY_UP: return run(Cmd::Pan, 2);
+        case KEY_DOWN: return run(Cmd::Pan, 3);
         // У 1.6 пробел вписывал картинку; рука — в интерфейсе 1.7 (UX-11).
         case KEY_SPACE: return run(Cmd::ZoomFit);
         default:
@@ -212,10 +213,29 @@ void Editor::runCommand(Cmd c, int arg) {
             break;
         case Cmd::Zoom100: m.setZoom(1, 1, (m.X0 + m.W) / 2, (m.Y0 + m.H) / 2); break;
         case Cmd::Hand: spaceHand(); break;
-        case Cmd::PanLeft: pan(step, 0); break;
-        case Cmd::PanRight: pan(-step, 0); break;
-        case Cmd::PanUp: pan(0, step); break;
-        case Cmd::PanDown: pan(0, -step); break;
+        case Cmd::Pan:
+        case Cmd::Nudge: {
+            const int dir = arg & 3;
+            const int ux = dir == 0 ? -1 : dir == 1 ? 1 : 0;
+            const int uy = dir == 2 ? -1 : dir == 3 ? 1 : 0;
+            if (c == Cmd::Nudge && arrowsMoveSelection()) {
+                // Пачка сдвигов подряд — один шаг истории: зажатая стрелка
+                // иначе забила бы историю повторами.
+                const int now = pf_.milliseconds();
+                if (now - nudgeMs_ > kNudgeBurstMs) m.pushUndo();
+                nudgeMs_ = now;
+                const int n = (arg & 4) != 0 ? 8 : 1;
+                m.nudgeSelection(ux * n, uy * n);
+                break;
+            }
+            // Холст: нажатие — шаг, зажатая клавиша — дальше плавно
+            // (stepArrowPan), повторы не нужны.
+            if (!classicUi_ && lastKey_.repeat) break;
+            pan(-ux * step, -uy * step);
+            arrowPanMs_ = pf_.milliseconds();
+            arrowPanLast_ = arrowPanMs_;
+            break;
+        }
         case Cmd::Grid:
             flip(m.gridOn);
             cfg.showGrid = m.gridOn;
@@ -314,6 +334,38 @@ void Editor::runCommand(Cmd c, int arg) {
         case Cmd::Cheatsheet: showCheatsheet(); break;
         case Cmd::SwitchMode: m.switchMode(tile ? DOC_MAP : DOC_TILE); break;
     }
+}
+
+bool Editor::arrowsMoveSelection() const {
+    const bool selTool = m.docMode == DOC_TILE ? m.toolTile == T_SELECT : m.toolMap == M_SELECT;
+    return !classicUi_ && selTool && m.hasSelection && m.selW > 0 && m.selH > 0;
+}
+
+void Editor::stepArrowPan() {
+    if (classicUi_ || arrowPanMs_ < 0) return;
+    const int ux = (isKeyPressed(KEY_RIGHT) ? 1 : 0) - (isKeyPressed(KEY_LEFT) ? 1 : 0);
+    const int uy = (isKeyPressed(KEY_DOWN) ? 1 : 0) - (isKeyPressed(KEY_UP) ? 1 : 0);
+    const bool panning = isKeyPressed(KEY_CTRL) || !arrowsMoveSelection();
+    if (!panning || (ux == 0 && uy == 0)) {
+        arrowPanMs_ = -1;
+        return;
+    }
+    const int now = pf_.milliseconds();
+    const int held = now - arrowPanMs_;
+    const int dt = std::clamp(now - arrowPanLast_, 0, 50);
+    arrowPanLast_ = now;
+    // Короткое нажатие — один шаг (его сделала сама клавиша); зажатая
+    // стрелка через миг везёт холст: полточки экрана за мс, через секунду
+    // — две.
+    if (held < kArrowPanDelayMs) return;
+    const double v = std::min(2.0, 0.5 + (held - kArrowPanDelayMs) / 700.0);
+    const int d = std::max(1, pround(v * dt));
+    const int vx = m.viewX;
+    const int vy = m.viewY;
+    m.viewX -= ux * d;
+    m.viewY -= uy * d;
+    m.clampView();
+    if (m.viewX != vx || m.viewY != vy) m.needRepaint = true;
 }
 
 // ---------------------------------------------------------------------------

@@ -247,7 +247,9 @@ void Editor::defineSelectionPro(int ax, int ay, int op) {
         repaintCanvasOnly();
     };
     update();
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = clampI(m.screenToTileX(mouseX()), 0, m.docW() - 1);
         const int ny = clampI(m.screenToTileY(mouseY()), 0, m.docH() - 1);
         if (nx != bx || ny != by) {
@@ -256,6 +258,8 @@ void Editor::defineSelectionPro(int ax, int ay, int op) {
             moved = true;
             pts.emplace_back(nx, ny);
             update();
+        } else if (scrolled) {
+            redraw();
         }
         idle();
     }
@@ -295,10 +299,12 @@ void Editor::moveSelectionPro(int mx, int my, bool copy) {
     m.selMask.clear();
     m.draggingSelection = true;
     repaintCanvasOnly();
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = m.screenToTileX(mouseX()) - offX;
         const int ny = m.screenToTileY(mouseY()) - offY;
-        if (nx != m.selX || ny != m.selY) {
+        if (scrolled || nx != m.selX || ny != m.selY) {
             m.selX = nx;
             m.selY = ny;
             repaintCanvasOnly();

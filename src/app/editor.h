@@ -375,6 +375,18 @@ private:
     void handlePaletteClick();
     void doOverviewDrag();
     void handlePanelClick();
+    /// Автопрокрутка при протяжке (dpsmpx/TrueJointTileMaker#16): курсор у
+    /// края холста или за ним двигает холст, и выделить или нарисовать
+    /// больше видимого можно, не отпуская кнопку. edgeScrollBegin — перед
+    /// протяжкой: пока курсор не сдвинулся, холст стоит, и мазок, начатый у
+    /// края, его не увозит.
+    void edgeScrollBegin();
+    /// true — холст сдвинут и уже перерисован; кадр нужно вывести.
+    bool edgeScroll();
+    int edgeStartX_ = 0;
+    int edgeStartY_ = 0;
+    bool edgeArmed_ = false;
+
     // --- клавиатура (keys.cpp): таблица сочетаний, шпаргалка ---
     void handleEditorKey(int key);
     /// Разбор клавиш 1.6 для «Классики»: Ctrl с буквой — та же буква, если
@@ -384,6 +396,17 @@ private:
     void runCommand(Cmd c, int arg = 0);
     /// Шпаргалка клавиш поверх холста (F1, ?), из той же таблицы.
     void showCheatsheet();
+    /// Стрелки двигают выделенное: инструмент выделения и есть что двигать
+    /// (правило владельца, #16). Иначе стрелки двигают холст.
+    bool arrowsMoveSelection() const;
+    /// Холст, пока стрелка зажата: плавно и всё быстрее, кадр за кадром,
+    /// а не рывками автоповтора.
+    void stepArrowPan();
+    int arrowPanMs_ = -1;  // когда нажали стрелку, двигающую холст; -1 — нет
+    int arrowPanLast_ = 0;
+    int nudgeMs_ = -1000000;
+    static constexpr int kNudgeBurstMs = 800;
+    static constexpr int kArrowPanDelayMs = 200;
 
     // --- этап 1 RoadToProLevel (pro.cpp) ---
     /// Три ячейки третьего ряда инструментов тайла: режим кисти,

@@ -106,9 +106,12 @@ void Editor::doVectorTool(int mx, int my) {
             m.pushUndo();
             vecSel_ = si;
             VecShape s = m.tileShapes[static_cast<std::size_t>(si)];
+            edgeScrollBegin();
             while (mousePressed() && !quitNow_) {
+                const bool scrolled = edgeScroll();
                 // Вершина встаёт в центр точки: фигура остаётся пиксельной.
                 const VecPoint np = center(m.screenToTileX(mouseX()), m.screenToTileY(mouseY()));
+                if (scrolled) redraw();
                 if (!(np == s.pts[static_cast<std::size_t>(vi)])) {
                     s.pts[static_cast<std::size_t>(vi)] = np;
                     m.setVectorShape(si, s);
@@ -127,9 +130,12 @@ void Editor::doVectorTool(int mx, int my) {
                 const VecShape base = m.tileShapes[static_cast<std::size_t>(si)];
                 int lastDx = 0;
                 int lastDy = 0;
+                edgeScrollBegin();
                 while (mousePressed() && !quitNow_) {
+                    const bool scrolled = edgeScroll();
                     const int dx = m.screenToTileX(mouseX()) - mx;
                     const int dy = m.screenToTileY(mouseY()) - my;
+                    if (scrolled) redraw();
                     if (dx != lastDx || dy != lastDy) {
                         VecShape s = base;
                         vec::translate(s, dx, dy);
@@ -181,11 +187,13 @@ void Editor::doVectorTool(int mx, int my) {
         s.pts = {center(mx, my), center(mx, my)};
         int bx = mx;
         int by = my;
+        edgeScrollBegin();
         while (mousePressed() && !quitNow_) {
+            const bool scrolled = edgeScroll();
             int nx = m.screenToTileX(mouseX());
             int ny = m.screenToTileY(mouseY());
             if (isKeyPressed(KEY_SHIFT) && type != VS_STAR) Model::squarifyTo(mx, my, nx, ny);
-            if (nx != bx || ny != by) {
+            if (scrolled || nx != bx || ny != by) {
                 bx = nx;
                 by = ny;
                 s.pts[1] = center(nx, ny);

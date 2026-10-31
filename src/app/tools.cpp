@@ -14,6 +14,51 @@ namespace tjtm {
 
 using namespace theme;
 
+void Editor::edgeScrollBegin() {
+    edgeStartX_ = mouseX();
+    edgeStartY_ = mouseY();
+    edgeArmed_ = false;
+}
+
+bool Editor::edgeScroll() {
+    if (classicUi_) return false;
+    if (!edgeArmed_) {
+        if (std::abs(mouseX() - edgeStartX_) + std::abs(mouseY() - edgeStartY_) < 4) return false;
+        edgeArmed_ = true;
+    }
+    // Полоса у края холста: чем глубже в ней курсор или чем дальше за
+    // краем, тем быстрее едет холст.
+    constexpr int kBand = 16;
+    auto speed = [](int depth) { return std::clamp(depth / 2, 1, 24); };
+    const int mx = mouseX();
+    const int my = mouseY();
+    int dx = 0;
+    int dy = 0;
+    if (mx < m.X0 + kBand) {
+        dx = speed(m.X0 + kBand - mx);
+    } else if (mx >= m.W - kBand) {
+        dx = -speed(mx - (m.W - kBand) + 1);
+    }
+    if (my < m.Y0 + kBand) {
+        dy = speed(m.Y0 + kBand - my);
+    } else if (my >= m.H - kBand) {
+        dy = -speed(my - (m.H - kBand) + 1);
+    }
+    if (dx == 0 && dy == 0) return false;
+    const int vx = m.viewX;
+    const int vy = m.viewY;
+    m.viewX += dx;
+    m.viewY += dy;
+    m.clampView();
+    if (m.viewX == vx && m.viewY == vy) return false;
+    // Мазок пишет точки прямо в кадр, мимо картинки холста: перед
+    // перерисовкой её нужно собрать заново, иначе мазок пропадёт.
+    m.tileBmpDirty = true;
+    drawCanvas();
+    drawOverviewSection();
+    return true;
+}
+
 /// Мазок кистью. Промежуточные точки достраиваются отрезком: при быстром
 /// движении мыши в линии не остаётся пропусков.
 void Editor::doPaintStroke(int startX, int startY) {
@@ -28,7 +73,9 @@ void Editor::doPaintStroke(int startX, int startY) {
     } else {
         redraw();
     }
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int mx = m.screenToTileX(mouseX());
         const int my = m.screenToTileY(mouseY());
         if (mx != lastX || my != lastY) {
@@ -40,6 +87,8 @@ void Editor::doPaintStroke(int startX, int startY) {
             } else {
                 redraw();
             }
+        } else if (scrolled) {
+            redraw();
         }
         idle();
     }
@@ -69,11 +118,13 @@ void Editor::emitShape(int ax, int ay, int bx, int by) {
 void Editor::doShapeTool(int ax, int ay) {
     int bx = ax;
     int by = ay;
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         int nx = m.screenToTileX(mouseX());
         int ny = m.screenToTileY(mouseY());
         if (isKeyPressed(KEY_SHIFT)) Model::squarifyTo(ax, ay, nx, ny);
-        if (nx != bx || ny != by) {
+        if (scrolled || nx != bx || ny != by) {
             bx = nx;
             by = ny;
             drawCanvas();
@@ -102,10 +153,12 @@ void Editor::defineSelection(int ax, int ay) {
     m.selY = ay;
     m.selW = 1;
     m.selH = 1;
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = clampI(m.screenToTileX(mouseX()), 0, m.docW() - 1);
         const int ny = clampI(m.screenToTileY(mouseY()), 0, m.docH() - 1);
-        if (nx != bx || ny != by) {
+        if (scrolled || nx != bx || ny != by) {
             bx = nx;
             by = ny;
             m.selX = std::min(ax, bx);
@@ -137,10 +190,12 @@ void Editor::dragSelection(int mx, int my) {
     const int offX = mx - m.selX;
     const int offY = my - m.selY;
     m.draggingSelection = true;
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = m.screenToTileX(mouseX()) - offX;
         const int ny = m.screenToTileY(mouseY()) - offY;
-        if (nx != m.selX || ny != m.selY) {
+        if (scrolled || nx != m.selX || ny != m.selY) {
             m.selX = nx;
             m.selY = ny;
             repaintCanvasOnly();
@@ -175,10 +230,13 @@ void Editor::doSelectTool(int mx, int my) {
 /// Перетаскивание объекта карты на новую клетку.
 void Editor::dragObject(int idx) {
     bool moved = false;
+    edgeScrollBegin();
     while (mousePressed() && !quitNow_) {
+        const bool scrolled = edgeScroll();
         const int nx = clampI(m.screenToTileX(mouseX()), 0, m.map.w - 1);
         const int ny = clampI(m.screenToTileY(mouseY()), 0, m.map.h - 1);
         MapObject& o = m.map.objects[static_cast<std::size_t>(idx)];
+        if (scrolled && nx == o.x && ny == o.y) redraw();
         if (nx != o.x || ny != o.y) {
             if (!moved) {
                 m.pushUndo();

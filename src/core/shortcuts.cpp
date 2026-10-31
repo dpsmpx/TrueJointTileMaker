@@ -50,6 +50,14 @@ constexpr std::array kTable = {
     Shortcut{KEY_X, kCtrl, kTile, Cut, 0, kSel, "Вырезать"},
     Shortcut{KEY_V, kCtrl, kTile, PasteClipboard, 0, kSel, "Вставить из буфера"},
     Shortcut{KEY_E, kCtrl, kTile, BrushFromSelection, 0, kSel, "Кисть из выделения"},
+    Shortcut{KEY_LEFT, 0, kBoth, Nudge, 0, kSel, "Сдвинуть; без выделения — холст", "Стрелки"},
+    Shortcut{KEY_RIGHT, 0, kBoth, Nudge, 1},
+    Shortcut{KEY_UP, 0, kBoth, Nudge, 2},
+    Shortcut{KEY_DOWN, 0, kBoth, Nudge, 3},
+    Shortcut{KEY_LEFT, kShift, kBoth, Nudge, 4, kSel, "Сдвинуть на 8 точек", "Shift+стрелки"},
+    Shortcut{KEY_RIGHT, kShift, kBoth, Nudge, 5},
+    Shortcut{KEY_UP, kShift, kBoth, Nudge, 6},
+    Shortcut{KEY_DOWN, kShift, kBoth, Nudge, 7},
     // Вид
     Shortcut{KEY_PLUS, 0, kBoth, ZoomIn, 0, kView, "Крупнее и мельче", "+  −"},
     Shortcut{KEY_NUMPLUS, 0, kBoth, ZoomIn},
@@ -60,10 +68,13 @@ constexpr std::array kTable = {
     Shortcut{KEY_0, kCtrl, kBoth, ZoomFit, 0, kView, "Вписать картинку"},
     Shortcut{KEY_1, kCtrl, kBoth, Zoom100, 0, kView, "Масштаб 100 %"},
     Shortcut{KEY_SPACE, 0, kBoth, Hand, 0, kView, "Рука; коротко — вписать"},
-    Shortcut{KEY_LEFT, 0, kBoth, PanLeft, 0, kView, "Двигать изображение", "Стрелки"},
-    Shortcut{KEY_RIGHT, 0, kBoth, PanRight},
-    Shortcut{KEY_UP, 0, kBoth, PanUp},
-    Shortcut{KEY_DOWN, 0, kBoth, PanDown},
+    // Стрелки по правилу владельца (#16): с инструментом выделения и
+    // выделением они двигают выделенное, иначе — холст; Ctrl+стрелки —
+    // всегда холст.
+    Shortcut{KEY_LEFT, kCtrl, kBoth, Pan, 0, kView, "Двигать холст", "Ctrl+стрелки"},
+    Shortcut{KEY_RIGHT, kCtrl, kBoth, Pan, 1},
+    Shortcut{KEY_UP, kCtrl, kBoth, Pan, 2},
+    Shortcut{KEY_DOWN, kCtrl, kBoth, Pan, 3},
     Shortcut{KEY_G, 0, kBoth, Grid, 0, kView, "Сетка"},
     Shortcut{KEY_C, 0, kBoth, Checker, 0, kView, "Шахматка"},
     Shortcut{KEY_B, 0, kBoth, Seamless, 0, kView, "Бесшовный предпросмотр"},
