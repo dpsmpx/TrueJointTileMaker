@@ -238,6 +238,8 @@ private:
     void dragObject(int idx);
     void doObjectTool(int mx, int my);
     void doMiddleDrag();
+    /// Пробел с протяжкой — рука; короткое нажатие — вписать картинку.
+    void spaceHand();
     bool openTileOfMapCell(int x, int y);
     void handleMapCanvas(int mx, int my);
     void handleCanvasClick();

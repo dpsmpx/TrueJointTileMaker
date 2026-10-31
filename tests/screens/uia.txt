@@ -70,3 +70,15 @@ wheel 0 1                  # вбок — холст сдвинут
 move 770 550
 sleep 0.2
 shot 09_wheel_zoom
+# A12: пробел с протяжкой — рука (выделения не появляется), короткое
+# нажатие вписывает картинку.
+keydown space
+drag 300 280 380 340
+keyup space
+move 770 550
+sleep 0.2
+shot 10_hand
+key space
+move 770 550
+sleep 0.2
+shot 11_fit

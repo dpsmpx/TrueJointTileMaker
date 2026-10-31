@@ -238,6 +238,37 @@ void Editor::doMiddleDrag() {
     }
 }
 
+/// Пробел, пока его держат, — рука: протяжка двигает холст, как во всех
+/// графических редакторах. У оригинала пробел сразу вписывал картинку и
+/// сбрасывал масштаб, ломая привычное движение (UX-11); короткое нажатие
+/// без протяжки вписывает и теперь.
+void Editor::spaceHand() {
+    bool used = false;
+    while (isKeyPressed(KEY_SPACE) && !quitNow_) {
+        if (mousePressed()) {
+            used = true;
+            const int sx = mouseX();
+            const int sy = mouseY();
+            const int vx = m.viewX;
+            const int vy = m.viewY;
+            while (mousePressed() && !quitNow_) {
+                m.viewX = vx + (mouseX() - sx);
+                m.viewY = vy + (mouseY() - sy);
+                m.clampView();
+                repaintCanvasAndOverview();
+                idle();
+            }
+        }
+        idle();
+    }
+    // Щелчок, которым двигали холст, не рисует, а повторы удержанного
+    // пробела не вписывают картинку заново.
+    dropInput();
+    std::erase_if(pf_.input().keys, [](const KeyPress& k) { return k.vk == KEY_SPACE; });
+    if (!used) m.fitScale();
+    m.needRepaint = true;
+}
+
 /// Открывает тайл клетки карты в редакторе тайла. true — открыл.
 bool Editor::openTileOfMapCell(int x, int y) {
     const std::string base = m.mapCellTileFile(x, y);
@@ -643,6 +674,10 @@ void Editor::handleModifiedKey(int key) {
             }
             return;
         case KEY_Y: m.doRedo(); return;
+        case KEY_0:
+            m.fitScale();
+            m.needRepaint = true;
+            return;
         case KEY_F:
             if (!tile) showMapFindScreen();
             return;
@@ -803,8 +838,12 @@ void Editor::handleEditorKey(int key) {
             m.needRepaint = true;
             break;
         case KEY_SPACE:
-            m.fitScale();
-            m.needRepaint = true;
+            if (classicUi_) {
+                m.fitScale();
+                m.needRepaint = true;
+            } else {
+                spaceHand();
+            }
             break;
         default:
             // Цифры выбирают инструмент. Оригинал прижимал номер к числу
