@@ -139,6 +139,12 @@ bool Editor::appInit(int argc, char** argv) {
     classicUi_ = classic;
     m.keepSelectionPerDoc = !classic;
     pf_.input().fineWheel = !classic;
+    if (!classic) {
+        m.undoBudget = std::int64_t{256} * 1024 * 1024;
+        m.undoBytesPerPx = 6;
+        m.undoMinSteps = 100;
+        m.undoMaxSteps = 1000;
+    }
     applyTheme();
     m.syncHSVFromColor();
     m.setDefaultPalette();

@@ -95,6 +95,32 @@ TEST(UiPlan, PaletteCellWriteIsUndone) {
     EXPECT_EQ(m.palette[1].argb(), before.argb());
 }
 
+// A11: история по реальному объёму — у тайла 512×512 не 6 шагов, а сотни.
+TEST(UiPlan, UndoKeepsHundredsOfSteps) {
+    Model m = tileModel(512, 512);
+    EXPECT_EQ(m.undoDepth(), 6) << "бюджет оригинала";
+    m.undoBudget = std::int64_t{256} * 1024 * 1024;
+    m.undoBytesPerPx = 6;
+    m.undoMinSteps = 100;
+    m.undoMaxSteps = 1000;
+    EXPECT_GE(m.undoDepth(), 100);
+    for (int k = 0; k < 120; ++k) {
+        m.pushUndo();
+        m.tile.at(k % 512, 0) = argb(255, k, 0, 0);
+    }
+    int undone = 0;
+    while (!m.undoStack.empty()) {
+        m.doUndo();
+        ++undone;
+    }
+    EXPECT_EQ(undone, 120);
+    EXPECT_EQ(m.tile.at(0, 0).argb(), tileModel(512, 512).tile.at(0, 0).argb());
+    m = tileModel(32, 32);
+    m.undoBudget = std::int64_t{256} * 1024 * 1024;
+    m.undoMaxSteps = 1000;
+    EXPECT_EQ(m.undoDepth(), 1000) << "мелкий тайл — до верхнего предела";
+}
+
 // A6: контраст по WCAG 2.1 — относительная яркость и отношение (L1 + 0,05) /
 // (L2 + 0,05).
 double luminance(Color c) {

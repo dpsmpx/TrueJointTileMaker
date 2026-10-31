@@ -472,6 +472,14 @@ public:
 
     // --- история ---
     int undoDepth() const;
+    /// Бюджет истории отмены. У оригинала — 6 МБ из расчёта 4 байта на
+    /// точку и от 3 до 64 шагов: тайл 512×512 помнил всего 6 шагов (UX-25).
+    /// Окно поднимает их при запуске; снимок на самом деле — цвет и номер
+    /// ячейки, 6 байт на точку.
+    std::int64_t undoBudget = UNDO_BUDGET_BYTES;
+    int undoBytesPerPx = 4;
+    int undoMinSteps = 3;
+    int undoMaxSteps = 64;
     void clearTileHistory();
     void clearMapHistory();
     void clearHistory();

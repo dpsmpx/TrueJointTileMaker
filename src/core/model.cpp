@@ -360,9 +360,10 @@ void Model::paletteFromGrid(const Grid<Color>& g) {
 // --- история ----------------------------------------------------------------
 
 int Model::undoDepth() const {
-    int per = docW() * docH() * 4;
-    if (per < 1) per = 1;
-    return clampI(UNDO_BUDGET_BYTES / per, 3, 64);
+    const std::int64_t per =
+        std::max<std::int64_t>(1, static_cast<std::int64_t>(docW()) * docH() * undoBytesPerPx);
+    const std::int64_t steps = std::clamp<std::int64_t>(undoBudget / per, undoMinSteps, undoMaxSteps);
+    return static_cast<int>(steps);
 }
 
 void Model::clearTileHistory() {
