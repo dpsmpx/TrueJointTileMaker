@@ -46,6 +46,10 @@ private:
     bool quitNow_ = false;
     /// Режим без окна для тестов: --frames N.
     int framesLeft_ = -1;
+    /// Интерфейс 1.6 и оригинала: щелчки, клавиши, вид. Окно включает
+    /// правила плана «Интерфейс» (docs/roadmap.md), а сценарии оригинала
+    /// идут с --classic: они сверяются с эталоном 0.6.0 и его жестами.
+    bool classicUi_ = true;
     std::string screenshotPath_;
 
     // --- ввод на кадр ---
@@ -84,6 +88,8 @@ private:
     void dropInput();
     int takeKey();
     int takeWheel();
+    /// Целые шаги прокрутки вбок: +1 вправо.
+    int takeWheelX();
     void waitMouseRelease();
     [[nodiscard]] bool isKeyPressed(int key) const { return pf_.keyHeld(key); }
     static bool isMiddle(int b) { return b != MB_LEFT && b != MB_RIGHT; }
@@ -114,6 +120,7 @@ private:
     void textCentered(int x0, int y0, int x1, int y1, const std::string& s, Color c);
     void textOut(int x, int y, const std::string& s, Color c);
     std::string fitText(const std::string& s, int maxW) const;
+    std::string fitTextEnd(const std::string& s, int maxW) const;
     int textWidth(const std::string& s) const { return font_.textWidth(s); }
     int textHeight() const { return font_.textHeight(); }
     std::vector<std::string> layoutText(const std::vector<std::string>& paragraphs,
@@ -156,6 +163,7 @@ private:
     // --- экраны ---
     void showTextScreen(const std::string& title, const std::vector<std::string>& paragraphs);
     void showMessage(const std::string& title, const std::string& text);
+    static std::string keysHint(const std::string& enter, const std::string& escape);
     int ask3(const std::string& title, const std::string& text, const std::string& yes,
              const std::string& no, const std::string& cancel);
     bool askYesNo(const std::string& title, const std::string& text, const std::string& yes,
@@ -174,6 +182,9 @@ private:
 
     // --- файлы ---
     std::string askOpenFile(const std::string& title);
+    /// Папка системным выбором папки (UX-49): пустую папку для нового
+    /// набора иначе было не выбрать.
+    std::string askFolder(const std::string& title, const std::string& current);
     std::string askSaveFile(const std::string& title, const std::string& suggested);
     std::string askOpenMap(const std::string& title);
     std::string askSaveMap(const std::string& title, const std::string& suggested);
@@ -193,6 +204,12 @@ private:
     bool commandSaveAs();
     bool commandSave();
     bool confirmDiscard(const std::string& what);
+    /// Имя документа для вопросов: «bridge.map» (карта) или «новый тайл».
+    std::string docName(int mode) const;
+    /// Первая фраза вопроса о несохранённом: какой документ изменён.
+    std::string unsavedText(int mode) const;
+    /// Сохранить документ режима mode, не меняя режим на экране.
+    bool saveDocument(int mode);
     void commandNew();
     void commandOpen();
     void commandOpenLast();
@@ -225,6 +242,8 @@ private:
     void dragObject(int idx);
     void doObjectTool(int mx, int my);
     void doMiddleDrag();
+    /// Пробел с протяжкой — рука; короткое нажатие — вписать картинку.
+    void spaceHand();
     bool openTileOfMapCell(int x, int y);
     void handleMapCanvas(int mx, int my);
     void handleCanvasClick();
@@ -250,6 +269,13 @@ private:
     void moveSelectionPro(int mx, int my, bool copy);
     void drawSelectionMask();
     bool handleProKey(int key);
+    /// Сочетания с Ctrl режима тайла: выделение, буфер, кисть из выделения.
+    bool handleProCtrlKey(int key);
+    /// Вставка буфера плавающим выделением под курсором.
+    void pasteBufferHere();
+    /// Клавиша с Ctrl или Alt в интерфейсе 1.7: только сочетания из таблицы,
+    /// буква без своего сочетания ничего не делает (UX-16).
+    void handleModifiedKey(int key);
     void showToolOptions();
     void showImageScreen();
     void showRotateDialog();
@@ -463,6 +489,8 @@ private:
     void exportRange(int& from, int& to) const;
 
     // --- запуск ---
+    /// Тема окна из настроек; с --classic — всегда «Классика».
+    void applyTheme();
     void initColorBars();
     void syncTitle();
     void finishFrame();

@@ -672,6 +672,7 @@ bool projectDecode(const std::vector<std::uint8_t>& file, Model& m, std::string&
     m.tileIdx.resize(p.w, p.h, IDX_NONE);
     m.loadActiveCel();
     m.resetSelection();
+    m.forgetSelection(DOC_TILE);
     if (!p.sel.empty()) m.setSelectionMask(p.sel);
     if (p.haveView) {
         m.gridOn = (p.flags & VF_GRID) != 0;

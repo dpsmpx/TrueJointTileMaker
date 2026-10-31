@@ -137,8 +137,8 @@ std::vector<std::string> splitLines(const std::string& s) {
 
 namespace {
 
-Color checkerAt(int x, int y) {
-    return ((x / 4) + (y / 4)) % 2 == 0 ? theme::cCheckA : theme::cCheckB;
+Color checkerAt(int x, int y, Color a, Color b) {
+    return ((x / 4) + (y / 4)) % 2 == 0 ? a : b;
 }
 
 void putBgra(std::vector<std::uint8_t>& raw, std::size_t k, Color c, std::uint8_t a) {
@@ -160,7 +160,8 @@ std::vector<std::uint8_t> makeThumbRaw(const Grid<Color>& g, int size) {
             const int sy = clampI(py * g.h / size, 0, g.h - 1);
             // Шахматка по точкам миниатюры, а не по пикселям тайла: клетки
             // шахматки одинаковы при любом размере исходника.
-            const Color c = blendOver(g.at(sx, sy), checkerAt(px, py));
+            const Color c = blendOver(g.at(sx, sy), checkerAt(px, py, theme::classicTheme().checkA,
+                                                              theme::classicTheme().checkB));
             putBgra(raw,
                     (static_cast<std::size_t>(py) * static_cast<std::size_t>(size) +
                      static_cast<std::size_t>(px)) *
@@ -359,9 +360,11 @@ void Model::paletteFromGrid(const Grid<Color>& g) {
 // --- история ----------------------------------------------------------------
 
 int Model::undoDepth() const {
-    int per = docW() * docH() * 4;
-    if (per < 1) per = 1;
-    return clampI(UNDO_BUDGET_BYTES / per, 3, 64);
+    const std::int64_t per =
+        std::max<std::int64_t>(1, static_cast<std::int64_t>(docW()) * docH() * undoBytesPerPx);
+    const std::int64_t steps =
+        std::clamp<std::int64_t>(undoBudget / per, undoMinSteps, undoMaxSteps);
+    return static_cast<int>(steps);
 }
 
 void Model::clearTileHistory() {
@@ -486,6 +489,7 @@ void Model::setTile(Grid<Color> newTile, const std::string& fileName) {
     docMode = DOC_TILE;
     tileModified = false;
     resetSelection();
+    forgetSelection(DOC_TILE);
     clearTileHistory();
     overDirty = true;
     fitScale();
@@ -521,6 +525,7 @@ void Model::newMapOfSize(int w, int h) {
     mapModified = false;
     docMode = DOC_MAP;
     resetSelection();
+    forgetSelection(DOC_MAP);
     clearMapHistory();
     overDirty = true;
     fitScale();
@@ -529,15 +534,35 @@ void Model::newMapOfSize(int w, int h) {
 
 void Model::switchMode(int mode) {
     if (docMode == mode) return;
+    if (keepSelectionPerDoc) {
+        SavedSelection& s = savedSel[static_cast<std::size_t>(docMode)];
+        s = {selX, selY, selW, selH, hasSelection, selMask};
+    }
     docMode = mode;
     resetSelection();
+    if (keepSelectionPerDoc) {
+        // Возвращается только то, что ложится на документ: размер мог
+        // смениться, пока он был не на экране.
+        const SavedSelection& s = savedSel[static_cast<std::size_t>(mode)];
+        const bool fits = s.on && s.x >= 0 && s.y >= 0 && s.x + s.w <= docW() &&
+                          s.y + s.h <= docH() &&
+                          (s.mask.empty() || (s.mask.w == docW() && s.mask.h == docH()));
+        if (fits) {
+            selX = s.x;
+            selY = s.y;
+            selW = s.w;
+            selH = s.h;
+            hasSelection = true;
+            selMask = s.mask;
+        }
+    }
     fitScale();
     overDirty = true;
     needRepaint = true;
 }
 
 Color Model::checkerColor(int x, int y) const {
-    return checkerAt(x, y);
+    return checkerAt(x, y, checkerA, checkerB);
 }
 
 Color Model::displayColor(int x, int y) const {
@@ -1074,6 +1099,12 @@ void Model::pickColor(Color c) {
     firstColor = c;
     firstIdx = indexOfColor(c);
     syncHSVFromColor();
+    needRepaint = true;
+}
+
+void Model::pickSecondFromPalette(PalIndex idx) {
+    secondColor = effectiveColor(idx);
+    secondIdx = idx;
     needRepaint = true;
 }
 

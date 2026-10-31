@@ -24,11 +24,6 @@ using namespace theme;
 namespace {
 
 constexpr int RULER = 20;
-constexpr Color cGuide = rgb(0, 168, 214);
-constexpr Color cGuideCenter = rgb(214, 0, 150);
-constexpr Color cMajorGrid = argb(170, 40, 70, 180);
-constexpr Color cCellCenter = argb(150, 214, 0, 150);
-constexpr Color cRulerMark = rgb(0, 140, 190);
 
 /// Цифры 3x5: строка — три бита, старший слева.
 constexpr std::uint8_t kDigits[11][5] = {
@@ -82,13 +77,13 @@ void Editor::drawGuides() {
     if (m.majorGridW > 0) {
         for (int k = m.majorGridW; k < dw; k += m.majorGridW) {
             const int sx = ox + k * ps - (ps >= 2 ? 1 : 0);
-            fb_.fillRect(sx, oy, sx + 1, ey, cMajorGrid);
+            fb_.fillRect(sx, oy, sx + 1, ey, active.majorGrid);
         }
     }
     if (m.majorGridH > 0) {
         for (int k = m.majorGridH; k < dh; k += m.majorGridH) {
             const int sy = oy + k * ps - (ps >= 2 ? 1 : 0);
-            fb_.fillRect(ox, sy, ex, sy + 1, cMajorGrid);
+            fb_.fillRect(ox, sy, ex, sy + 1, active.majorGrid);
         }
     }
     if (!m.guidesOn) {
@@ -107,33 +102,33 @@ void Editor::drawGuides() {
     if (m.guideCellCenters) {
         if (m.majorGridW > 0) {
             for (int k = 0; (2 * k + 1) * m.majorGridW <= 2 * dw; ++k)
-                dottedV(ox + (2 * k + 1) * m.majorGridW * ps / 2, cCellCenter, 2, 3);
+                dottedV(ox + (2 * k + 1) * m.majorGridW * ps / 2, active.cellCenter, 2, 3);
         }
         if (m.majorGridH > 0) {
             for (int k = 0; (2 * k + 1) * m.majorGridH <= 2 * dh; ++k)
-                dottedH(oy + (2 * k + 1) * m.majorGridH * ps / 2, cCellCenter, 2, 3);
+                dottedH(oy + (2 * k + 1) * m.majorGridH * ps / 2, active.cellCenter, 2, 3);
         }
     }
     if (m.guideCenter) {
-        dottedV(ox + dw * ps / 2, cGuideCenter, 5, 3);
-        dottedH(oy + dh * ps / 2, cGuideCenter, 5, 3);
+        dottedV(ox + dw * ps / 2, active.guideCenter, 5, 3);
+        dottedH(oy + dh * ps / 2, active.guideCenter, 5, 3);
     }
     // Свои направляющие идут через весь холст, как в редакторах растра:
     // по ним выравнивают и то, что за краем документа в бесшовном виде.
     for (const int x2 : m.guidesX2) {
         const int sx = ox + x2 * ps / 2;
-        fb_.fillRect(sx, m.Y0, sx + 1, m.H, cGuide);
+        fb_.fillRect(sx, m.Y0, sx + 1, m.H, active.guide);
     }
     for (const int y2 : m.guidesY2) {
         const int sy = oy + y2 * ps / 2;
-        fb_.fillRect(m.X0, sy, m.W, sy + 1, cGuide);
+        fb_.fillRect(m.X0, sy, m.W, sy + 1, active.guide);
     }
     // Начало координат, сдвинутое с угла документа, — крестиком.
     if (m.originX != 0 || m.originY != 0) {
         const int cx = ox + m.originX * ps;
         const int cy = oy + m.originY * ps;
-        fb_.fillRect(cx - 6, cy, cx + 7, cy + 1, cGuideCenter);
-        fb_.fillRect(cx, cy - 6, cx + 1, cy + 7, cGuideCenter);
+        fb_.fillRect(cx - 6, cy, cx + 7, cy + 1, active.guideCenter);
+        fb_.fillRect(cx, cy - 6, cx + 1, cy + 7, active.guideCenter);
     }
     fb_.resetClip();
 }
@@ -146,7 +141,7 @@ void Editor::drawRadialAxes() {
     const double cx = m.tileToScreenX(0) + m.axisX2() * ps / 2.0;
     const double cy = m.tileToScreenY(0) + m.axisY2() * ps / 2.0;
     const double r = static_cast<double>(std::max(m.docW(), m.docH()) * ps);
-    const Color c = argb(110, 220, 60, 60);
+    const Color c = active.radialAxis;
     fb_.setClip(canvasRect());
     for (int k = 0; k < m.symRadial; ++k) {
         const double a = -std::numbers::pi / 2 + 2 * std::numbers::pi * k / m.symRadial;
@@ -180,8 +175,8 @@ void Editor::drawRulers() {
     }
     for (const int x2 : m.guidesX2) {
         const int sx = m.tileToScreenX(0) + x2 * ps / 2;
-        fb_.fillRect(sx - 3, m.Y0 - 7, sx + 4, m.Y0 - 4, cRulerMark);
-        fb_.fillRect(sx - 1, m.Y0 - 4, sx + 2, m.Y0 - 1, cRulerMark);
+        fb_.fillRect(sx - 3, m.Y0 - 7, sx + 4, m.Y0 - 4, active.rulerMark);
+        fb_.fillRect(sx - 1, m.Y0 - 4, sx + 2, m.Y0 - 1, active.rulerMark);
     }
     if (overCanvas(mouseX(), mouseY())) fb_.fillRect(mouseX(), 0, mouseX() + 1, m.Y0 - 1, cAccent);
 
@@ -197,8 +192,8 @@ void Editor::drawRulers() {
     }
     for (const int y2 : m.guidesY2) {
         const int sy = m.tileToScreenY(0) + y2 * ps / 2;
-        fb_.fillRect(m.X0 - 7, sy - 3, m.X0 - 4, sy + 4, cRulerMark);
-        fb_.fillRect(m.X0 - 4, sy - 1, m.X0 - 1, sy + 2, cRulerMark);
+        fb_.fillRect(m.X0 - 7, sy - 3, m.X0 - 4, sy + 4, active.rulerMark);
+        fb_.fillRect(m.X0 - 4, sy - 1, m.X0 - 1, sy + 2, active.rulerMark);
     }
     if (overCanvas(mouseX(), mouseY())) fb_.fillRect(0, mouseY(), m.X0 - 1, mouseY() + 1, cAccent);
     fb_.resetClip();

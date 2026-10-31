@@ -34,6 +34,7 @@ add_executable(tjtm_core_tests
     test_palette.cpp
     test_precision.cpp
     test_png.cpp
+    test_ui.cpp
 )
 target_link_libraries(tjtm_core_tests PRIVATE tjtm_core GTest::gtest_main)
 target_compile_definitions(tjtm_core_tests PRIVATE TJTM_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

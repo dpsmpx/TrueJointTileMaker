@@ -31,8 +31,9 @@ namespace tjtm {
 inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // 0.7 — перенос 0.6.0 на C++ с исправлениями из docs/fixes.md. Этапы
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
-// 1.1 и дальше — разделы плана сверх них (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.6.0";
+// 1.1 и дальше — разделы плана сверх них, 1.7 и дальше — этапы плана
+// «Интерфейс» (docs/roadmap.md).
+inline constexpr const char* kAppVersion = "1.7.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -76,6 +77,9 @@ inline constexpr int TOOL_CH = 36;
 /// Сторона значка на кнопке инструмента: значок любого размера
 /// показывается уменьшенным до неё.
 inline constexpr int ICON_PX = 28;
+/// Значок интерфейса 1.7: не больше 32 точек — столько вмещает кнопка
+/// 42×34 без сжатия (UX-31).
+inline constexpr int ICON_MAX_PX = 32;
 
 inline constexpr int BAR_SIZE = 100;
 inline constexpr int BAR_H = 12;
@@ -216,6 +220,10 @@ public:
     int viewX = 0, viewY = 0;
     bool gridOn = false;
     bool checkerOn = true;
+    /// Клетки шахматки под прозрачным: окно берёт их из темы, а ядро темы
+    /// не знает.
+    Color checkerA = theme::classicTheme().checkA;
+    Color checkerB = theme::classicTheme().checkB;
     bool seamlessOn = false;
     bool wrapOn = false;
     bool symX = false, symY = false;
@@ -236,6 +244,19 @@ public:
     /// Кисть, фигуры и заливка не выходят за выделение. В оригинале
     /// выделение рисование не ограничивало.
     bool clipToSelection = false;
+    /// Выделение остаётся за своим документом при смене режима (UX-17): у
+    /// оригинала Tab снимал выделение, и вернуться к нему было нельзя.
+    bool keepSelectionPerDoc = false;
+    /// Выделение документа, который сейчас не на экране; номер — DOC_TILE
+    /// или DOC_MAP. Пустое (on = false) — нечего возвращать.
+    struct SavedSelection {
+        int x = 0, y = 0, w = 0, h = 0;
+        bool on = false;
+        Grid<std::uint8_t> mask;
+    };
+    std::array<SavedSelection, 2> savedSel;
+    /// Документ заменён: прежнее его выделение возвращать нельзя.
+    void forgetSelection(int which) { savedSel[static_cast<std::size_t>(which)] = {}; }
     /// «Новый» и «Очистить» дают прозрачный холст, а не белый.
     bool transparentBlank = false;
     /// Мазок без углов «Г»: карандаш, ластик и узор.
@@ -452,6 +473,14 @@ public:
 
     // --- история ---
     int undoDepth() const;
+    /// Бюджет истории отмены. У оригинала — 6 МБ из расчёта 4 байта на
+    /// точку и от 3 до 64 шагов: тайл 512×512 помнил всего 6 шагов (UX-25).
+    /// Окно поднимает их при запуске; снимок на самом деле — цвет и номер
+    /// ячейки, 6 байт на точку.
+    std::int64_t undoBudget = UNDO_BUDGET_BYTES;
+    int undoBytesPerPx = 4;
+    int undoMinSteps = 3;
+    int undoMaxSteps = 64;
     void clearTileHistory();
     void clearMapHistory();
     void clearHistory();
@@ -518,6 +547,8 @@ public:
     void syncHSVFromColor();
     void applyHSVToColor();
     void pickColor(Color c);
+    /// Второй рабочий цвет — из ячейки idx палитры, с точной привязкой.
+    void pickSecondFromPalette(PalIndex idx);
     void pickColorFromTile(int x, int y);
     void swapColors();
 

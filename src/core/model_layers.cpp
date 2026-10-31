@@ -16,8 +16,6 @@ namespace tjtm {
 
 namespace {
 
-constexpr Color kClear = argb(0, 0, 0, 0);
-
 /// Слой документа по номеру; один шаблон и для чтения, и для правки.
 template <class Doc>
 auto& layerAt(Doc& d, int l) {

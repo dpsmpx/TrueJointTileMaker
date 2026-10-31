@@ -93,11 +93,11 @@ void Editor::drawToolsSection() {
                               (m.docMode == DOC_MAP && i == M_PAINT && m.mapMix);
         if (!airLabel && ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
             !iconBmp_[static_cast<std::size_t>(ic)].empty()) {
-            fb_.drawImage(iconBmp_[static_cast<std::size_t>(ic)], x0 + (TOOL_CW - 2 - ICON_PX) / 2,
-                          y0 + (TOOL_CH - 2 - ICON_PX) / 2);
+            const Grid<Color>& icon = iconBmp_[static_cast<std::size_t>(ic)];
+            fb_.drawImage(icon, x0 + (TOOL_CW - 2 - icon.w) / 2, y0 + (TOOL_CH - 2 - icon.h) / 2);
         } else {
             textCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, toolLabel(i),
-                         m.curTool() == i ? rgb(255, 255, 255) : cText);
+                         m.curTool() == i ? active.onAccent : cText);
         }
     }
     drawToolChips();
@@ -166,14 +166,14 @@ void Editor::drawColorSection() {
 
     int mx = HSV_X0 + percentToAxis(m.sat, BAR_SIZE);
     const int my = HSV_Y0 + valueToAxis(m.val, BAR_SIZE);
-    fb_.fillRect(mx - 1, HSV_Y0, mx + 1, HSV_Y1, argb(200, 0, 0, 0));
-    fb_.fillRect(HSV_X0, my - 1, HSV_X0 + BAR_SIZE, my + 1, argb(200, 0, 0, 0));
+    fb_.fillRect(mx - 1, HSV_Y0, mx + 1, HSV_Y1, active.barMarker);
+    fb_.fillRect(HSV_X0, my - 1, HSV_X0 + BAR_SIZE, my + 1, active.barMarker);
 
     mx = HSV_X0 + hueToAxis(m.hue, BAR_SIZE);
-    fb_.fillRect(mx - 1, HUE_Y0, mx + 1, HUE_Y1, argb(200, 0, 0, 0));
+    fb_.fillRect(mx - 1, HUE_Y0, mx + 1, HUE_Y1, active.barMarker);
 
     mx = HSV_X0 + byteToAxis(m.firstColor.a, BAR_SIZE);
-    fb_.fillRect(mx - 1, ALPHA_Y0, mx + 1, ALPHA_Y1, argb(200, 220, 40, 40));
+    fb_.fillRect(mx - 1, ALPHA_Y0, mx + 1, ALPHA_Y1, active.alphaMarker);
 
     // Оба рабочих цвета: первым рисуют, второй участвует в дизеринге и обмене.
     fb_.fillRect(PANEL_X + 4, SLOT2_Y0, PANEL_X + 34, SLOT2_Y0 + 30,
@@ -194,9 +194,12 @@ void Editor::drawTerrainSection() {
                       m.mapBrush == i ? cAccent : cBorder);
         // Подпись светлая на тёмной местности и наоборот.
         const bool dark = i == MT_WALL || i == MT_TREE || i == MT_WATER || i == MT_DEADWATER;
-        textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MTERR_CH - 2,
-                     std::string(1, mapTileChar(i)) + " " + mapTileName(i),
-                     dark ? rgb(245, 245, 245) : rgb(20, 20, 24));
+        // «стоячая вода» со знаком не влезала и обрезалась снизу (UX-32):
+        // тогда — название без знака.
+        std::string label = std::string(1, mapTileChar(i)) + " " + mapTileName(i);
+        if (textWidth(label) > MSEL_CW - 6) label = fitTextEnd(mapTileName(i), MSEL_CW - 6);
+        textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MTERR_CH - 2, label,
+                     dark ? active.labelOnDark : active.labelOnLight);
     }
 }
 
@@ -210,7 +213,7 @@ void Editor::drawObjectKindSection() {
                           m.mapObjKind == i ? cAccent : cBack);
         textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MOBJ_CH - 2,
                      mapObjGlyph(mapKindName(i)) + " " + mapKindName(i),
-                     m.mapObjKind == i ? rgb(255, 255, 255) : cText);
+                     m.mapObjKind == i ? active.onAccent : cText);
     }
 }
 
@@ -245,8 +248,7 @@ void Editor::drawOverviewSection() {
     int vy0 = 0;
     int vx1 = 0;
     int vy1 = 0;
-    if (m.overviewViewport(vx0, vy0, vx1, vy1))
-        fb_.frameRect(vx0, vy0, vx1, vy1, rgb(250, 240, 80));
+    if (m.overviewViewport(vx0, vy0, vx1, vy1)) fb_.frameRect(vx0, vy0, vx1, vy1, active.viewport);
 }
 
 /// Сетка цветов, вписанная в квадрат: перебор по точкам приёмника, поэтому
@@ -303,7 +305,13 @@ void Editor::drawInfoSection() {
     s += "\n" + std::to_string(m.docW()) + "x" + std::to_string(m.docH()) + "  " +
          std::to_string(m.pixelSize) + "x" + alpha;
     if (m.docMode == DOC_MAP) s += "  объектов " + std::to_string(m.map.objects.size());
-    uiLabel(PANEL_X + 46, INFO_Y0, PANEL_W - 48, INFO_Y1 - INFO_Y0, s, cText);
+    // У карты нет миниатюры буфера: сведения — во всю ширину, иначе
+    // строка размера рвалась на три (UX-32).
+    if (m.docMode == DOC_MAP) {
+        uiLabel(PANEL_X + 2, INFO_Y0, PANEL_W - 4, INFO_Y1 - INFO_Y0, s, cText);
+    } else {
+        uiLabel(PANEL_X + 46, INFO_Y0, PANEL_W - 48, INFO_Y1 - INFO_Y0, s, cText);
+    }
 }
 
 void Editor::drawMenuButtonSection() {

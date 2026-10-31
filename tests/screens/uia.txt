@@ -1,0 +1,84 @@
+# Этап A плана «Интерфейс» (docs/roadmap.md): быстрые исправления без смены
+# раскладки. Палитра на панели — ячейки по 16 точек от (624, 116).
+key Escape
+sleep 0.4
+# A1: щелчок по ячейке берёт цвет — левая первым, правая вторым;
+# Ctrl+щелчок записывает в ячейку первый цвет, и это отменяется.
+click 650 125              # синий — первым
+click 682 125 3            # красный — вторым
+move 770 550
+sleep 0.2
+shot 01_palette_pick
+keydown ctrl
+click 666 125              # зелёный ← синий
+keyup ctrl
+move 770 550
+sleep 0.2
+shot 02_palette_write
+key ctrl+z
+move 770 550
+sleep 0.2
+shot 03_palette_undo
+# A2: Ctrl+Shift+Z — повтор, а не вторая отмена; Tab оставляет выделение
+# за документом, и Delete стирает выделенное, а не весь тайл.
+key 1
+drag 150 150 450 150       # линия первым цветом
+key ctrl+z ctrl+shift+z    # отмена и повтор — линия на месте
+key 9
+drag 200 250 400 350       # выделение
+key Tab Tab                # на карту и обратно
+key Delete
+key ctrl+d
+move 770 550
+sleep 0.2
+shot 04_keys
+# A3: двойной щелчок по объекту инструментом объектов открывает его форму.
+key Tab                    # карта
+key 4                      # объекты
+click 300 300              # поставить объект
+sleep 0.6
+click 300 300
+click 300 300              # двойной щелчок по нему
+sleep 0.3
+shot 05_object_form
+key Escape
+sleep 0.2
+# A4: вопрос о несохранённом называет документ; Enter и Escape подписаны.
+key Tab                    # тайл изменён
+key ctrl+n
+sleep 0.3
+shot 06_unsaved
+key Escape
+sleep 0.2
+# A6: светлая тема (uia.config) — подсказки и обводка кнопок по WCAG.
+key k
+sleep 0.3
+shot 07_theme
+key Escape
+sleep 0.2
+# A10: трекпад шлёт доли щелчка — масштаб меняется, только когда их набралось
+# на целый щелчок; прокрутка вбок двигает холст.
+move 300 280
+wheel 0.4
+wheel 0.4                  # 0,8 щелчка — масштаб прежний
+move 770 550
+sleep 0.2
+shot 08_wheel_part
+move 300 280
+wheel 0.4                  # 1,2 — один щелчок: вдвое крупнее
+wheel 0 1                  # вбок — холст сдвинут
+move 770 550
+sleep 0.2
+shot 09_wheel_zoom
+# A12: пробел с протяжкой — рука (выделения не появляется), короткое
+# нажатие вписывает картинку.
+keydown space
+drag 300 280 380 340
+keyup space
+move 770 550
+sleep 0.2
+shot 10_hand
+key space
+move 770 550
+sleep 0.2
+shot 11_fit

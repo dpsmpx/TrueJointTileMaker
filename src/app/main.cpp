@@ -1,7 +1,7 @@
 // Запуск и главный цикл (TJTM.pas: «Запуск»).
 //
 //   tjtm [файл.png | карта.map] [--base КАТАЛОГ] [--frames N] [--screenshot кадр.png]
-//        [--script СЦЕНАРИЙ [--shots КАТАЛОГ]]
+//        [--script СЦЕНАРИЙ [--shots КАТАЛОГ]] [--classic]
 //
 // --base     где искать Config.txt, Resources/ и Картинки/ вместо каталога
 //            программы;
@@ -11,7 +11,9 @@
 // --screenshot  сохранить последний кадр в PNG;
 // --script   вести программу по сценарию tests/screens/*.txt (см.
 //            platform/script.h) и закрыться в его конце; снимки «shot» —
-//            в каталог --shots.
+//            в каталог --shots;
+// --classic  интерфейс 1.6 — жесты и вид оригинала: так идут сценарии,
+//            которые сверяются с эталоном 0.6.0 (tools/screens.sh, тесты).
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -30,6 +32,17 @@ namespace tjtm {
 Editor::Editor() {
     m.drawTilePixel = [this](int x, int y) { drawTilePixel(x, y); };
     m.drawPreviewPixel = [this](int x, int y) { drawPreviewPixel(x, y); };
+}
+
+void Editor::applyTheme() {
+    // Сценарии оригинала сверяются с обликом 1.6 — «Классикой».
+    theme::active =
+        classicUi_ || cfg.theme == "классика" ? theme::classicTheme() : theme::lightTheme();
+    m.checkerA = theme::active.checkA;
+    m.checkerB = theme::active.checkB;
+    m.tileBmpDirty = true;
+    m.overDirty = true;
+    m.needRepaint = true;
 }
 
 void Editor::syncTitle() {
@@ -51,6 +64,7 @@ bool Editor::appInit(int argc, char** argv) {
     std::string base;
     std::string script;
     std::string shots;
+    bool classic = false;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         const bool hasValue = i + 1 < argc;
@@ -64,6 +78,8 @@ bool Editor::appInit(int argc, char** argv) {
             script = argv[++i];
         } else if (a == "--shots" && hasValue) {
             shots = argv[++i];
+        } else if (a == "--classic") {
+            classic = true;
         } else if (!a.empty() && a[0] != '-') {
             openPath = a;
         }
@@ -105,8 +121,8 @@ bool Editor::appInit(int argc, char** argv) {
     m.gridOn = cfg.showGrid;
     m.checkerOn = cfg.showChecker;
     m.seamlessOn = cfg.showSeamless;
-    m.firstColor = argb(255, 0, 0, 0);
-    m.secondColor = argb(255, 255, 255, 255);
+    m.firstColor = kBlack;
+    m.secondColor = kWhite;
     // Этап 1 RoadToProLevel: карандаш пиксель-арта заменяет цвет, а не
     // смешивает; новый и очищенный тайл прозрачен; кисть и заливка не
     // выходят за выделение. Смешивание осталось — клавиша E.
@@ -119,6 +135,17 @@ bool Editor::appInit(int argc, char** argv) {
     // карта картинками — сразу, как в игре (без папки набора — цветами).
     m.mapAutotile = true;
     m.mapTiles = true;
+    // Интерфейс 1.7 и дальше (docs/roadmap.md, «Интерфейс — план»).
+    classicUi_ = classic;
+    m.keepSelectionPerDoc = !classic;
+    pf_.input().fineWheel = !classic;
+    if (!classic) {
+        m.undoBudget = std::int64_t{256} * 1024 * 1024;
+        m.undoBytesPerPx = 6;
+        m.undoMinSteps = 100;
+        m.undoMaxSteps = 1000;
+    }
+    applyTheme();
     m.syncHSVFromColor();
     m.setDefaultPalette();
     m.buffer.clear();
@@ -191,6 +218,18 @@ void Editor::appStep() {
     // Колесо могло провернуться на несколько щелчков между кадрами. Над
     // длинной палитрой оно её листает, а не меняет масштаб.
     int wheel = takeWheel();
+    // Прокрутка вбок и Shift с роликом двигают холст по горизонтали (UX-12):
+    // у оригинала ролик только менял масштаб.
+    int wheelX = takeWheelX();
+    if (!classicUi_ && wheel != 0 && isKeyPressed(KEY_SHIFT) && overCanvas(mouseX(), mouseY())) {
+        wheelX -= wheel;
+        wheel = 0;
+    }
+    if (wheelX != 0 && !classicUi_) {
+        m.viewX -= wheelX * std::max(1, m.pixelSize * 4);
+        m.clampView();
+        m.needRepaint = true;
+    }
     if (wheel != 0 && timelineShown() && mouseX() < m.W && mouseY() >= m.H) {
         timelineWheel(wheel);
         wheel = 0;

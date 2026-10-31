@@ -24,7 +24,8 @@
 # Оригинал ищет Config.txt, Resources/ и Картинки/ рядом с exe и пишет
 # в Config.txt при работе. Поэтому для него всё это копируется в build/ref,
 # а не связывается ссылками: эталон не должен трогать файлы репозитория.
-# Каждая сборка возвращает его настройки к тем, что лежат в репозитории.
+# Каждая сборка возвращает его настройки к настройкам сценариев
+# (tests/screens/Config.txt) — тем же, с которыми идёт перенос.
 # Перенос при каждом запуске получает такой же свежий каталог (--base):
 # иначе прошлый прогон сценария менял бы настройки следующему.
 set -euo pipefail
@@ -49,7 +50,7 @@ build_ref() {
     [ -f "$compiler" ] || die "нет $compiler — сначала tools/setup-env.sh"
     rm -rf "$REF_DIR"
     mkdir -p "$REF_DIR"
-    cp "$ROOT"/pascal/*.pas "$ROOT/Config.txt" "$REF_DIR"/
+    cp "$ROOT"/pascal/*.pas "$ROOT/tests/screens/Config.txt" "$REF_DIR"/
     cp -r "$ROOT/Resources" "$ROOT/Картинки" "$REF_DIR"/
     # Компилятор кладёт exe рядом с исходником; строки с номерами шагов
     # ([12]BeginParsingFile...) — шум, остальное показываем.
@@ -73,10 +74,14 @@ launch() {
             [ -x "$PORT_BIN" ] || build_port >/dev/null
             rm -rf "$STATE/base"
             mkdir -p "$STATE/base"
-            cp "$ROOT/Config.txt" "$STATE/base"/
+            cp "$ROOT/tests/screens/Config.txt" "$STATE/base"/
             cp -r "$ROOT/Resources" "$ROOT/Картинки" "$STATE/base"/
             # Программный кадровый буфер: Xvfb всё равно рисует без GPU.
-            (cd "$STATE/base" && SDL_FRAMEBUFFER_ACCELERATION=0 exec "$PORT_BIN" --base "$STATE/base") ;;
+            # TJTM_PORT_ARGS — ключи переноса, например --classic у сверки
+            # с оригиналом (tools/screens.sh).
+            # shellcheck disable=SC2086
+            (cd "$STATE/base" && SDL_FRAMEBUFFER_ACCELERATION=0 exec "$PORT_BIN" --base "$STATE/base" \
+                ${TJTM_PORT_ARGS:-}) ;;
     esac
 }
 

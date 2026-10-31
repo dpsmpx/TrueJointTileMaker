@@ -61,6 +61,13 @@ int Editor::takeWheel() {
     return w;
 }
 
+int Editor::takeWheelX() {
+    Input& in = pf_.input();
+    const int w = in.wheelX;
+    in.wheelX = 0;
+    return w;
+}
+
 void Editor::waitMouseRelease() {
     while (mousePressed() && !quitNow_)
         idle();
@@ -139,7 +146,7 @@ bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption
     if (enabled && !down)
         fb_.fillRoundRect(x + 1, y + 2, x + bw - 1, y + bh + 1, BTN_R, BTN_R, cShadow);
 
-    fb_.fillRoundRect(x, y, x + bw, y + bh, BTN_R, BTN_R, on ? cAccent : cBorder);
+    fb_.fillRoundRect(x, y, x + bw, y + bh, BTN_R, BTN_R, on ? cAccent : cOutline);
     Color face = on ? cHover : cBack;
     if (!enabled || down) {
         face = cFace;
@@ -155,13 +162,18 @@ bool Editor::uiButtonEx(int x, int y, int bw, int bh, const std::string& caption
         fb_.fillRoundRect(x + 1, y + bh - 3, x + bw - 1, y + bh - 2, BTN_R, BTN_R, cHover);
     }
 
-    textCentered(x + 4, y, x + bw - 4, y + bh, caption, enabled ? cText : cTextDim);
+    // Подпись шире кнопки обрезается многоточием, а не вылезает за край
+    // (UX-32); полный текст покажет подсказка (этап B).
+    const std::string shown = classicUi_ ? caption : fitTextEnd(caption, bw - 8);
+    textCentered(x + 4, y, x + bw - 4, y + bh, shown, enabled ? cText : cTextDim);
     // Щелчок забирается кнопкой: одно нажатие приводит в действие ровно
     // одну кнопку, даже если экран сменился посреди кадра.
     if (enabled && frameClick_ && frameClickX_ >= x && frameClickX_ < x + bw && frameClickY_ >= y &&
         frameClickY_ < y + bh) {
         frameClick_ = false;
-        return true;
+        // Нажимает только левая кнопка мыши: правый щелчок по «Выход» у
+        // оригинала тоже выходил, а его ждут как контекстное меню (UX-15).
+        return classicUi_ || frameClickButton_ == MB_LEFT;
     }
     return false;
 }
@@ -206,6 +218,16 @@ std::string Editor::fitText(const std::string& s, int maxW) const {
     while (u.size() > 1 && textWidth("…" + u32ToUtf8(u)) > maxW)
         u.erase(0, 1);
     return "…" + u32ToUtf8(u);
+}
+
+/// Обрезает строку справа до ширины maxW, ставя многоточие. Строка из
+/// нескольких строк (\n) не трогается: её переносит рисование.
+std::string Editor::fitTextEnd(const std::string& s, int maxW) const {
+    if (s.find('\n') != std::string::npos || textWidth(s) <= maxW) return s;
+    std::u32string u = utf8ToU32(s);
+    while (u.size() > 1 && textWidth(u32ToUtf8(u) + "…") > maxW)
+        u.pop_back();
+    return u32ToUtf8(u) + "…";
 }
 
 /// Разворачивает абзацы в строки не шире maxWidth, перенося по словам.

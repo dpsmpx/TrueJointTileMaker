@@ -28,6 +28,9 @@ SCENARIO="$1"
 [ -f "$SCENARIO" ] || { echo "screens.sh: нет $SCENARIO" >&2; exit 2; }
 NAME="$(basename "$SCENARIO" .txt)"
 OUT="${2:-$ROOT/build/screens/$NAME}"
+# С оригиналом сверяется интерфейс оригинала: перенос — с его жестами и
+# видом, без правил плана «Интерфейс» (docs/roadmap.md).
+export TJTM_PORT_ARGS="--classic ${TJTM_PORT_ARGS:-}"
 rm -rf "$OUT"
 mkdir -p "$OUT/ref" "$OUT/port" "$OUT/side" "$OUT/diff"
 

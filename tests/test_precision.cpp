@@ -15,7 +15,6 @@ namespace {
 
 constexpr Color kRed = argb(255, 255, 0, 0);
 constexpr Color kBlue = argb(255, 0, 0, 255);
-constexpr Color kClear = argb(0, 0, 0, 0);
 
 Model spriteModel(int w = 16, int h = 16) {
     Model m;

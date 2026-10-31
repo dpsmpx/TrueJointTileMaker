@@ -209,7 +209,7 @@ void Editor::showObjectForm(int idx) {
             const int w = boxW(k);
             uiLabelLeft(LX, y, BH, fields[k].label, cText);
             fb_.fillRect(BX, y, BX + w, y + BH, k == focus ? cAccent : cBorder);
-            fb_.fillRect(BX + 1, y + 1, BX + w - 1, y + BH - 1, rgb(255, 255, 255));
+            fb_.fillRect(BX + 1, y + 1, BX + w - 1, y + BH - 1, active.field);
             TextField& tf = boxes[k];
             const int inner = w - 12;
             const int cx = width(tf, tf.caret);
@@ -220,7 +220,7 @@ void Editor::showObjectForm(int idx) {
             const int ty = y + (BH - mono_.textHeight()) / 2;
             if (k == focus && tf.hasSel())
                 fb_.fillRect(tx + width(tf, tf.selLo()), ty, tx + width(tf, tf.selHi()),
-                             ty + mono_.textHeight(), rgb(173, 214, 255));
+                             ty + mono_.textHeight(), active.fieldSelection);
             mono_.draw(fb_, tx, ty, u32ToUtf8(tf.text), cText);
             if (k == focus && ((pf_.milliseconds() - blinkStart) / 530) % 2 == 0)
                 fb_.fillRect(tx + cx, ty, tx + cx + 1, ty + mono_.textHeight(), cText);
@@ -337,7 +337,7 @@ void Editor::showMapBrushOptions() {
         } else {
             uiLabelLeft(LX, 110, 22, "Кисть, прямоугольник и заливка кладут местность, выбранную",
                         cTextDim);
-            uiLabelLeft(LX, 130, 22, "на панели, — как в оригинале.", cTextDim);
+            uiLabelLeft(LX, 130, 22, "на панели.", cTextDim);
         }
         if (uiButton(WIN_W / 2 - 90, WIN_H - 52, 180, 36, "Закрыть", true)) done = true;
         redraw();

@@ -13,12 +13,6 @@
 
 namespace tjtm {
 
-namespace {
-
-constexpr Color kClear = argb(0, 0, 0, 0);
-
-}  // namespace
-
 void Model::snapStrict(Grid<Color>& next, const Grid<Color>& before) const {
     if (palette.empty()) return;
     const Color clear = transparentIdx != IDX_NONE ? effectiveColor(transparentIdx) : kClear;

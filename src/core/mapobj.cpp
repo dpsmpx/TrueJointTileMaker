@@ -16,7 +16,8 @@ struct Spec {
 
 /// Поля вида — в порядке разбора world.cpp игры.
 std::vector<Spec> specOf(const std::string& kind) {
-    if (kind == "npc") return {{"Житель", false, false, false, "id из build_npcs() игры"}};
+    if (kind == "npc")
+        return {{"Житель", false, false, false, "имя жителя, как в игре: elder, smith"}};
     if (kind == "item")
         return {{"Предмет", false, false, false, "id предмета"},
                 {"Количество", true, true, false, "пусто — один"}};
@@ -27,7 +28,7 @@ std::vector<Spec> specOf(const std::string& kind) {
             {"Y цели", true, false, false, ""},
             {"Условия", false, true, true, "key=ключ quest=код:этап counter=код:число deny=текст"}};
     if (kind == "spawn")
-        return {{"Враг", false, false, false, "id из build_enemies() игры"},
+        return {{"Враг", false, false, false, "имя врага, как в игре: wolf, rat"},
                 {"Сколько", true, false, false, "сколько врагов держит зона"},
                 {"Радиус", true, false, false, "в клетках"}};
     if (kind == "chest")

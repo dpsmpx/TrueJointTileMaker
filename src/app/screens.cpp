@@ -71,6 +71,16 @@ void Editor::showTextScreen(const std::string& title, const std::vector<std::str
     m.needRepaint = true;
 }
 
+/// Подпись под кнопками вопроса: какую нажимает Enter, какую — Escape.
+std::string Editor::keysHint(const std::string& enter, const std::string& escape) {
+    std::string s = "Enter — «";
+    s += enter;
+    s += "»,   Escape — «";
+    s += escape;
+    s += "»";
+    return s;
+}
+
 void Editor::showMessage(const std::string& title, const std::string& text) {
     showTextScreen(title, {text});
 }
@@ -100,9 +110,16 @@ int Editor::ask3(const std::string& title, const std::string& text, const std::s
             res = -1;
             done = true;
         }
+        // Главная кнопка — первая: Enter её нажимает (UX-19).
+        if (!classicUi_)
+            textCentered(0, H / 2 + 72, WIN_W, H / 2 + 92, keysHint(yes, cancel), cTextDim);
         redraw();
-        if (takeKey() == KEY_ESC) {
+        const int key = takeKey();
+        if (key == KEY_ESC) {
             res = -1;
+            done = true;
+        } else if (key == KEY_ENTER && !classicUi_) {
+            res = 1;
             done = true;
         }
         idle();
@@ -133,9 +150,15 @@ bool Editor::askYesNo(const std::string& title, const std::string& text, const s
             res = false;
             done = true;
         }
+        if (!classicUi_)
+            textCentered(0, H / 2 + 72, WIN_W, H / 2 + 92, keysHint(yes, no), cTextDim);
         redraw();
-        if (takeKey() == KEY_ESC) {
+        const int key = takeKey();
+        if (key == KEY_ESC) {
             res = false;
+            done = true;
+        } else if (key == KEY_ENTER && !classicUi_) {
+            res = true;
             done = true;
         }
         idle();
@@ -440,13 +463,13 @@ bool Editor::askText(const std::string& title, const std::string& prompt,
                 "Enter — готово, Escape — отмена. Работают выделение и буфер обмена", cTextDim);
 
         fb_.fillRect(fx, fy, fx + fw, fy + fh, cAccent);
-        fb_.fillRect(fx + 1, fy + 1, fx + fw - 1, fy + fh - 1, rgb(255, 255, 255));
+        fb_.fillRect(fx + 1, fy + 1, fx + fw - 1, fy + fh - 1, active.field);
         fb_.setClip(gfx::Rect{fx + 4, fy + 2, fx + fw - 4, fy + fh - 2});
         const int tx = fx + 6 - tf.scroll;
         const int ty = fy + (fh - mono_.textHeight()) / 2;
         if (tf.hasSel()) {
             fb_.fillRect(tx + width(tf.selLo()), ty, tx + width(tf.selHi()),
-                         ty + mono_.textHeight(), rgb(173, 214, 255));
+                         ty + mono_.textHeight(), active.fieldSelection);
         }
         mono_.draw(fb_, tx, ty, u32ToUtf8(tf.text), cText);
         if (((pf_.milliseconds() - blinkStart) / 530) % 2 == 0)

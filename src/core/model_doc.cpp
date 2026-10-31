@@ -15,8 +15,6 @@ namespace tjtm {
 
 namespace {
 
-constexpr Color kClear = argb(0, 0, 0, 0);
-
 bool blankCel(const Grid<Color>& img, const Grid<PalIndex>& idx) {
     for (const Color c : img.d) {
         if (c.a != 0) return false;

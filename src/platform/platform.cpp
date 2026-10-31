@@ -160,8 +160,24 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
             in_.mousePressed = buttons_ != 0;
             break;
         case SDL_EVENT_MOUSE_WHEEL:
-            if (e.wheel.y > 0) ++in_.wheel;
-            if (e.wheel.y < 0) --in_.wheel;
+            if (!in_.fineWheel) {
+                if (e.wheel.y > 0) ++in_.wheel;
+                if (e.wheel.y < 0) --in_.wheel;
+                break;
+            }
+            {
+                // Целые щелчки — из накопленного, остаток ждёт следующих
+                // событий: трекпад шлёт много мелких долей щелчка.
+                auto whole = [](float& acc) {
+                    const int n = static_cast<int>(acc);
+                    acc -= static_cast<float>(n);
+                    return n;
+                };
+                in_.wheelAccY += e.wheel.y;
+                in_.wheelAccX += e.wheel.x;
+                in_.wheel += whole(in_.wheelAccY);
+                in_.wheelX += whole(in_.wheelAccX);
+            }
             break;
         case SDL_EVENT_KEY_DOWN: {
             const int vk = vkFromScancode(e.key.scancode);
@@ -251,7 +267,8 @@ void Platform::scriptStep() {
                 break;
             case ScriptEvent::WHEEL:
                 e.type = SDL_EVENT_MOUSE_WHEEL;
-                e.wheel.y = static_cast<float>(se.wheel);
+                e.wheel.y = se.wheelY;
+                e.wheel.x = se.wheelX;
                 e.wheel.mouse_x = static_cast<float>(se.x);
                 e.wheel.mouse_y = static_cast<float>(se.y);
                 break;
@@ -368,6 +385,11 @@ std::string Platform::saveFileDialog(const std::string& title,
                                      const std::string& folder, const std::string& suggested) {
     const std::string loc = dirExists(folder) ? pathCombine(folder, suggested) : suggested;
     return runDialog(SDL_FILEDIALOG_SAVEFILE, title, filters, loc);
+}
+
+std::string Platform::openFolderDialog(const std::string& title, const std::string& folder) {
+    return runDialog(SDL_FILEDIALOG_OPENFOLDER, title, {},
+                     dirExists(folder) ? folder : std::string());
 }
 
 std::string Platform::clipboardText() const {

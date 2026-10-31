@@ -79,6 +79,9 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             tilesFolder = val;
         } else if (key == "iconsfolder") {
             iconsFolder = val;
+        } else if (key == "theme") {
+            const std::string t = netToLower(val);
+            theme = t == "classic" ? "классика" : t == "light" ? "светлая" : t;
         } else {
             continue;
         }
@@ -158,6 +161,12 @@ std::string Config::serialize() const {
     add("# Файл палитры 8x8, загружаемый при запуске.");
     add("PaletteFile = " + paletteFile);
     add("");
+    const Config def;
+    if (theme != def.theme) {
+        add("# Тема окна: светлая или классика (облик 1.6).");
+        add("Theme = " + theme);
+        add("");
+    }
     add("# Заполняется программой.");
     add("LastFile = " + lastFile);
     add("LastMapFile = " + lastMapFile);

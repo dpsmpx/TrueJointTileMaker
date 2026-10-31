@@ -7,7 +7,7 @@
 ShowHelpOnStart = нет
 
 # Показывать главное меню при запуске.
-ShowMenuOnStart = да
+ShowMenuOnStart = нет
 
 # Размер нового тайла по умолчанию, 4..512.
 # Используется только когда стартовое изображение не загрузилось.
@@ -42,10 +42,10 @@ IconsFolder = Resources/Icons
 
 # Изображение, загружаемое при запуске. Пусто — не загружать.
 # Размер тайла берётся из самого изображения.
-StartupImage = Картинки/debug.png
+StartupImage =
 
 # Открывать последний файл вместо стартового изображения.
-AutoLoadLastFile = нет
+AutoLoadLastFile = да
 
 # Файл палитры 8x8, загружаемый при запуске.
 PaletteFile = Resources/Palitra.png

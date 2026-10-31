@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -48,14 +49,26 @@ std::vector<Region> readRegions() {
     return out;
 }
 
-/// Свежий каталог программы: настройки, ресурсы и картинки из репозитория.
-/// Программа пишет в Config.txt, и прогоны не должны влиять друг на друга.
+/// Свежий каталог программы: настройки сценариев, ресурсы и картинки из
+/// репозитория. Программа пишет в Config.txt, и прогоны не должны влиять
+/// друг на друга.
 fs::path makeBase(const std::string& name, const std::string& scenario = {}) {
     const fs::path src(TJTM_SOURCE_DIR);
     const fs::path base = fs::temp_directory_path() / ("tjtm_app_test_" + name);
     fs::remove_all(base);
     fs::create_directories(base);
-    fs::copy_file(src / "Config.txt", base / "Config.txt");
+    // Настройки сценариев, а не выпуска (tests/screens/Config.txt), и
+    // добавка сценария в конце: последнее значение ключа побеждает.
+    fs::copy_file(src / "tests" / "screens" / "Config.txt", base / "Config.txt");
+    {
+        std::ifstream add(
+            src / "tests" / "screens" / ((scenario.empty() ? name : scenario) + ".config"),
+            std::ios::binary);
+        if (add) {
+            std::ofstream out(base / "Config.txt", std::ios::binary | std::ios::app);
+            out << add.rdbuf();
+        }
+    }
     fs::copy(src / "Resources", base / "Resources", fs::copy_options::recursive);
     fs::copy(src / fs::path(u8"Картинки"), base / fs::path(u8"Картинки"),
              fs::copy_options::recursive);
@@ -94,6 +107,13 @@ std::string prepareDialogs(const std::string& scenario, const fs::path& base) {
     return answers.string();
 }
 
+/// Сценарии оригинала: их эталон снят с 0.6.0, и перенос идёт с жестами и
+/// видом оригинала (--classic), а не с правилами плана «Интерфейс».
+bool isOriginalScenario(const std::string& scenario) {
+    return scenario == "tile" || scenario == "map" || scenario == "draw" || scenario == "mapedit" ||
+           scenario == "menu";
+}
+
 /// Пройти сценарий; снимки — в base/shots.
 bool runScenario(const std::string& scenario, const fs::path& base) {
     const fs::path shots = base / "shots";
@@ -105,7 +125,8 @@ bool runScenario(const std::string& scenario, const fs::path& base) {
     setEnv("SDL_FRAMEBUFFER_ACCELERATION", "0");
     setEnv("TJTM_TEST_DIALOGS", prepareDialogs(scenario, base));
     const std::string cmd = "\"" + std::string(TJTM_APP_EXE) + "\" --base \"" + base.string() +
-                            "\" --script \"" + script + "\" --shots \"" + shots.string() + "\"";
+                            "\" --script \"" + script + "\" --shots \"" + shots.string() + "\"" +
+                            (isOriginalScenario(scenario) ? " --classic" : "");
 #ifdef _WIN32
     // cmd /c срезает первую и последнюю кавычку строки: без внешней пары
     // от пути к программе осталась бы половина.
@@ -169,7 +190,45 @@ TEST_P(AppScreens, MatchOriginal) {
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
                                            "anim4", "prec5", "layers6", "game7", "fx8", "art9",
-                                           "map10"));
+                                           "map10", "uia"));
+
+/// Настройки выпуска (Config.txt в корне): при запуске — сразу редактор с
+/// последним файлом, без меню во всё окно (план «Интерфейс», A9).
+TEST(AppScreens, ReleaseConfigOpensLastFile) {
+    const fs::path base = makeBase("start");
+    fs::copy_file(fs::path(TJTM_SOURCE_DIR) / "Config.txt", base / "Config.txt",
+                  fs::copy_options::overwrite_existing);
+    {
+        std::ofstream add(base / "Config.txt", std::ios::binary | std::ios::app);
+        add << "LastFile = " << reinterpret_cast<const char*>(u8"Картинки/debug.png") << "\r\n";
+    }
+    ASSERT_TRUE(runScenario("start", base));
+    std::string err;
+    tjtm::Grid<tjtm::Color> shot;
+    ASSERT_TRUE(tjtm::pngLoad((base / "shots" / "01_start.png").string(), shot, err)) << err;
+    tjtm::Grid<tjtm::Color> img;
+    ASSERT_TRUE(tjtm::pngLoad((base / fs::path(u8"Картинки") / "debug.png").string(), img, err))
+        << err;
+    // Картинка вписана в холст: её середина — посреди холста. Меню на её
+    // месте рисовало бы кнопки.
+    const int ps = std::min(tjtm::CANVAS_W / img.w, tjtm::CANVAS_H / img.h);
+    const int ox = (tjtm::CANVAS_W - img.w * ps) / 2;
+    const int oy = (tjtm::CANVAS_H - img.h * ps) / 2;
+    int same = 0;
+    for (int y = 0; y < img.h; ++y) {
+        for (int x = 0; x < img.w; ++x) {
+            const tjtm::Color c = img.at(x, y);
+            if (c.a == 255 &&
+                shot.at(ox + x * ps + ps / 2, oy + y * ps + ps / 2).argb() == c.argb())
+                ++same;
+        }
+    }
+    int opaque = 0;
+    for (const tjtm::Color c : img.d)
+        opaque += c.a == 255 ? 1 : 0;
+    EXPECT_EQ(same, opaque) << "на холсте — последний файл, а не меню";
+    fs::remove_all(base);
+}
 
 /// Сценарии, которые сверяются только глазами (tools/screens.sh), обязаны
 /// хотя бы проходить: экраны открываются и закрываются, программа не падает.
