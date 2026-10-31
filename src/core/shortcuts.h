@@ -108,6 +108,7 @@ enum class Cmd {
     LayersScreen,
     GameSet,
     MapProperties,
+    Dock,
 };
 
 struct Shortcut {
@@ -162,5 +163,8 @@ std::span<const MenuItem> menuItems();
 /// Клавиша команды для пункта меню: первое её сочетание в таблице; пусто —
 /// клавиши нет.
 std::string commandKeys(Cmd c, int arg, bool tile);
+/// Название команды для истории: пункт меню без многоточия или строка
+/// шпаргалки.
+std::string commandTitle(Cmd c, int arg, bool tile);
 
 }  // namespace tjtm

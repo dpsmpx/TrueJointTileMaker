@@ -34,7 +34,7 @@ constexpr int TL_CELL_W = 26;
 constexpr int TL_MARK_W = 12;
 // Лента — внизу холста во всю его ширину: окно растягивается (C1).
 int canvasW() {
-    return panelX();
+    return panelX() - gLayout.dock;
 }
 int canvasH() {
     return gLayout.h - gLayout.bottom;

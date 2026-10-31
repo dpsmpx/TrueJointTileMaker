@@ -476,6 +476,19 @@ private:
     void handleOptionsBarClick();
     int optionsHover_ = -1;
 
+    // --- боковая панель (dock.cpp, C3) ---
+    struct DockLayout {
+        int x0 = 0, x1 = 0;
+        int layersHead = 0, layersY0 = 0, layersY1 = 0;
+        int historyHead = 0, historyY0 = 0, historyY1 = 0;
+    };
+    void applyDock();
+    [[nodiscard]] DockLayout dockLayout() const;
+    void drawDock();
+    void handleDockClick();
+    bool dockLayersOpen_ = true;
+    bool dockHistoryOpen_ = true;
+
     // --- клавиатура (keys.cpp): таблица сочетаний, шпаргалка ---
     void handleEditorKey(int key);
     /// Разбор клавиш 1.6 для «Классики»: Ctrl с буквой — та же буква, если

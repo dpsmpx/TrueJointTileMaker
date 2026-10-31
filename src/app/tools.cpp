@@ -417,6 +417,13 @@ void Editor::handleCanvasClick() {
     // Ручка оси симметрии (C2) — раньше инструмента: щелчок по ней не
     // рисует.
     if (dragAxisHandle()) return;
+    // Название шага истории (C3) — по инструменту.
+    {
+        const int tool = m.docMode == DOC_TILE ? m.toolTile : m.toolMap;
+        std::string name = splitLines(toolTip(tool)).front();
+        if (const std::size_t dot = name.find(" · "); dot != std::string::npos) name.resize(dot);
+        m.actionName = name;
+    }
     const int mx = m.screenToTileX(frameClickX_);
     const int my = m.screenToTileY(frameClickY_);
 

@@ -97,6 +97,7 @@ bool Editor::cmdChecked(Cmd c) const {
         case Cmd::Play: return playing_;
         case Cmd::MapContext: return m.mapContext;
         case Cmd::MapTiles: return m.mapTiles;
+        case Cmd::Dock: return cfg.dock;
         default: return false;
     }
 }

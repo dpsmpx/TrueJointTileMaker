@@ -199,6 +199,7 @@ constexpr std::array kMenu = {
     MenuItem{"Вид", "Вписать картинку", ZoomFit},
     MenuItem{"Вид", "Масштаб 100 %", Zoom100},
     MenuItem{"Вид", "Во весь экран", Fullscreen},
+    MenuItem{"Вид", "Боковая панель", Dock},
     MenuItem{"Вид"},
     MenuItem{"Вид", "Сетка", Grid},
     MenuItem{"Вид", "Шахматка", Checker},
@@ -234,6 +235,21 @@ std::span<const char* const> menuTitles() {
 
 std::span<const MenuItem> menuItems() {
     return kMenu;
+}
+
+std::string commandTitle(Cmd c, int arg, bool tile) {
+    for (const MenuItem& mi : kMenu) {
+        if (mi.text == nullptr || mi.cmd != c || mi.arg != arg) continue;
+        if (mi.where != KeyWhere::Both && (mi.where == KeyWhere::Tile) != tile) continue;
+        std::string t = mi.text;
+        const std::string dots = "…";
+        if (t.size() > dots.size() && t.ends_with(dots)) t.resize(t.size() - dots.size());
+        return t;
+    }
+    for (const Shortcut& s : kTable) {
+        if (s.cmd == c && s.text != nullptr && fits(s, tile)) return s.text;
+    }
+    return "Правка";
 }
 
 std::string commandKeys(Cmd c, int arg, bool tile) {

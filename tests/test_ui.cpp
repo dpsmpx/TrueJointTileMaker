@@ -573,5 +573,46 @@ TEST(UiWindow, PanelFollowsWindow) {
     gLayout = saved;
 }
 
+// --- C3: панель истории ------------------------------------------------------
+
+TEST(UiHistory, LabelsFollowUndoAndRedo) {
+    Model m = tileModel(8, 8);
+    m.actionName = "Карандаш";
+    m.pushUndo();
+    m.tile.at(0, 0) = kBlack;
+    m.actionName = "Заливка";
+    m.pushUndo();
+    m.tile.at(1, 1) = kBlack;
+    int done = 0;
+    EXPECT_EQ(m.historyLabels(done), (std::vector<std::string>{"Карандаш", "Заливка"}));
+    EXPECT_EQ(done, 2);
+    m.doUndo();
+    EXPECT_EQ(m.historyLabels(done), (std::vector<std::string>{"Карандаш", "Заливка"}));
+    EXPECT_EQ(done, 1);
+    // Переход к началу и обратно — отменой и повтором.
+    m.historyGoTo(0);
+    EXPECT_EQ(m.tile.at(0, 0), Model().blankColor());
+    m.historyGoTo(2);
+    EXPECT_EQ(m.tile.at(1, 1), kBlack);
+    EXPECT_FALSE(m.historyLabels(done).empty());
+    EXPECT_EQ(done, 2);
+}
+
+TEST(UiHistory, MapLabels) {
+    Model m = tileModel();
+    m.switchMode(DOC_MAP);
+    m.actionName = "Кисть";
+    m.pushUndo();
+    m.actionName = "Объект";
+    m.pushUndo();
+    m.doUndo();
+    int done = 0;
+    EXPECT_EQ(m.historyLabels(done), (std::vector<std::string>{"Кисть", "Объект"}));
+    EXPECT_EQ(done, 1);
+    m.doRedo();
+    EXPECT_FALSE(m.historyLabels(done).empty());
+    EXPECT_EQ(done, 2);
+}
+
 }  // namespace
 }  // namespace tjtm

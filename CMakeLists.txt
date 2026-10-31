@@ -110,6 +110,7 @@ if(TJTM_BUILD_APP)
         src/app/map_ui.cpp
         src/app/tips.cpp
         src/app/color_ui.cpp
+        src/app/dock.cpp
         src/app/keys.cpp
         src/app/menu.cpp
         src/app/palette_ui.cpp

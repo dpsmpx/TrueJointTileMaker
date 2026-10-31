@@ -264,6 +264,7 @@ void Editor::appStep() {
     // Значки перечитываются здесь, а не там, где их правят: правка приходит
     // из экрана наборов, а он в это время сам занимает окно.
     ensureIcons();
+    applyDock();
     applyLayout();
     stepPlayback();
     stepArrowPan();
@@ -317,18 +318,20 @@ void Editor::appStep() {
         frameClick_ = false;
         const bool aboveCanvas = frameClickY_ < gLayout.top;
         const bool belowAll = frameClickY_ >= gLayout.h - gLayout.bottom;
-        if (frameClickX_ < m.W && aboveCanvas) {
+        if (frameClickX_ < panelX() && aboveCanvas) {
             if (frameClickY_ < MENU_BAR_H) {
                 handleMenuBarClick();
             } else {
                 handleOptionsBarClick();
             }
-        } else if (frameClickX_ < m.W && belowAll) {
+        } else if (frameClickX_ < panelX() && belowAll) {
             // Строка состояния — только сведения.
         } else if (frameClickX_ < m.W && timelineShown() && frameClickY_ >= m.H) {
             handleTimelineClick();
         } else if (frameClickX_ < m.W && (frameClickX_ < m.X0 || frameClickY_ < m.Y0)) {
             handleRulerPress();
+        } else if (frameClickX_ >= m.W && frameClickX_ < panelX()) {
+            handleDockClick();
         } else if (frameClickX_ < m.W) {
             // Рисовать по бегущим кадрам нельзя: щелчок по холсту
             // останавливает проигрывание.

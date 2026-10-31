@@ -57,6 +57,8 @@ struct WindowLayout {
     /// (строка состояния) — в новых темах (C2); у «Классики» их нет.
     int top = 0;
     int bottom = 0;
+    /// Боковая панель между холстом и панелью инструментов (C3); 0 — нет.
+    int dock = 0;
 };
 inline WindowLayout gLayout;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 /// Левый край панели.
@@ -206,6 +208,8 @@ struct TileSnapshot {
     /// Активная ячейка векторного слоя и тайлкарты (этап 6).
     std::vector<VecShape> shapes;
     Grid<int> tileMap;
+    /// Что за правка шла после снимка — строка панели истории (C3, UX-25).
+    std::string label;
 };
 
 /// Какая команда идёт по всем ячейкам (forEachCel): цветовая меняет
@@ -439,6 +443,11 @@ public:
 
     std::vector<TileSnapshot> undoStack, redoStack;
     std::vector<MapDoc> mapUndo, mapRedo;
+    /// Названия шагов карты — рядом со снимками, в том же порядке.
+    std::vector<std::string> mapUndoLabels, mapRedoLabels;
+    /// Название следующей правки: его ставит тот, кто её начинает
+    /// (инструмент, команда), pushUndo кладёт его в снимок.
+    std::string actionName = "Правка";
 
     // --- этап 6: активная ячейка векторного слоя и тайлкарты ---
     /// Фигуры активной ячейки векторного слоя; tile — их растр.
@@ -551,6 +560,11 @@ public:
     void pushUndo();
     void doUndo();
     void doRedo();
+    /// Шаги для панели истории: сделанные — старшие первыми, затем
+    /// отменённые — ближайший к повтору первым; done — сколько сделано.
+    [[nodiscard]] std::vector<std::string> historyLabels(int& done) const;
+    /// Отменить или повторить до состояния после done шагов.
+    void historyGoTo(int done);
 
     // --- документ ---
     void setTile(Grid<Color> newTile, const std::string& fileName);

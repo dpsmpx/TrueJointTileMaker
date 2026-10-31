@@ -61,6 +61,8 @@ struct Config {
     int uiScale = 0;
     /// Сетка точек сама с этого масштаба (во сколько раз); 0 — только по G.
     int gridAutoZoom = 12;
+    /// Боковая панель со слоями и историей (C3), когда окно достаточно широко.
+    bool dock = true;
     /// Недавние файлы, последний — первым; не больше kRecentMax (UX-24).
     std::vector<std::string> recentFiles;
     static constexpr std::size_t kRecentMax = 10;

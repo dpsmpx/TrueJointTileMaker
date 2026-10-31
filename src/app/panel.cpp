@@ -385,6 +385,7 @@ void Editor::repaint() {
     drawCanvas();
     drawTimeline();
     drawPanel();
+    drawDock();
     drawMenuBar();
     drawOptionsBar();
     drawStatusBar();

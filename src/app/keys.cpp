@@ -138,6 +138,8 @@ void Editor::handleClassicKey(int key) {
 
 void Editor::runCommand(Cmd c, int arg) {
     const bool tile = m.docMode == DOC_TILE;
+    // Название шага истории (C3) — по команде.
+    m.actionName = commandTitle(c, arg, tile);
     const int nf = m.doc.frameCount();
     const int nl = m.doc.layerCount();
     const int step = std::max(1, m.pixelSize * 4);
@@ -342,6 +344,11 @@ void Editor::runCommand(Cmd c, int arg) {
         case Cmd::LayersScreen: showAnimationScreen(); break;
         case Cmd::GameSet: showGameSetScreen(); break;
         case Cmd::MapProperties: showMapPropertiesScreen(); break;
+        case Cmd::Dock:
+            cfg.dock = !cfg.dock;
+            saveConfig();
+            applyDock();
+            break;
     }
 }
 
