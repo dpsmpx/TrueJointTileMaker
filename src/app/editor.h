@@ -694,6 +694,8 @@ private:
     std::vector<int> timelineRows() const;
     void drawLayerKindMark(int x, int cy, const Layer& layer);
     void handleTimelineClick();
+    /// Протяжка ячейки или номера кадра по ленте — порядок кадров (C3).
+    void dragFrame();
     void timelineWheel(int wheel);
     void togglePlayback();
     void stopPlayback();

@@ -1,14 +1,9 @@
 key Escape
 sleep 0.2
-window 1200 720
+window 1100 700
 sleep 0.3
-drag 300 300 400 350
-key g
-drag 200 200 250 260
-move 1150 700
+key j
 sleep 0.2
-shot a_dock
-key ctrl+z
-move 1150 700
+move 1050 650
 sleep 0.2
-shot b_undo
+shot a_tl

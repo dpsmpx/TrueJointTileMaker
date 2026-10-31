@@ -20,7 +20,10 @@ using namespace theme;
 
 namespace {
 
-constexpr int TL_H = 150;
+/// Высота ленты: в новых темах её тянут за верхний край (C3, UX-41), у
+/// 1.6 она отнимала у холста ровно 150 точек.
+int gTlH = 150;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+constexpr int TL_H_MIN = 96;
 constexpr int TL_BAR_H = 30;
 constexpr int TL_TAG_H = 16;
 constexpr int TL_HEAD_H = 18;
@@ -40,7 +43,7 @@ int canvasH() {
     return gLayout.h - gLayout.bottom;
 }
 int tlY0() {
-    return canvasH() - TL_H;
+    return canvasH() - gTlH;
 }
 int tlTagY() {
     return tlY0() + TL_BAR_H;
@@ -268,6 +271,21 @@ void Editor::drawTimeline() {
             if (layer.kind == LK_GROUP) {
                 // У группы своих ячеек нет: полоса через кадры.
                 fb_.fillRect(x, cy - 1, x + TL_CELL_W, cy + 1, cBorder);
+            } else if (has && active.modern) {
+                // Миниатюра ячейки вместо точки (UX-41): видно, что в кадре,
+                // не открывая его. Пропорции картинки сохраняются.
+                const Grid<Color>* img = isActive ? &m.tile : &d.cel(l, f)->img;
+                if (!img->empty()) {
+                    const int bw = TL_CELL_W - 6;
+                    const int bh = TL_ROW_H - 4;
+                    const int tw = std::max(1, std::min(bw, img->w * bh / std::max(1, img->h)));
+                    const int th = std::max(1, std::min(bh, img->h * bw / std::max(1, img->w)));
+                    const int tx = x + 3 + (bw - tw) / 2;
+                    const int ty = y + 2 + (bh - th) / 2;
+                    fb_.fillRect(tx, ty, tx + tw, ty + th, active.checkA);
+                    fb_.drawImage(*img, tx, ty, tw, th);
+                    fb_.frameRect(tx - 1, ty - 1, tx + tw + 1, ty + th + 1, cBorder);
+                }
             } else if (has) {
                 fb_.fillRoundRect(cx - 4, cy - 4, cx + 5, cy + 5, 9, 9,
                                   layer.visible ? cText : cTextDim);
@@ -368,6 +386,21 @@ void Editor::handleTimelineClick() {
     const bool frameOk = frameAt >= 0 && frameAt < nf;
     m.needRepaint = true;
 
+    // Верхний край ленты тянут — высота ленты (UX-41).
+    if (!classicUi_ && y < tbY() && !right) {
+        while (mousePressed() && !quitNow_) {
+            const int h = std::clamp(canvasH() - mouseY(), TL_H_MIN,
+                                     std::max(TL_H_MIN, (canvasH() - gLayout.top) * 2 / 3));
+            if (h != gTlH) {
+                gTlH = h;
+                applyLayout();
+                repaint();
+            }
+            idle();
+        }
+        return;
+    }
+
     if (y < tlTagY()) {
         for (int b = 0; b < TB_COUNT; ++b) {
             if (x < tbX(b) || x >= tbX(b) + kTbW[b] || y < tbY() || y >= tbY() + TB_H) continue;
@@ -419,7 +452,11 @@ void Editor::handleTimelineClick() {
         if (!frameOk) return;
         stopPlayback();
         m.setActiveCel(m.activeLayer, frameAt);
-        if (right) editFrameDuration(frameAt);
+        if (right) {
+            editFrameDuration(frameAt);
+        } else {
+            dragFrame();
+        }
         return;
     }
 
@@ -454,7 +491,26 @@ void Editor::handleTimelineClick() {
     }
     if (frameOk) {
         m.setActiveCel(l, frameAt);
-        if (right) editFrameDuration(frameAt);
+        if (right) {
+            editFrameDuration(frameAt);
+        } else {
+            dragFrame();
+        }
+    }
+}
+
+void Editor::dragFrame() {
+    // Протяжка вдоль ленты — порядок кадров (UX-41): кадр идёт за мышью
+    // шаг за шагом; у 1.6 — только кнопками «Левее» и «Правее» на экране.
+    if (classicUi_) return;
+    m.actionName = "Порядок кадров";
+    while (mousePressed() && !quitNow_) {
+        const int nf = m.doc.frameCount();
+        const int want =
+            std::clamp(tlFirstFrame_ + (mouseX() - TL_NAME_W) / TL_CELL_W, 0, std::max(0, nf - 1));
+        const int dir = want > m.activeFrame ? 1 : (want < m.activeFrame ? -1 : 0);
+        if (dir != 0 && m.moveFrame(dir)) repaint();
+        idle();
     }
 }
 
