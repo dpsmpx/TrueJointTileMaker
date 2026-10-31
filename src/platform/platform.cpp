@@ -227,6 +227,9 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
         case SDL_EVENT_TEXT_INPUT:
             if (textInputOn_ && e.text.text != nullptr) in_.text += e.text.text;
             break;
+        case SDL_EVENT_DROP_FILE:
+            if (e.drop.data != nullptr) in_.drops.emplace_back(e.drop.data);
+            break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             // Отпускание после ухода фокуса придёт уже не нам: клавиши
             // осталась бы «нажатыми» навсегда.
@@ -306,6 +309,10 @@ void Platform::scriptStep() {
             case ScriptEvent::TEXT:
                 e.type = SDL_EVENT_TEXT_INPUT;
                 e.text.text = se.text.c_str();
+                break;
+            case ScriptEvent::DROP:
+                e.type = SDL_EVENT_DROP_FILE;
+                e.drop.data = se.text.c_str();
                 break;
         }
         handle(e, false);
@@ -413,6 +420,39 @@ std::string Platform::saveFileDialog(const std::string& title,
 std::string Platform::openFolderDialog(const std::string& title, const std::string& folder) {
     return runDialog(SDL_FILEDIALOG_OPENFOLDER, title, {},
                      dirExists(folder) ? folder : std::string());
+}
+
+namespace {
+
+const void* SDLCALL clipboardImageData(void* userdata, const char* mime, std::size_t* size) {
+    const auto* png = static_cast<const std::vector<std::uint8_t>*>(userdata);
+    if (mime == nullptr || std::string_view(mime) != "image/png" || png->empty()) {
+        *size = 0;
+        return nullptr;
+    }
+    *size = png->size();
+    return png->data();
+}
+
+}  // namespace
+
+void Platform::setClipboardImage(std::vector<std::uint8_t> png) {
+    clipPng_ = std::move(png);
+    const char* mimes[] = {"image/png"};
+    SDL_SetClipboardData(clipboardImageData, nullptr, &clipPng_, mimes, 1);
+}
+
+std::vector<std::uint8_t> Platform::clipboardImage() const {
+    std::vector<std::uint8_t> out;
+    if (!SDL_HasClipboardData("image/png")) return out;
+    std::size_t n = 0;
+    void* p = SDL_GetClipboardData("image/png", &n);
+    if (p != nullptr) {
+        const auto* b = static_cast<const std::uint8_t*>(p);
+        out.assign(b, b + n);
+        SDL_free(p);
+    }
+    return out;
 }
 
 std::string Platform::clipboardText() const {

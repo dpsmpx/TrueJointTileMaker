@@ -142,6 +142,8 @@ struct Input {
     std::deque<KeyPress> presses;
     std::string text;
     int wheel = 0;
+    /// Файлы, брошенные в окно.
+    std::vector<std::string> drops;
     /// Целые шаги прокрутки вбок: +1 вправо.
     int wheelX = 0;
     /// Копить дробные доли щелчка (UX-12). У оригинала каждое событие
@@ -198,6 +200,13 @@ public:
     /// Выбор папки системным диалогом; folder — с какой начать.
     std::string openFolderDialog(const std::string& title, const std::string& folder);
 
+    /// Картинка в системный буфер обмена — PNG (UX-14); и обратно: пусто,
+    /// если там не картинка.
+    void setClipboardImage(std::vector<std::uint8_t> png);
+    [[nodiscard]] std::vector<std::uint8_t> clipboardImage() const;
+    /// PNG, который положили мы: своё выделение вставляется из внутреннего
+    /// буфера, с номерами палитры.
+    [[nodiscard]] const std::vector<std::uint8_t>& ownClipboardImage() const { return clipPng_; }
     std::string clipboardText() const;
     void setClipboardText(const std::string& s);
 
@@ -237,6 +246,7 @@ private:
     Input in_;
     bool textInputOn_ = false;
     std::array<SDL_Cursor*, CURSOR_COUNT> cursors_{};
+    std::vector<std::uint8_t> clipPng_;
     Cursor cursor_ = CURSOR_ARROW;
     /// Нажатые кнопки мыши битами: «нажата» — пока нажата хоть одна.
     unsigned buttons_ = 0;

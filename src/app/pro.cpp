@@ -410,9 +410,17 @@ bool Editor::handleProCtrlKey(int key) {
             }
             return true;
         case KEY_I: m.invertSelection(); return true;
-        case KEY_C: m.copySelection(); return true;
-        case KEY_X: m.cutSelection(); return true;
-        case KEY_V: pasteBufferHere(); return true;
+        case KEY_C:
+            if (m.copySelection()) exportBufferToClipboard();
+            return true;
+        case KEY_X:
+            if (m.cutSelection()) exportBufferToClipboard();
+            return true;
+        case KEY_V:
+            // Картинка, скопированная в другой программе, вставляется так же.
+            importClipboardImage();
+            pasteBufferHere();
+            return true;
         default: return false;
     }
 }

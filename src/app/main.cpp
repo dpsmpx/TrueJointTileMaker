@@ -225,6 +225,11 @@ void Editor::appStep() {
     beginFrameInput();
     editorTipFrame();
     if (!classicUi_ && pf_.milliseconds() - autosaveMs_ >= kAutosaveMs) autosave();
+    if (!pf_.input().drops.empty()) {
+        const std::vector<std::string> drops = std::move(pf_.input().drops);
+        pf_.input().drops.clear();
+        if (!classicUi_) openDropped(drops.front(), isKeyPressed(KEY_SHIFT));
+    }
     // Уведомление отслужило — стереть его полной перерисовкой.
     if (!toastText_.empty() && pf_.milliseconds() >= toastUntil_) {
         toastText_.clear();

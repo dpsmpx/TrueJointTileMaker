@@ -851,6 +851,40 @@ void Editor::offerRestore() {
     }
 }
 
+void Editor::openDropped(const std::string& raw, bool asReference) {
+    const std::string path = resolvePath(raw);
+    if (!fileExists(path)) {
+        errorOpen("Файл не найден", path);
+        return;
+    }
+    if (asReference && m.docMode == DOC_TILE && pathExtLower(path) != ".map") {
+        Grid<Color> img;
+        if (readImageGrid(path, img, false)) {
+            m.addReferenceLayer(img, pathStem(path));
+            notify("Слой-образец", "Добавлен из «" + fileNameOnly(path) + "»");
+        }
+        return;
+    }
+    openAnyFile(path);
+}
+
+void Editor::exportBufferToClipboard() {
+    if (classicUi_ || m.docMode != DOC_TILE || m.buffer.empty()) return;
+    pf_.setClipboardImage(pngEncode(m.buffer, 1));
+}
+
+bool Editor::importClipboardImage() {
+    if (classicUi_ || m.docMode != DOC_TILE) return false;
+    const std::vector<std::uint8_t> png = pf_.clipboardImage();
+    // Своё выделение — из внутреннего буфера: оно уже там.
+    if (png.empty() || png == pf_.ownClipboardImage()) return false;
+    Grid<Color> img;
+    std::string err;
+    if (!pngDecode(png, img, err)) return false;
+    m.buffer = std::move(img);
+    return true;
+}
+
 bool Editor::openRecentAsk() {
     std::vector<std::string> items;
     for (const std::string& f : cfg.recentFiles)
@@ -862,6 +896,10 @@ bool Editor::openRecentAsk() {
         errorOpen("Файл не найден", path);
         return false;
     }
+    return openAnyFile(path);
+}
+
+bool Editor::openAnyFile(const std::string& path) {
     const bool isMap = pathExtLower(path) == ".map";
     // Вопрос — о том документе, который откроется на место текущего.
     const int was = m.docMode;

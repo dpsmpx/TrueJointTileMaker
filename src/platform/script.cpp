@@ -268,6 +268,13 @@ bool Script::parse(const std::string& text, std::string& error) {
             e.kind = ScriptEvent::BUTTON_UP;
             push(e);
             pause(kAfterInput);
+        } else if (cmd == "drop") {
+            if (a.empty()) return fail("drop ПУТЬ");
+            ScriptEvent e;
+            e.kind = ScriptEvent::DROP;
+            e.text = a[0];
+            push(e);
+            pause(kAfterInput);
         } else if (cmd == "type") {
             const std::size_t p = line.find("type");
             std::string t = line.substr(p + 4);

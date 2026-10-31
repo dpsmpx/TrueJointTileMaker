@@ -62,3 +62,10 @@ sleep 0.4
 shot 09_error
 key Escape
 sleep 0.2
+# B9: файл, брошенный в окно, открывается — с вопросом о несохранённом.
+drop Картинки/debug.png
+sleep 0.3
+click 390 312               # «Не сохранять»
+move 700 558
+sleep 0.3
+shot 10_dropped
