@@ -138,6 +138,7 @@ bool Editor::appInit(int argc, char** argv) {
     // Интерфейс 1.7 и дальше (docs/roadmap.md, «Интерфейс — план»).
     classicUi_ = classic;
     m.keepSelectionPerDoc = !classic;
+    pf_.input().fineWheel = !classic;
     applyTheme();
     m.syncHSVFromColor();
     m.setDefaultPalette();
@@ -211,6 +212,18 @@ void Editor::appStep() {
     // Колесо могло провернуться на несколько щелчков между кадрами. Над
     // длинной палитрой оно её листает, а не меняет масштаб.
     int wheel = takeWheel();
+    // Прокрутка вбок и Shift с роликом двигают холст по горизонтали (UX-12):
+    // у оригинала ролик только менял масштаб.
+    int wheelX = takeWheelX();
+    if (!classicUi_ && wheel != 0 && isKeyPressed(KEY_SHIFT) && overCanvas(mouseX(), mouseY())) {
+        wheelX -= wheel;
+        wheel = 0;
+    }
+    if (wheelX != 0 && !classicUi_) {
+        m.viewX -= wheelX * std::max(1, m.pixelSize * 4);
+        m.clampView();
+        m.needRepaint = true;
+    }
     if (wheel != 0 && timelineShown() && mouseX() < m.W && mouseY() >= m.H) {
         timelineWheel(wheel);
         wheel = 0;

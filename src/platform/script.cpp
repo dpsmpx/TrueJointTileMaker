@@ -200,6 +200,15 @@ bool Script::parse(const std::string& text, std::string& error) {
             for (const std::string& k : a) {
                 if (!hold(k, cmd == "keydown", error)) return fail(error);
             }
+        } else if (cmd == "wheel") {
+            // Прокрутка трекпада: дробные доли щелчка там, где курсор.
+            if (a.empty()) return fail("wheel DY [DX]");
+            ScriptEvent e;
+            e.kind = ScriptEvent::WHEEL;
+            e.wheelY = static_cast<float>(std::atof(a[0].c_str()));
+            e.wheelX = a.size() > 1 ? static_cast<float>(std::atof(a[1].c_str())) : 0.0F;
+            push(e);
+            pause(0.05);
         } else if (cmd == "move") {
             if (a.size() < 2) return fail("move X Y");
             ScriptEvent e;
@@ -217,10 +226,14 @@ bool Script::parse(const std::string& text, std::string& error) {
             e.y = num(1, 0);
             push(e);
             pause(0.05);
-            if (btn == 4 || btn == 5) {
-                // Ролик у xdotool — кнопки 4 и 5.
+            if (btn >= 4 && btn <= 7) {
+                // Ролик у xdotool — кнопки 4 и 5, прокрутка вбок — 6 и 7.
                 e.kind = ScriptEvent::WHEEL;
-                e.wheel = btn == 4 ? 1 : -1;
+                if (btn <= 5) {
+                    e.wheelY = btn == 4 ? 1.0F : -1.0F;
+                } else {
+                    e.wheelX = btn == 6 ? -1.0F : 1.0F;
+                }
                 push(e);
             } else {
                 e.button = btn;

@@ -141,6 +141,13 @@ struct Input {
     std::deque<KeyPress> presses;
     std::string text;
     int wheel = 0;
+    /// Целые шаги прокрутки вбок: +1 вправо.
+    int wheelX = 0;
+    /// Копить дробные доли щелчка (UX-12). У оригинала каждое событие
+    /// ролика было целым щелчком, а трекпад шлёт много мелких: лёгкое
+    /// движение двумя пальцами удваивало масштаб несколько раз подряд.
+    bool fineWheel = false;
+    float wheelAccY = 0, wheelAccX = 0;
     bool quitRequested = false;
 };
 

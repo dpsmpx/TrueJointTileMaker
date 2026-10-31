@@ -88,6 +88,8 @@ private:
     void dropInput();
     int takeKey();
     int takeWheel();
+    /// Целые шаги прокрутки вбок: +1 вправо.
+    int takeWheelX();
     void waitMouseRelease();
     [[nodiscard]] bool isKeyPressed(int key) const { return pf_.keyHeld(key); }
     static bool isMiddle(int b) { return b != MB_LEFT && b != MB_RIGHT; }

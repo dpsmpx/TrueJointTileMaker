@@ -61,6 +61,13 @@ int Editor::takeWheel() {
     return w;
 }
 
+int Editor::takeWheelX() {
+    Input& in = pf_.input();
+    const int w = in.wheelX;
+    in.wheelX = 0;
+    return w;
+}
+
 void Editor::waitMouseRelease() {
     while (mousePressed() && !quitNow_)
         idle();
