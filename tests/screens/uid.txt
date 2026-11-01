@@ -29,3 +29,38 @@ shot 03_help_context
 key Escape
 key Escape
 sleep 0.3
+# D3: правка клавиш. Ctrl+N, отданное «Открыть», у «Новый документ»
+# снимается — свои сочетания отмечены точкой и акцентом.
+key ctrl+k
+sleep 0.2
+type Настроить клавиши
+sleep 0.2
+key Return
+sleep 0.4
+click 633 160                # «Задать» у «Открыть»
+sleep 0.2
+key ctrl+n
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 04_keys_own
+# Набор «как в Aseprite»: свои сочетания сбросятся — спрашивает.
+click 307 63
+sleep 0.3
+shot 05_keys_ask
+key Return
+sleep 0.3
+click 685 529                # «Готово»
+sleep 0.4
+# Шпаргалка — по новой таблице; E — ластик, как в Aseprite.
+sleep 3                      # уведомление о снятом сочетании догорает
+key F1
+sleep 0.4
+shot 06_cheat_aseprite
+key Escape
+sleep 0.2
+key e
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 07_tool_by_letter

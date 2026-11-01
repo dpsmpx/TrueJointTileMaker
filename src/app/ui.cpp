@@ -87,7 +87,7 @@ void Editor::focusFrame(bool screen) {
     if (frameClick_) focusShown_ = false;
     // Набираемое поле разбирает Tab само: принимает набранное и передаёт
     // фокус дальше.
-    if (numEdit_ != 0 || textEditId_ != 0) return;
+    if (numEdit_ != 0 || textEditId_ != 0 || keyCapture_) return;
     Input& in = pf_.input();
     std::deque<KeyPress> rest;
     for (const KeyPress& k : in.keys) {

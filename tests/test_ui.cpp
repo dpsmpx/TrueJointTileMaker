@@ -656,4 +656,155 @@ TEST(UiMap, KindTitlesAndProblemCells) {
 }
 
 }  // namespace
+
+// --- D3: правка клавиш и набор «как в Aseprite» ------------------------------
+
+namespace {
+
+/// Таблица клавиш — одна на процесс: тест возвращает стандартную.
+struct KeymapGuard {
+    KeymapGuard() = default;
+    KeymapGuard(const KeymapGuard&) = delete;
+    KeymapGuard& operator=(const KeymapGuard&) = delete;
+    ~KeymapGuard() { applyKeymap(kKeysStandard, {}); }
+};
+
+void expectNoConflicts() {
+    const auto all = shortcuts();
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        for (std::size_t j = i + 1; j < all.size(); ++j) {
+            const Shortcut& a = all[i];
+            const Shortcut& b = all[j];
+            if (a.key == 0) continue;
+            const bool overlap =
+                a.where == KeyWhere::Both || b.where == KeyWhere::Both || a.where == b.where;
+            EXPECT_FALSE(a.key == b.key && a.mods == b.mods && overlap)
+                << keyName(a.key, a.mods) << " — дважды";
+        }
+    }
+}
+
+}  // namespace
+
+TEST(UiKeymap, KeyNamesRoundTrip) {
+    for (const Shortcut& s : defaultShortcuts()) {
+        KeyCombo k;
+        ASSERT_TRUE(parseKeyName(keyName(s.key, s.mods), k)) << keyName(s.key, s.mods);
+        EXPECT_EQ(k, (KeyCombo{s.key, s.mods})) << keyName(s.key, s.mods);
+    }
+    // Как пишут руками.
+    KeyCombo k;
+    ASSERT_TRUE(parseKeyName("ctrl+space", k));
+    EXPECT_EQ(k, (KeyCombo{KEY_SPACE, MOD_CTRL}));
+    ASSERT_TRUE(parseKeyName("Ctrl+-", k));
+    EXPECT_EQ(k, (KeyCombo{KEY_MINUS, MOD_CTRL}));
+    ASSERT_TRUE(parseKeyName("shift+u", k));
+    EXPECT_EQ(k, (KeyCombo{KEY_U, MOD_SHIFT}));
+    EXPECT_FALSE(parseKeyName("Ctrl+Что-то", k));
+    EXPECT_EQ(parseKeysText("Ctrl+Y | Ctrl+Shift+Z | мусор").size(), 2u);
+    EXPECT_EQ(keysText({}), "нет");
+}
+
+TEST(UiKeymap, ActionsHaveIdsAndTitles) {
+    std::vector<std::string> ids;
+    for (const KeyAction& a : keyActions()) {
+        const std::string id = actionId(a);
+        EXPECT_FALSE(a.title.empty()) << id;
+        EXPECT_EQ(findAction(id), &a) << id;
+        EXPECT_EQ(std::count(ids.begin(), ids.end(), id), 0) << id;
+        ids.push_back(id);
+    }
+    EXPECT_EQ(findAction("tool.3")->arg, 3);
+    EXPECT_EQ(findAction("SAVE")->cmd, Cmd::Save);
+    EXPECT_EQ(findAction("Нет такого"), nullptr);
+    // Команды меню без клавиш тоже можно назначить.
+    ASSERT_NE(findAction("Settings"), nullptr);
+    EXPECT_EQ(findAction("Settings")->group, "Файл");
+}
+
+TEST(UiKeymap, AsepritePreset) {
+    const KeymapGuard guard;
+    applyKeymap(kKeysAseprite, {});
+    expectNoConflicts();
+    const auto tool = [](int key, int mods) {
+        const Shortcut* s = findShortcut(key, mods, true);
+        return s != nullptr && s->cmd == Cmd::Tool ? s->arg : -1;
+    };
+    EXPECT_EQ(tool(KEY_B, 0), 0);  // карандаш
+    EXPECT_EQ(tool(KEY_E, 0), 1);  // ластик
+    EXPECT_EQ(tool(KEY_G, 0), 2);  // заливка
+    EXPECT_EQ(tool(KEY_I, 0), 3);  // пипетка
+    EXPECT_EQ(tool(KEY_M, 0), 8);  // выделение
+    EXPECT_EQ(findShortcut(KEY_1, 0, true)->cmd, Cmd::Zoom100);
+    EXPECT_EQ(findShortcut(KEY_PLUS, 0, true)->cmd, Cmd::BrushBigger);
+    EXPECT_EQ(findShortcut(KEY_TAB, 0, true)->cmd, Cmd::Timeline);
+    EXPECT_EQ(findShortcut(KEY_TAB, MOD_CTRL, true)->cmd, Cmd::SwitchMode);
+    EXPECT_EQ(findShortcut(KEY_SPACE, MOD_CTRL, true)->cmd, Cmd::CommandSearch);
+    EXPECT_EQ(findShortcut(KEY_K, MOD_CTRL, true)->cmd, Cmd::Settings);
+    // Занятое буквой осталось без клавиши, но строкой — её можно задать.
+    EXPECT_TRUE(keysIn(shortcuts(), Cmd::Seamless, 0).empty());
+    EXPECT_EQ(commandKeys(Cmd::Seamless, 0, true), "");
+    // Подпись строки «1 … 9» снята: клавиши — как есть.
+    const auto all = shortcuts();
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        if (all[i].cmd == Cmd::Tool && all[i].text != nullptr) {
+            EXPECT_EQ(shortcutKeys(all, i), "B, E, G, I, L, U, Shift+U, 8, M");
+        }
+    }
+    // Стандартный набор — снова таблица 1.9.
+    applyKeymap(kKeysStandard, {});
+    ASSERT_EQ(shortcuts().size(), defaultShortcuts().size());
+    for (std::size_t i = 0; i < shortcuts().size(); ++i) {
+        EXPECT_EQ(shortcuts()[i].key, defaultShortcuts()[i].key);
+        EXPECT_EQ(shortcuts()[i].cmd, defaultShortcuts()[i].cmd);
+    }
+}
+
+TEST(UiKeymap, CustomKeysStealAndRoundTrip) {
+    const KeymapGuard guard;
+    applyKeymap(kKeysStandard, {{"Save", "F2"}});
+    EXPECT_EQ(findShortcut(KEY_F2, 0, true)->cmd, Cmd::Save);
+    EXPECT_EQ(findShortcut(KEY_S, MOD_CTRL, true), nullptr);
+    ASSERT_EQ(keymapDiff(kKeysStandard).size(), 1u);
+    EXPECT_EQ(keymapDiff(kKeysStandard)[0], (std::pair<std::string, std::string>{"Save", "F2"}));
+
+    // Сочетание другого действия у того снимается.
+    const auto robbed = setActionKeys(*findAction("Open"), {{KEY_N, MOD_CTRL}});
+    ASSERT_EQ(robbed.size(), 1u);
+    EXPECT_EQ(robbed[0]->cmd, Cmd::New);
+    EXPECT_EQ(findShortcut(KEY_N, MOD_CTRL, true)->cmd, Cmd::Open);
+    EXPECT_TRUE(keysIn(shortcuts(), Cmd::New, 0).empty());
+    expectNoConflicts();
+
+    // Записанное и прочитанное снова — та же таблица.
+    const auto diff = keymapDiff(kKeysStandard);
+    EXPECT_EQ(diff.size(), 3u);
+    const std::vector<Shortcut> before(shortcuts().begin(), shortcuts().end());
+    applyKeymap(kKeysStandard, {});
+    applyKeymap(kKeysStandard, diff);
+    ASSERT_EQ(shortcuts().size(), before.size());
+    for (std::size_t i = 0; i < before.size(); ++i) {
+        EXPECT_EQ(shortcuts()[i].key, before[i].key) << i;
+        EXPECT_EQ(shortcuts()[i].mods, before[i].mods) << i;
+        EXPECT_EQ(shortcuts()[i].cmd, before[i].cmd) << i;
+    }
+    // Команда меню без клавиши получает строку в своём разделе.
+    setActionKeys(*findAction("Settings"), {{KEY_K, MOD_CTRL | MOD_SHIFT}});
+    EXPECT_EQ(findShortcut(KEY_K, MOD_CTRL | MOD_SHIFT, true)->cmd, Cmd::Settings);
+    EXPECT_EQ(commandKeys(Cmd::Settings, 0, true), "Ctrl+Shift+K");
+}
+
+TEST(UiKeymap, ConfigKeys) {
+    Config c;
+    c.applyLines({"KeyPreset = как в Aseprite", "Key.Save = F2 | Ctrl+S", "key.tool.0 = нет"});
+    EXPECT_EQ(c.keyPreset, kKeysAseprite);
+    ASSERT_EQ(c.keys.size(), 2u);
+    EXPECT_EQ(c.keys[1].first, "tool.0");
+    const std::string text = c.serialize();
+    EXPECT_NE(text.find("KeyPreset = как в Aseprite"), std::string::npos);
+    EXPECT_NE(text.find("Key.Save = F2 | Ctrl+S"), std::string::npos);
+    // По умолчанию — ни строки: файл как у оригинала.
+    EXPECT_EQ(Config{}.serialize().find("Key"), std::string::npos);
+}
+
 }  // namespace tjtm

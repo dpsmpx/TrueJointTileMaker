@@ -342,6 +342,12 @@ private:
     /// тексте); пусто — с начала.
     void showHelpScreen(const std::string& section = "");
     void showSettingsScreen();
+    /// Правка клавиш и набор «как в Aseprite» (D3).
+    void showKeysScreen();
+    /// Название действия на экране клавиш; у цифр — инструменты тайла и карты.
+    std::string keyActionTitle(const KeyAction& a) const;
+    /// Экран клавиш ждёт сочетание: Tab и стрелки — ему, а не фокусу.
+    bool keyCapture_ = false;
     void showMainMenu();
     bool showTilesetScreen();
 

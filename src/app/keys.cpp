@@ -356,6 +356,7 @@ void Editor::runCommand(Cmd c, int arg) {
         case Cmd::SwitchMode: m.switchMode(tile ? DOC_MAP : DOC_TILE); break;
         case Cmd::Recent: openRecentAsk(); break;
         case Cmd::Settings: showSettingsScreen(); break;
+        case Cmd::KeysScreen: showKeysScreen(); break;
         case Cmd::Exit: commandExit(); break;
         case Cmd::ColorOps: showColorOpsScreen(); break;
         case Cmd::LayersScreen: showAnimationScreen(); break;
@@ -602,6 +603,7 @@ void Editor::showCheatsheet() {
             if (s.where != KeyWhere::Both && (s.where == KeyWhere::Tile) != tile) continue;
             Row r;
             r.keys = shortcutKeys(all, i);
+            if (r.keys.empty()) continue;  // клавиши сняты на экране клавиш
             if (!want.empty() &&
                 netToLower(std::string(s.text) + " " + r.keys).find(want) == std::string::npos)
                 continue;
@@ -702,6 +704,13 @@ void Editor::showCheatsheet() {
         if (rows.empty() && foot.empty()) textOut(kX0 + 14, top + 6, "Ничего не нашлось", cTextDim);
         int fx = kX0 + 14;
         const int fy = kY1 - 28;
+        // Промежутки сжимаются, когда клавиши длинные (набор «как в
+        // Aseprite»: Ctrl+Tab, Ctrl+Пробел).
+        int footW = 0;
+        for (const Foot& f : foot)
+            footW += textWidth(f.text) + 6 + textWidth(f.keys) + 12;
+        const int gaps = std::max(1, static_cast<int>(foot.size()) - 1);
+        const int gap = std::clamp((kX1 - kX0 - 28 - footW) / gaps, 4, 16);
         for (const Foot& f : foot) {
             textOut(fx, fy, f.text, cTextDim);
             fx += textWidth(f.text) + 6;
@@ -709,14 +718,19 @@ void Editor::showCheatsheet() {
             fb_.fillRoundRect(fx, fy - 1, fx + kw, fy + lh + 2, 8, 8, cFace);
             fb_.strokeRoundRect(fx, fy - 1, fx + kw, fy + lh + 2, 8, 8, cOutline, 1);
             textOut(fx + 6, fy, f.keys, cText);
-            fx += kw + 16;
+            fx += kw + gap;
         }
 
         redraw();
         const int key = takeKey();
-        if (key == KEY_ESC || key == KEY_F1 || key == KEY_ENTER) done = true;
-        if (key == KEY_SLASH && lastKey_.shift) done = true;
-        if (key == KEY_H) {
+        // Закрывают и открывают справку те же клавиши, что в таблице: их
+        // могли переназначить (D3).
+        const int mods = (lastKey_.shift ? MOD_SHIFT : 0) | (lastKey_.ctrl ? MOD_CTRL : 0) |
+                         (lastKey_.alt ? MOD_ALT : 0);
+        const Shortcut* sc = key != 0 ? findShortcut(key, mods, tile) : nullptr;
+        if (key == KEY_ESC || key == KEY_ENTER || (sc != nullptr && sc->cmd == Cmd::Cheatsheet))
+            done = true;
+        if (sc != nullptr && sc->cmd == Cmd::Help) {
             endCard(backdrop);
             showHelpScreen();
             return;

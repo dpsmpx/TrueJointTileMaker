@@ -166,6 +166,8 @@ bool Editor::appInit(int argc, char** argv) {
     m.mapTiles = true;
     // Интерфейс 1.7 и дальше (docs/roadmap.md, «Интерфейс — план»).
     classicUi_ = classic;
+    // Набор и свои клавиши (D3); «Классика» разбирает клавиши по-старому.
+    applyKeymap(cfg.keyPreset, cfg.keys);
     m.keepSelectionPerDoc = !classic;
     m.zoomSteps = !classic;
     m.gridAutoZoom = classic ? 0 : cfg.gridAutoZoom;

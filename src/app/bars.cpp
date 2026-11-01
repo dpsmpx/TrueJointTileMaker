@@ -377,30 +377,29 @@ std::vector<Editor::BarItem> Editor::optionsItems() {
     // показан нигде, оси — полупрозрачной линией.
     struct Mode {
         const char* full;
-        const char* key;
+        const char* abbr;  // коротко, когда клавиши нет или она длинная
         const char* tip;
         bool on;
         Cmd cmd;
     };
     std::vector<Mode> modes;
-    modes.push_back({"Сетка", "G", "Сетка между точками · G", m.gridOn, Cmd::Grid});
+    modes.push_back({"Сетка", "Сет.", "Сетка между точками", m.gridOn, Cmd::Grid});
     if (baseUi()) {
         // В базовом режиме из переключателей — только сетка.
     } else if (tile) {
+        modes.push_back({"Бесшовно", "Бш.", "Бесшовный предпросмотр", m.seamlessOn, Cmd::Seamless});
         modes.push_back(
-            {"Бесшовно", "B", "Бесшовный предпросмотр · B", m.seamlessOn, Cmd::Seamless});
-        modes.push_back(
-            {"Заворот", "W", "Мазок через край — с другой стороны · W", m.wrapOn, Cmd::Wrap});
-        modes.push_back({"Ось ↕", "F", "Вертикальная ось симметрии · F", m.symX, Cmd::SymX});
-        modes.push_back({"Ось ↔", "D", "Горизонтальная ось симметрии · D", m.symY, Cmd::SymY});
-        modes.push_back({"ПП", "Q", "Пиксель-перфект: без углов «Г» в мазке · Q", m.pixelPerfect,
+            {"Заворот", "Зав.", "Мазок через край — с другой стороны", m.wrapOn, Cmd::Wrap});
+        modes.push_back({"Ось ↕", "↕", "Вертикальная ось симметрии", m.symX, Cmd::SymX});
+        modes.push_back({"Ось ↔", "↔", "Горизонтальная ось симметрии", m.symY, Cmd::SymY});
+        modes.push_back({"ПП", "ПП", "Пиксель-перфект: без углов «Г» в мазке", m.pixelPerfect,
                          Cmd::PixelPerfect});
         modes.push_back(
-            {"Смесь", "E", "Смешивание вместо замены цвета · E", !m.brushReplace, Cmd::BlendMode});
-        modes.push_back({"Индекс", "I", "Индексная палитра · I", m.indexedOn, Cmd::Indexed});
+            {"Смесь", "См.", "Смешивание вместо замены цвета", !m.brushReplace, Cmd::BlendMode});
+        modes.push_back({"Индекс", "Инд.", "Индексная палитра", m.indexedOn, Cmd::Indexed});
     } else {
         modes.push_back(
-            {"Картинками", "B", "Карта картинками набора · Shift+B", m.mapTiles, Cmd::MapTiles});
+            {"Картинками", "Карт.", "Карта картинками набора", m.mapTiles, Cmd::MapTiles});
     }
 
     // Раскладка: слева направо и справа налево; не помещается — режимы
@@ -418,8 +417,12 @@ std::vector<Editor::BarItem> Editor::optionsItems() {
         int w = 8;
         for (const Mode& md : modes) {
             BarItem b;
-            b.text = shortLabels ? md.key : md.full;
-            b.tip = md.tip;
+            // Клавиша — из действующей таблицы (D3): её могли переназначить.
+            const std::string keys = commandKeys(md.cmd, 0, tile);
+            std::string key = keys.starts_with("Shift+") ? keys.substr(6) : keys;
+            if (key.empty() || key.find('+') != std::string::npos || key.size() > 3) key = md.abbr;
+            b.text = shortLabels ? key : md.full;
+            b.tip = std::string(md.tip) + (keys.empty() ? "" : " · " + keys);
             b.on = md.on;
             b.act = [this, c = md.cmd] { runCommand(c); };
             w += widthOf(b) + kGap;

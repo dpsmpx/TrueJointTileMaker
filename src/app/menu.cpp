@@ -349,7 +349,8 @@ void Editor::showHelpScreen(const std::string& section) {
             const char* where = s.where == KeyWhere::Tile  ? " (тайл)"
                                 : s.where == KeyWhere::Map ? " (карта)"
                                                            : "";
-            add(shortcutKeys(all, i) + " — " + netToLower(s.text) + where);
+            const std::string keys = shortcutKeys(all, i);
+            if (!keys.empty()) add(keys + " — " + netToLower(s.text) + where);
         }
     }
     add("");
@@ -551,6 +552,9 @@ void Editor::showSettingsScreen() {
             v.windowW = cfg.windowW;
             v.windowH = cfg.windowH;
             v.windowMaximized = cfg.windowMaximized;
+            // Клавиши правит свой экран и сам их записывает.
+            v.keyPreset = cfg.keyPreset;
+            v.keys = cfg.keys;
             cfg = v;
             applyTheme();
             if (!classicUi_) {
@@ -568,6 +572,7 @@ void Editor::showSettingsScreen() {
             done = true;
         }
         if (uiButton(WIN_W / 2 + 10, WIN_H - 52, 180, 36, "Отмена", true)) done = true;
+        if (!classicUi_ && uiButton(30, WIN_H - 52, 130, 36, "Клавиши…", true)) showKeysScreen();
         redraw();
         if (takeKey() == KEY_ESC) done = true;
         idle();

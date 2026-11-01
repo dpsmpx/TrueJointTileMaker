@@ -7,6 +7,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace tjtm {
@@ -67,6 +68,11 @@ struct Config {
     /// возможности на виду, «базовый» — только повседневное, для маленького
     /// окна. Сочетания скрытого работают и в базовом.
     std::string uiMode = "полный";
+    /// Набор клавиш (D3): «стандартный» или «как в Aseprite».
+    std::string keyPreset = "стандартный";
+    /// Свои клавиши поверх набора: имя действия и сочетания через «|»
+    /// («Key.Save = Ctrl+S | F2»; «нет» — без клавиши).
+    std::vector<std::pair<std::string, std::string>> keys;
     /// Недавние файлы, последний — первым; не больше kRecentMax (UX-24).
     std::vector<std::string> recentFiles;
     static constexpr std::size_t kRecentMax = 10;

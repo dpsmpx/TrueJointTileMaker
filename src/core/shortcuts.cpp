@@ -1,6 +1,11 @@
 #include "core/shortcuts.h"
 
+#include <algorithm>
 #include <array>
+#include <cstring>
+#include <deque>
+
+#include "core/text.h"
 
 namespace tjtm {
 
@@ -227,6 +232,7 @@ constexpr std::array kMenu = {
     MenuItem{"Карта", "Удалить объект под курсором", DeleteObject, 0, kMap},
     MenuItem{"Справка", "Найти команду…", CommandSearch},
     MenuItem{"Справка", "Клавиши", Cheatsheet},
+    MenuItem{"Справка", "Настроить клавиши…", KeysScreen},
     MenuItem{"Справка", "Справка", Help},
     MenuItem{"Справка", "Главное меню", MainMenu},
 };
@@ -235,9 +241,19 @@ bool fits(const Shortcut& s, bool tile) {
     return s.where == KeyWhere::Both || (s.where == KeyWhere::Tile) == tile;
 }
 
+/// Действующая таблица: стандартная, пока applyKeymap не собрал другую.
+std::vector<Shortcut>& live() {
+    static std::vector<Shortcut> t(kTable.begin(), kTable.end());
+    return t;
+}
+
 }  // namespace
 
 std::span<const Shortcut> shortcuts() {
+    return live();
+}
+
+std::span<const Shortcut> defaultShortcuts() {
     return kTable;
 }
 
@@ -265,15 +281,17 @@ std::string commandTitle(Cmd c, int arg, bool tile) {
 }
 
 std::string commandKeys(Cmd c, int arg, bool tile) {
-    for (const Shortcut& s : kTable) {
-        if (s.cmd == c && s.arg == arg && fits(s, tile)) return keyName(s.key, s.mods);
+    for (const Shortcut& s : live()) {
+        if (s.cmd == c && s.arg == arg && s.key != 0 && fits(s, tile))
+            return keyName(s.key, s.mods);
     }
     return {};
 }
 
 const Shortcut* findShortcut(int key, int mods, bool tile) {
+    if (key == 0) return nullptr;
     auto find = [&](int want) -> const Shortcut* {
-        for (const Shortcut& s : kTable) {
+        for (const Shortcut& s : live()) {
             if (s.key == key && s.mods == want && fits(s, tile)) return &s;
         }
         return nullptr;
@@ -284,6 +302,7 @@ const Shortcut* findShortcut(int key, int mods, bool tile) {
 }
 
 std::string keyName(int key, int mods) {
+    if (key == 0) return {};
     // «?» — это Shift с косой чертой; так его и ищут глазами.
     if (key == KEY_SLASH && mods == MOD_SHIFT) return "?";
     std::string s;
@@ -317,6 +336,11 @@ std::string keyName(int key, int mods) {
         case KEY_SLASH: return s + "/";
         case KEY_LBRACKET: return s + "[";
         case KEY_RBRACKET: return s + "]";
+        case KEY_BACK: return s + "Backspace";
+        case KEY_INSERT: return s + "Insert";
+        case KEY_QUOTE: return s + "'";
+        case KEY_GRAVE: return s + "`";
+        case KEY_BACKSLASH: return s + "\\";
         default: return s + "#" + std::to_string(key);
     }
 }
@@ -324,10 +348,410 @@ std::string keyName(int key, int mods) {
 std::string shortcutKeys(std::span<const Shortcut> all, std::size_t i) {
     const Shortcut& s = all[i];
     if (s.label != nullptr) return s.label;
-    std::string out = keyName(s.key, s.mods);
-    for (std::size_t j = i + 1; j < all.size() && all[j].text == nullptr && all[j].cmd == s.cmd;
-         ++j)
-        out += ", " + keyName(all[j].key, all[j].mods);
+    // Вся строка: в стандартной таблице за строкой без подписи идут только
+    // сочетания той же команды, а у переназначенной подпись снята, и
+    // строку собирают её клавиши как есть.
+    std::string out;
+    for (std::size_t j = i; j < all.size() && (j == i || all[j].text == nullptr); ++j) {
+        if (all[j].key == 0) continue;
+        if (!out.empty()) out += ", ";
+        out += keyName(all[j].key, all[j].mods);
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// Правка клавиш (D3)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Строки, на которые ссылаются созданные здесь Shortcut: живут до конца.
+const char* intern(const std::string& s) {
+    static std::deque<std::string> pool;
+    for (const std::string& p : pool) {
+        if (p == s) return p.c_str();
+    }
+    pool.push_back(s);
+    return pool.back().c_str();
+}
+
+/// Имена команд в Config.txt — по порядку перечисления Cmd.
+constexpr std::array<const char*, static_cast<std::size_t>(KeysScreen) + 1> kIds = {
+    "New",
+    "Open",
+    "Save",
+    "SaveAs",
+    "SaveSelection",
+    "Undo",
+    "Redo",
+    "PasteHere",
+    "EraseSelection",
+    "SelectAll",
+    "Deselect",
+    "Reselect",
+    "InvertSelection",
+    "Copy",
+    "Cut",
+    "PasteClipboard",
+    "BrushFromSelection",
+    "ZoomIn",
+    "ZoomOut",
+    "ZoomFit",
+    "Zoom100",
+    "Fullscreen",
+    "Hand",
+    "Pan",
+    "Nudge",
+    "Grid",
+    "Checker",
+    "Seamless",
+    "Wrap",
+    "Rulers",
+    "Guides",
+    "GridScreen",
+    "MapContext",
+    "NextMapPlace",
+    "MapTiles",
+    "Tool",
+    "BrushSmaller",
+    "BrushBigger",
+    "PatternPrev",
+    "PatternNext",
+    "PixelPerfect",
+    "BlendMode",
+    "SymX",
+    "SymY",
+    "ToolOptions",
+    "SwapColors",
+    "ResetColors",
+    "ColorPicker",
+    "PaletteScreen",
+    "Indexed",
+    "ImageScreen",
+    "Filters",
+    "Tileset",
+    "TilePicker",
+    "Timeline",
+    "Play",
+    "PrevFrame",
+    "NextFrame",
+    "FirstFrame",
+    "LastFrame",
+    "LayerUp",
+    "LayerDown",
+    "Onion",
+    "ObjectForm",
+    "MapFind",
+    "MainMenu",
+    "Help",
+    "Cheatsheet",
+    "SwitchMode",
+    "Recent",
+    "Settings",
+    "Exit",
+    "ColorOps",
+    "LayersScreen",
+    "GameSet",
+    "MapProperties",
+    "Dock",
+    "UiMode",
+    "CommandSearch",
+    "DeleteObject",
+    "Export",
+    "ExportAgain",
+    "KeysScreen",
+};
+
+/// Названия действий, которые в шпаргалке делят строку: там «Кадр назад,
+/// вперёд», а на экране клавиш у каждого — своя строка.
+struct SplitName {
+    Cmd cmd;
+    int arg;
+    const char* title;
+};
+constexpr std::array kSplit = {
+    SplitName{ZoomIn, 0, "Крупнее"},
+    SplitName{ZoomOut, 0, "Мельче"},
+    SplitName{Nudge, 0, "Сдвинуть влево"},
+    SplitName{Nudge, 1, "Сдвинуть вправо"},
+    SplitName{Nudge, 2, "Сдвинуть вверх"},
+    SplitName{Nudge, 3, "Сдвинуть вниз"},
+    SplitName{Nudge, 4, "Сдвинуть влево на 8"},
+    SplitName{Nudge, 5, "Сдвинуть вправо на 8"},
+    SplitName{Nudge, 6, "Сдвинуть вверх на 8"},
+    SplitName{Nudge, 7, "Сдвинуть вниз на 8"},
+    SplitName{Pan, 0, "Холст влево"},
+    SplitName{Pan, 1, "Холст вправо"},
+    SplitName{Pan, 2, "Холст вверх"},
+    SplitName{Pan, 3, "Холст вниз"},
+    SplitName{BrushSmaller, 0, "Кисть меньше"},
+    SplitName{BrushBigger, 0, "Кисть больше"},
+    SplitName{PatternPrev, 0, "Узор назад"},
+    SplitName{PatternNext, 0, "Узор вперёд"},
+    SplitName{SymX, 0, "Симметрия по X"},
+    SplitName{SymY, 0, "Симметрия по Y"},
+    SplitName{PrevFrame, 0, "Кадр назад"},
+    SplitName{NextFrame, 0, "Кадр вперёд"},
+    SplitName{FirstFrame, 0, "Первый кадр"},
+    SplitName{LastFrame, 0, "Последний кадр"},
+    SplitName{LayerUp, 0, "Слой выше"},
+    SplitName{LayerDown, 0, "Слой ниже"},
+    SplitName{Cheatsheet, 0, "Шпаргалка клавиш"},
+    SplitName{Hand, 0, "Рука (пока зажат пробел)"},
+};
+
+/// Раздел шпаргалки для команды, у которой клавиши не было: по меню.
+const char* groupOfMenu(const char* menu) {
+    if (std::strcmp(menu, "Изображение") == 0) return kColor;
+    if (std::strcmp(menu, "Справка") == 0) return kWin;
+    return menu;
+}
+
+/// Набор «как в Aseprite» — по data/gui.xml Aseprite: буквы инструментов,
+/// + и − — размер кисти, 1 — масштаб 100 %, Tab — лента кадров, Ctrl+Tab —
+/// соседний документ (у нас — тайл и карта), Ctrl+Space — поиск команды,
+/// Ctrl+K — настройки. Чего у Aseprite нет, остаётся как в стандартном.
+constexpr std::array<std::pair<const char*, const char*>, 27> kAseprite = {{
+    {"Tool.0", "B"},
+    {"Tool.1", "E"},
+    {"Tool.2", "G"},
+    {"Tool.3", "I"},
+    {"Tool.4", "L"},
+    {"Tool.5", "U"},
+    {"Tool.6", "Shift+U"},
+    {"Tool.8", "M"},
+    {"Zoom100", "1 | Ctrl+1"},
+    {"BrushBigger", "+ | Num + | ]"},
+    {"BrushSmaller", "− | Num − | ["},
+    {"ZoomIn", "Ctrl++"},
+    {"ZoomOut", "Ctrl+−"},
+    {"Grid", "Ctrl+'"},
+    {"PaletteScreen", "F4"},
+    {"Timeline", "Tab"},
+    {"SwitchMode", "Ctrl+Tab"},
+    {"CommandSearch", "Ctrl+Пробел"},
+    {"Settings", "Ctrl+K"},
+    {"Export", "Ctrl+E"},
+    {"ExportAgain", "Ctrl+Shift+X"},
+    {"BrushFromSelection", "Ctrl+B"},
+    {"InvertSelection", "Ctrl+Shift+I"},
+    {"Undo", "Ctrl+Z"},
+    {"Redo", "Ctrl+Y | Ctrl+Shift+Z"},
+    {"EraseSelection", "Delete | Backspace"},
+    {"MainMenu", "Esc"},
+}};
+
+bool overlaps(KeyWhere a, KeyWhere b) {
+    return a == KeyWhere::Both || b == KeyWhere::Both || a == b;
+}
+
+/// Ставит клавиши действию, не трогая других.
+void placeKeys(std::vector<Shortcut>& t, const KeyAction& a, const std::vector<KeyCombo>& keys) {
+    if (keysIn(t, a.cmd, a.arg) == keys) return;
+    auto first = std::find_if(t.begin(), t.end(),
+                              [&](const Shortcut& s) { return s.cmd == a.cmd && s.arg == a.arg; });
+    Shortcut tmpl;
+    std::size_t at = t.size();
+    if (first == t.end()) {
+        // Команда меню без клавиши: строкой в конец своего раздела.
+        tmpl = Shortcut{0, 0, a.where, a.cmd, a.arg, intern(a.group), intern(a.title)};
+        for (std::size_t i = 0; i < t.size(); ++i) {
+            if (a.group == t[i].group) at = i + 1;
+        }
+    } else {
+        at = static_cast<std::size_t>(first - t.begin());
+        tmpl = *first;
+        // Строка шпаргалки сменилась: её подпись («1 … 9») больше не верна.
+        std::size_t head = at;
+        while (head > 0 && t[head].text == nullptr)
+            --head;
+        t[head].label = nullptr;
+        tmpl.label = nullptr;
+        std::erase_if(t, [&](const Shortcut& s) { return s.cmd == a.cmd && s.arg == a.arg; });
+    }
+    std::vector<Shortcut> add;
+    for (const KeyCombo& k : keys) {
+        Shortcut s = tmpl;
+        s.key = k.key;
+        s.mods = k.mods;
+        if (!add.empty()) s.text = nullptr;
+        add.push_back(s);
+    }
+    // Без клавиш действие остаётся строкой с key = 0: у строки шпаргалки
+    // сохраняется заголовок, а клавишу можно задать снова.
+    if (add.empty()) add.push_back(tmpl);
+    if (add.size() == 1 && keys.empty()) {
+        add[0].key = 0;
+        add[0].mods = 0;
+    }
+    t.insert(t.begin() + static_cast<std::ptrdiff_t>(std::min(at, t.size())), add.begin(),
+             add.end());
+}
+
+std::vector<const KeyAction*> setIn(std::vector<Shortcut>& t, const KeyAction& a,
+                                    const std::vector<KeyCombo>& keys) {
+    std::vector<const KeyAction*> robbed;
+    for (const KeyCombo& k : keys) {
+        for (const KeyAction& b : keyActions()) {
+            if ((b.cmd == a.cmd && b.arg == a.arg) || !overlaps(a.where, b.where)) continue;
+            std::vector<KeyCombo> bk = keysIn(t, b.cmd, b.arg);
+            if (std::erase(bk, k) == 0) continue;
+            placeKeys(t, b, bk);
+            robbed.push_back(&b);
+        }
+    }
+    placeKeys(t, a, keys);
+    return robbed;
+}
+
+bool isAseprite(const std::string& preset) {
+    return netToLower(preset).find("aseprite") != std::string::npos;
+}
+
+}  // namespace
+
+const std::vector<KeyAction>& keyActions() {
+    static const std::vector<KeyAction> all = [] {
+        std::vector<KeyAction> out;
+        auto known = [&](Cmd c, int arg) {
+            return std::any_of(out.begin(), out.end(),
+                               [&](const KeyAction& a) { return a.cmd == c && a.arg == arg; });
+        };
+        const char* rowText = nullptr;
+        for (const Shortcut& s : kTable) {
+            if (s.text != nullptr) rowText = s.text;
+            if (known(s.cmd, s.arg)) continue;
+            KeyAction a{s.cmd, s.arg, s.where, s.group, s.text != nullptr ? s.text : ""};
+            for (const SplitName& n : kSplit) {
+                if (n.cmd == s.cmd && n.arg == s.arg) a.title = n.title;
+            }
+            if (a.title.empty() && s.cmd == Tool)
+                a.title = "Инструмент " + std::to_string(s.arg + 1);
+            if (a.title.empty() && rowText != nullptr) a.title = rowText;
+            a.fixed = s.cmd == Hand;
+            out.push_back(a);
+        }
+        for (const MenuItem& mi : kMenu) {
+            if (mi.text == nullptr || known(mi.cmd, mi.arg)) continue;
+            std::string t = mi.text;
+            const std::string dots = "…";
+            if (t.ends_with(dots)) t.resize(t.size() - dots.size());
+            out.push_back(KeyAction{mi.cmd, mi.arg, mi.where, groupOfMenu(mi.menu), t});
+        }
+        return out;
+    }();
+    return all;
+}
+
+std::string actionId(const KeyAction& a) {
+    std::string id = kIds[static_cast<std::size_t>(a.cmd)];
+    const bool many = std::count_if(keyActions().begin(), keyActions().end(),
+                                    [&](const KeyAction& b) { return b.cmd == a.cmd; }) > 1;
+    if (many) id += "." + std::to_string(a.arg);
+    return id;
+}
+
+const KeyAction* findAction(const std::string& id) {
+    const std::string want = netToLower(netTrim(id));
+    for (const KeyAction& a : keyActions()) {
+        if (netToLower(actionId(a)) == want) return &a;
+    }
+    return nullptr;
+}
+
+bool parseKeyName(const std::string& s, KeyCombo& out) {
+    std::string want = netToLower(netTrim(s));
+    // Как пишут руками: дефис вместо минуса, английские имена.
+    auto alias = [&](const std::string& from, const std::string& to) {
+        if (want.ends_with(from) &&
+            (want.size() == from.size() || want[want.size() - from.size() - 1] == '+'))
+            want = want.substr(0, want.size() - from.size()) + to;
+    };
+    alias("space", "пробел");
+    alias("plus", "+");
+    alias("minus", "−");
+    alias("-", "−");
+    alias("del", "delete");
+    alias("escape", "esc");
+    alias("return", "enter");
+    if (want.empty()) return false;
+    for (int mods = 0; mods < 8; ++mods) {
+        for (int key = 1; key <= KEY_CODE_MAX; ++key) {
+            const std::string n = keyName(key, mods);
+            if (n[0] != '#' && netToLower(n) == want) {
+                out = {key, mods};
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+std::string keysText(const std::vector<KeyCombo>& keys) {
+    std::string out;
+    for (const KeyCombo& k : keys) {
+        if (!out.empty()) out += " | ";
+        out += keyName(k.key, k.mods);
+    }
+    return out.empty() ? "нет" : out;
+}
+
+std::vector<KeyCombo> parseKeysText(const std::string& s) {
+    std::vector<KeyCombo> out;
+    std::size_t from = 0;
+    while (from <= s.size()) {
+        std::size_t bar = s.find('|', from);
+        if (bar == std::string::npos) bar = s.size();
+        KeyCombo k;
+        if (parseKeyName(s.substr(from, bar - from), k) &&
+            std::find(out.begin(), out.end(), k) == out.end())
+            out.push_back(k);
+        from = bar + 1;
+    }
+    return out;
+}
+
+std::vector<KeyCombo> keysIn(std::span<const Shortcut> table, Cmd c, int arg) {
+    std::vector<KeyCombo> out;
+    for (const Shortcut& s : table) {
+        if (s.cmd == c && s.arg == arg && s.key != 0) out.push_back({s.key, s.mods});
+    }
+    return out;
+}
+
+std::vector<Shortcut> presetTable(const std::string& preset) {
+    std::vector<Shortcut> t(kTable.begin(), kTable.end());
+    if (isAseprite(preset)) {
+        for (const auto& [id, keys] : kAseprite) {
+            if (const KeyAction* a = findAction(id)) setIn(t, *a, parseKeysText(keys));
+        }
+    }
+    return t;
+}
+
+std::vector<const KeyAction*> setActionKeys(const KeyAction& a, const std::vector<KeyCombo>& keys) {
+    return setIn(live(), a, keys);
+}
+
+void applyKeymap(const std::string& preset,
+                 const std::vector<std::pair<std::string, std::string>>& custom) {
+    std::vector<Shortcut> t = presetTable(preset);
+    for (const auto& [id, keys] : custom) {
+        const KeyAction* a = findAction(id);
+        if (a == nullptr || a->fixed) continue;
+        setIn(t, *a, parseKeysText(keys));
+    }
+    live() = std::move(t);
+}
+
+std::vector<std::pair<std::string, std::string>> keymapDiff(const std::string& preset) {
+    const std::vector<Shortcut> base = presetTable(preset);
+    std::vector<std::pair<std::string, std::string>> out;
+    for (const KeyAction& a : keyActions()) {
+        const std::vector<KeyCombo> now = keysIn(live(), a.cmd, a.arg);
+        if (now != keysIn(base, a.cmd, a.arg)) out.emplace_back(actionId(a), keysText(now));
+    }
     return out;
 }
 

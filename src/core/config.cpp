@@ -95,6 +95,15 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             uiMode = v == "базовый" || v == "basic" ? "базовый" : "полный";
         } else if (key == "dock") {
             dock = parseBool(val, dock);
+        } else if (key == "keypreset") {
+            keyPreset = netToLower(val).find("aseprite") != std::string::npos ? "как в Aseprite"
+                                                                              : "стандартный";
+        } else if (key.starts_with("key.") && key.size() > 4) {
+            // Имя действия — как в файле: регистр сверяет таблица клавиш.
+            const std::string id = netTrim(s.substr(4, p - 4));
+            std::erase_if(keys,
+                          [&](const auto& kv) { return netToLower(kv.first) == key.substr(4); });
+            keys.emplace_back(id, val);
         } else if (key == "gridautozoom") {
             gridAutoZoom = parseInt(val, gridAutoZoom, 0, 64);
         } else if (key == "windowmaximized") {
@@ -241,6 +250,20 @@ std::string Config::serialize() const {
     if (dock != def.dock) {
         add("# Боковая панель со слоями и историей.");
         add(std::string("Dock = ") + ruBool(dock));
+        add("");
+    }
+    if (keyPreset != def.keyPreset || !keys.empty()) {
+        add("# Клавиши: набор (стандартный или как в Aseprite) и свои сочетания");
+        add("# поверх него, через | ; «нет» — без клавиши. Правятся экраном");
+        add("# «Настроить клавиши» в меню «Справка».");
+        add("KeyPreset = " + keyPreset);
+        for (const auto& [id, val] : keys) {
+            std::string line = "Key.";
+            line += id;
+            line += " = ";
+            line += val;
+            add(line);
+        }
         add("");
     }
     if (gridAutoZoom != def.gridAutoZoom) {

@@ -118,7 +118,6 @@ void Editor::showHelpBrowser(const std::vector<std::string>& paragraphs,
     struct Line {
         std::string text;
         bool header = false;
-        int section = -1;
     };
     std::vector<Line> lines;
     std::vector<std::pair<std::string, int>> toc;  // раздел и его первая строка
@@ -133,17 +132,15 @@ void Editor::showHelpBrowser(const std::vector<std::string>& paragraphs,
         lines.clear();
         toc.clear();
         const std::string want = netToLower(netTrim(q));
-        int section = -1;
         std::string head;
         bool headShown = false;
         for (const std::string& par : paragraphs) {
             if (helpHeader(par)) {
-                ++section;
                 head = par;
                 headShown = false;
                 if (want.empty()) {
                     toc.emplace_back(sentenceCase(par), static_cast<int>(lines.size()));
-                    lines.push_back({sentenceCase(par), true, section});
+                    lines.push_back({sentenceCase(par), true});
                     headShown = true;
                 }
                 continue;
@@ -151,14 +148,14 @@ void Editor::showHelpBrowser(const std::vector<std::string>& paragraphs,
             if (!want.empty()) {
                 if (netToLower(par).find(want) == std::string::npos) continue;
                 if (!headShown && !head.empty()) {
-                    if (!lines.empty()) lines.push_back({"", false, section});
+                    if (!lines.empty()) lines.push_back({"", false});
                     toc.emplace_back(sentenceCase(head), static_cast<int>(lines.size()));
-                    lines.push_back({sentenceCase(head), true, section});
+                    lines.push_back({sentenceCase(head), true});
                     headShown = true;
                 }
             }
             for (const std::string& l : layoutText({par}, cw - 20))
-                lines.push_back({l, false, section});
+                lines.push_back({l, false});
         }
     };
 

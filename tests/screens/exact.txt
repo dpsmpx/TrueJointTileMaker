@@ -178,3 +178,7 @@ uic        16_rotate_cancel 0    0  780  560
 uid        01_help_toc      0    0  780  560
 uid        02_help_search   0    0  780  560
 uid        03_help_context  0    0  780  560
+uid        04_keys_own      0    0  780  560
+uid        05_keys_ask      0    0  780  560
+uid        06_cheat_aseprite 0   0  780  560
+uid        07_tool_by_letter 0   0  780  560

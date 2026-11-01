@@ -9,6 +9,8 @@
 
 #include <span>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "core/keys.h"
 
@@ -114,6 +116,7 @@ enum class Cmd {
     DeleteObject,
     Export,
     ExportAgain,
+    KeysScreen,
 };
 
 struct Shortcut {
@@ -134,8 +137,11 @@ struct Shortcut {
 /// Раздел общих клавиш: шпаргалка ставит его строкой внизу.
 inline constexpr const char* kWindowGroup = "Окна";
 
-/// Вся таблица в порядке шпаргалки.
+/// Действующая таблица в порядке шпаргалки: стандартная, если набор и свои
+/// клавиши не заданы (applyKeymap).
 std::span<const Shortcut> shortcuts();
+/// Стандартная таблица — клавиши 1.7–1.9.
+std::span<const Shortcut> defaultShortcuts();
 
 /// Сочетание для нажатия. Сначала — точное совпадение модификаторов; не
 /// нашлось и зажат Shift — то же без Shift: Shift+G, как и в 1.6, — сетка.
@@ -173,5 +179,61 @@ std::string commandKeys(Cmd c, int arg, bool tile);
 /// Название команды для истории: пункт меню без многоточия или строка
 /// шпаргалки.
 std::string commandTitle(Cmd c, int arg, bool tile);
+
+// --- Правка клавиш (план «Интерфейс», D3, UX-18) ---------------------------
+//
+// Действующая таблица = набор («стандартный» или «как в Aseprite») и
+// поверх него свои клавиши из Config.txt: строка «Key.Save = Ctrl+S» на
+// действие, отличное от набора. Сочетание, отданное одному действию, у
+// других снимается — двух действий на одно нажатие таблица не держит.
+
+/// Сочетание клавиш; key == 0 — клавиши нет.
+struct KeyCombo {
+    int key = 0;
+    int mods = 0;
+    bool operator==(const KeyCombo&) const = default;
+};
+
+/// Что можно повесить на клавишу: команда с аргументом.
+struct KeyAction {
+    Cmd cmd = Cmd::MainMenu;
+    int arg = 0;
+    KeyWhere where = KeyWhere::Both;
+    /// Раздел шпаргалки.
+    std::string group;
+    /// Название для экрана клавиш.
+    std::string title;
+    /// Клавишу не сменить: рука — пока зажат пробел.
+    bool fixed = false;
+};
+
+inline constexpr const char* kKeysStandard = "стандартный";
+inline constexpr const char* kKeysAseprite = "как в Aseprite";
+
+/// Все действия: из таблицы по порядку, затем команды меню без клавиш.
+const std::vector<KeyAction>& keyActions();
+/// Имя действия в Config.txt: «Save», «Tool.3».
+std::string actionId(const KeyAction& a);
+/// Действие по имени без учёта регистра; nullptr — нет такого.
+const KeyAction* findAction(const std::string& id);
+/// Обратное keyName, без учёта регистра; ещё «Space», «-», «Plus».
+bool parseKeyName(const std::string& s, KeyCombo& out);
+/// Сочетания строкой: «Ctrl+Y | Ctrl+Shift+Z», пусто — «нет».
+std::string keysText(const std::vector<KeyCombo>& keys);
+/// Обратное keysText; непонятые части пропускаются.
+std::vector<KeyCombo> parseKeysText(const std::string& s);
+
+/// Таблица набора без своих клавиш.
+std::vector<Shortcut> presetTable(const std::string& preset);
+/// Клавиши действия в таблице.
+std::vector<KeyCombo> keysIn(std::span<const Shortcut> table, Cmd c, int arg);
+/// Задаёт клавиши действию в действующей таблице. Возвращает действия, у
+/// которых сочетание пришлось снять.
+std::vector<const KeyAction*> setActionKeys(const KeyAction& a, const std::vector<KeyCombo>& keys);
+/// Собирает действующую таблицу: набор и свои клавиши (id, «Ctrl+S | …»).
+void applyKeymap(const std::string& preset,
+                 const std::vector<std::pair<std::string, std::string>>& custom);
+/// Свои клавиши — чем действующая таблица отличается от набора.
+std::vector<std::pair<std::string, std::string>> keymapDiff(const std::string& preset);
 
 }  // namespace tjtm
