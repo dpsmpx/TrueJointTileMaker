@@ -322,6 +322,7 @@ bool Editor::showGameSetScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 12, WIN_W, 40, "Набор для игры");
+        uiHelpButton(WIN_W - 44, 11, "НАБОР ДЛЯ ИГРЫ");
         const std::string dir = tilesDir();
         uiLabel(0, 40, WIN_W, 20, dir.empty() ? "Папка набора не задана" : fitText(dir, WIN_W - 40),
                 dir.empty() ? cWarn : cTextDim);

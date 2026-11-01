@@ -1,0 +1,31 @@
+# Этап D плана «Интерфейс» (docs/roadmap.md): рост аудитории. Светлая
+# тема (uid.config); стартовый экран закрывается.
+key Escape
+sleep 0.3
+# D2: справка — оглавление слева, щелчок по разделу ведёт к нему; поиск
+# оставляет абзацы с найденным и подсвечивает его.
+key h
+sleep 0.3
+click 120 257                # «Палитра»
+move 770 550
+sleep 0.2
+shot 01_help_toc
+click 120 70                 # поле поиска
+sleep 0.2
+type сетк
+sleep 0.3
+shot 02_help_search
+key Escape
+key Escape
+sleep 0.3
+# Кнопка «?» экрана открывает справку на его разделе: у палитры — «Палитра».
+key u
+sleep 0.3
+click 751 21
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 03_help_context
+key Escape
+key Escape
+sleep 0.3

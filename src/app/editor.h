@@ -338,7 +338,9 @@ private:
     void showColorOpsScreen();
     void showMapReport();
     void showMapPropertiesScreen();
-    void showHelpScreen();
+    /// section — заголовок раздела, на котором открыть (заглавными, как в
+    /// тексте); пусто — с начала.
+    void showHelpScreen(const std::string& section = "");
     void showSettingsScreen();
     void showMainMenu();
     bool showTilesetScreen();
@@ -534,6 +536,12 @@ private:
     /// двенадцати кнопок: продолжить, новый, открыть, недавние с
     /// миниатюрами, что нового.
     void showStartScreen();
+    /// Справка с оглавлением и поиском (D2, UX-09): у 1.6 — 250 строк
+    /// сплошного текста с кнопками ▲▼.
+    void showHelpBrowser(const std::vector<std::string>& paragraphs, const std::string& section);
+    /// Кнопка «?» экрана: открывает справку на его разделе (UX-09). Только
+    /// в новых темах: у «Классики» заголовки экранов — как у 1.6.
+    void uiHelpButton(int x, int y, const std::string& section);
     /// Команда, выбранная в поиске: её выполнит следующий шаг главного цикла.
     std::optional<std::pair<Cmd, int>> pendingCmd_;
     /// Стрелки двигают выделенное: инструмент выделения и есть что двигать

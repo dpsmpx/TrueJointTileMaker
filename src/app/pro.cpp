@@ -407,6 +407,7 @@ void Editor::showToolOptions() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 12, WIN_W, 40, "Параметры инструментов");
+        uiHelpButton(WIN_W - 44, 11, "ИНСТРУМЕНТЫ РЕЖИМА ТАЙЛА");
 
         // --- кисть ---
         uiLabelLeft(LX, 46, 24, "Карандаш, ластик, узор", cTextDim);
@@ -735,6 +736,7 @@ void Editor::showImageScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 8, WIN_W, 34, "Изображение и выделение");
+        uiHelpButton(WIN_W - 44, 6, "ВЫДЕЛЕНИЕ И ПРЕОБРАЗОВАНИЯ");
         const bool tile = m.docMode == DOC_TILE;
         const bool sel = tile && m.hasSelection;
         const std::string what = sel ? "выделенного" : "всего тайла";

@@ -705,6 +705,7 @@ void Editor::showAnimationScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 8, WIN_W, 34, "Слои, кадры и экспорт");
+        uiHelpButton(WIN_W - 44, 6, "СЛОИ, КАДРЫ И АНИМАЦИЯ");
         const bool tile = m.docMode == DOC_TILE;
         const int nl = m.doc.layerCount();
         const int nf = m.doc.frameCount();

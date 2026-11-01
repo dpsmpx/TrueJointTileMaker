@@ -39,7 +39,7 @@ Grid<Color> gridFromBgra(const std::vector<std::uint8_t>& raw, int size) {
 // Справка
 // ---------------------------------------------------------------------------
 
-void Editor::showHelpScreen() {
+void Editor::showHelpScreen(const std::string& section) {
     std::vector<std::string> p;
     // Набираемый абзац: строки прозы склеиваются и переносятся потом по
     // ширине окна, а не по ширине набора в исходнике.
@@ -397,7 +397,11 @@ void Editor::showHelpScreen() {
     add("");
     add("Программа распространяется по лицензии GNU GPL версии 3.");
     flush();
-    showTextScreen("Справка", p);
+    if (active.modern && !classicUi_) {
+        showHelpBrowser(p, section);
+    } else {
+        showTextScreen("Справка", p);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +460,7 @@ void Editor::showSettingsScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 14, WIN_W, 46, "Настройки");
+        uiHelpButton(WIN_W - 44, 15, "НАСТРОЙКИ");
         uiLabel(0, 46, WIN_W, 20, "Сохраняются в Config.txt рядом с программой", cTextDim);
 
         int y = 76;
@@ -1097,6 +1102,7 @@ bool Editor::showTilesetScreen() {
         const std::string dir = tsetDirOf(tsetKind_);
         fb_.clear(cWindow);
         uiTitle(0, 6, WIN_W, 40, "Наборы тайлов");
+        uiHelpButton(WIN_W - 44, 8, "НАБОРЫ ТАЙЛОВ");
 
         // Переключатель наборов — вкладки: открытая видна сразу.
         for (int i = 0; i < TS_KINDS; ++i) {

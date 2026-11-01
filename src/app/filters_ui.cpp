@@ -194,6 +194,7 @@ void Editor::showFiltersScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 6, WIN_W, 34, "Фильтры и эффекты");
+        uiHelpButton(WIN_W - 44, 5, "ВНЕ ПИКСЕЛЬ-АРТА");
         uiLabel(0, 32, WIN_W, 20,
                 "Не пиксель-арт: новые цвета, полупрозрачность и мягкие края. "
                 "В строгом индексном режиме итог сводится к палитре.",

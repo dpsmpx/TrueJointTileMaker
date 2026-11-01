@@ -174,3 +174,7 @@ uic        13_write_slot    0    0  780  560
 uic        14_export        0    0  780  560
 uic        15_rotate_preview 0    0  780  560
 uic        16_rotate_cancel 0    0  780  560
+# Интерфейс, этап D.
+uid        01_help_toc      0    0  780  560
+uid        02_help_search   0    0  780  560
+uid        03_help_context  0    0  780  560

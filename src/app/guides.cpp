@@ -309,6 +309,7 @@ void Editor::showGridScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 12, WIN_W, 40, "Сетка и направляющие");
+        uiHelpButton(WIN_W - 44, 11, "ЛИНЕЙКИ, НАПРАВЛЯЮЩИЕ, СЕТКА");
         const int dw = m.docW();
         const int dh = m.docH();
 
