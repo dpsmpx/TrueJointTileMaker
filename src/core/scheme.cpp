@@ -272,8 +272,8 @@ std::string hexColor(Color c) {
 
 namespace {
 
-/// Роли файла темы → поля Theme.
-Color* roleField(Theme& t, const std::string& role) {
+/// Роли файла темы → поля Theme; nullptr — нет такой роли.
+Color Theme::*roleField(const std::string& role) {
     static const std::pair<const char*, Color Theme::*> kRoles[] = {
         {"surface", &Theme::window},
         {"surface_container_lowest", &Theme::field},
@@ -302,7 +302,7 @@ Color* roleField(Theme& t, const std::string& role) {
         {"grid.major", &Theme::majorGrid},
     };
     for (const auto& [name, field] : kRoles) {
-        if (role == name) return &(t.*field);
+        if (role == name) return field;
     }
     return nullptr;
 }
@@ -313,7 +313,6 @@ bool parseThemeFile(const std::string& text, ThemeFile& out, std::vector<std::st
     std::istringstream in(text);
     std::string line;
     int n = 0;
-    Theme probe = lightTheme();
     while (std::getline(in, line)) {
         ++n;
         if (!line.empty() && line.back() == '\r') line.pop_back();
@@ -351,7 +350,7 @@ bool parseThemeFile(const std::string& text, ThemeFile& out, std::vector<std::st
             out.values.emplace_back(key, netToLower(val));
         } else if (key.starts_with("color.")) {
             Color c;
-            if (roleField(probe, key.substr(6)) == nullptr) {
+            if (roleField(key.substr(6)) == nullptr) {
                 problems.push_back("строка " + std::to_string(n) + ": нет роли " + key.substr(6));
             } else if (!parseHexColor(val, c)) {
                 problems.push_back("строка " + std::to_string(n) + ": " + key + " — не цвет");
@@ -393,8 +392,8 @@ Theme buildTheme(const std::string& name, Color seed, bool systemDark,
                 continue;
             }
             Color c;
-            if (Color* field = roleField(t, key); field != nullptr && parseHexColor(val, c)) {
-                *field = c;
+            if (Color Theme::*field = roleField(key); field != nullptr && parseHexColor(val, c)) {
+                t.*field = c;
                 if (key == "primary_container") t.fieldSelection = c;
             }
         }

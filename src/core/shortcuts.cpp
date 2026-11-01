@@ -673,7 +673,7 @@ bool parseKeyName(const std::string& s, KeyCombo& out) {
     auto alias = [&](const std::string& from, const std::string& to) {
         if (want.ends_with(from) &&
             (want.size() == from.size() || want[want.size() - from.size() - 1] == '+'))
-            want = want.substr(0, want.size() - from.size()) + to;
+            want.replace(want.size() - from.size(), from.size(), to);
     };
     alias("space", "пробел");
     alias("plus", "+");
