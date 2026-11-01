@@ -61,8 +61,9 @@ Linux, со всем планом `RoadToProLevel` и тем, что сдела�
 editor. Switch the interface to English in Settings → Language (or
 `Language = english` in `Config.txt`); the built-in help is translated too.
 
-Готовые сборки для Windows и Linux — на странице релизов; каждое изменение
-проверяет CI (Linux, санитайзеры, Windows под Wine).
+Готовые сборки для Windows и Linux — на странице релизов. Проверки — сборка
+и все тесты на Linux, с санитайзерами и для Windows под Wine, линтеры —
+гоняются локально; CI на GitHub запускается вручную.
 
 Что и как сделано — [docs/roadmap.md](docs/roadmap.md), исправленные ошибки
 оригинала — [docs/fixes.md](docs/fixes.md), полная справка — в самой

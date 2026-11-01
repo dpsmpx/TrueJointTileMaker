@@ -1,5 +1,8 @@
-# Проверка каждого изменения: сборка и все тесты на Linux и Windows,
-# санитайзеры и линтеры.
+# Проверка: сборка и все тесты на Linux и Windows, санитайзеры и линтеры.
+#
+# Запускается только вручную (Actions → CI → Run workflow): у закрытого
+# репозитория нет минут Actions на каждый push. Те же проверки — локально:
+# ctest --preset debug, asan и mingw, tools/lint.sh.
 #
 # Windows — кросс-сборка MinGW-w64 с тестами под Wine, ровно как
 # `ctest --preset mingw` у разработчика: CI и локальный прогон — одно и то
@@ -8,9 +11,6 @@
 name: CI
 
 on:
-  push:
-    branches: ['**']
-  pull_request:
   workflow_dispatch:
 
 concurrency:
