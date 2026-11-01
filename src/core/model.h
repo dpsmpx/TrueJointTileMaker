@@ -423,6 +423,12 @@ public:
     bool onionSkin = false;
     int onionPrev = 1;
     int onionNext = 1;
+    /// Цвета луковой кожи (D7, UX-51): 0 — красный и синий, как было;
+    /// 1 — оранжевый и голубой, 2 — пурпурный и зелёный. Различать их
+    /// должен и тот, кто путает красный с зелёным.
+    int onionPalette = 0;
+    static constexpr int kOnionPalettes = 3;
+    [[nodiscard]] static Color onionColor(int palette, bool past);
 
     Color firstColor = argb(255, 0, 0, 0);
     Color secondColor = argb(255, 255, 255, 255);

@@ -516,6 +516,9 @@ std::string Editor::statusInfo() {
              std::to_string(m.doc.layerCount()) + ", кадр " + std::to_string(m.activeFrame + 1) +
              "/" + std::to_string(m.doc.frameCount());
     }
+    // Индексный режим — словом, а не только цветом рамки палитры (D7,
+    // UX-51).
+    if (m.docMode == DOC_TILE && m.indexedOn) s += "   ·   индексная палитра";
     // Перо: нажим виден, пока его ведут (D6).
     if (pf_.input().pen)
         s += "   ·   нажим " + std::to_string(pround(pf_.input().pressure * 100.0F)) + " %";

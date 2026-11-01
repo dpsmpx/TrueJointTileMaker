@@ -190,3 +190,6 @@ uie        04_help          0    0  780  560
 uie        05_palette       0    0  780  560
 uid        08_pressure_switch 0 0  780  560
 uid        09_pressure_stroke 0 0  780  560
+uid        10_menu_f10      0    0  780  560
+uid        11_onion_colors  0    0  780  560
+uid        12_onion_timeline 0   0  780  560

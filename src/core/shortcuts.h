@@ -117,6 +117,7 @@ enum class Cmd {
     Export,
     ExportAgain,
     KeysScreen,
+    MenuBar,
 };
 
 struct Shortcut {

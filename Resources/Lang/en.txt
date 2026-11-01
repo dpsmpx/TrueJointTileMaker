@@ -1401,3 +1401,10 @@ TIFF в CMYK, YCbCr и Lab не поддержан: сохраните в RGB	TI
 Сила кисти — по нажиму пера	Brush strength — by pen pressure
 Напор — по нажиму пера	Flow — by pen pressure
 ~   ·   нажим 	   ·   pressure 
+Строка меню	Menu bar
+~   ·   индексная палитра	   ·   indexed palette
+Соседние кадры — полупрозрачно под текущим	Neighboring frames — semi-transparent under the current one
+Цвета: прошлые и будущие	Colors: past and future
+Красный и синий	Red and blue
+Оранжевый и голубой	Orange and light blue
+Пурпурный и зелёный	Magenta and green

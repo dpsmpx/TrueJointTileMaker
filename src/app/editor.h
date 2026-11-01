@@ -344,6 +344,8 @@ private:
     void showSettingsScreen();
     /// Правка клавиш и набор «как в Aseprite» (D3).
     void showKeysScreen();
+    /// Луковая кожа: сколько кадров и какими цветами (D7).
+    void showOnionOptions();
     /// Язык интерфейса из настроек (D4); «Классика» (--classic) — русский.
     void applyLanguage();
     /// Название действия на экране клавиш; у цифр — инструменты тайла и карты.

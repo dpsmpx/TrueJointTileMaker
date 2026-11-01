@@ -99,6 +99,8 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             penPressureBrush = parseBool(val, penPressureBrush);
         } else if (key == "penpressureair") {
             penPressureAir = parseBool(val, penPressureAir);
+        } else if (key == "onioncolors") {
+            onionColors = parseInt(val, onionColors, 0, 2);
         } else if (key == "language") {
             const std::string v = netToLower(netTrim(val));
             language = v.starts_with("en") || v.starts_with("англ") ? "english" : "русский";
@@ -263,6 +265,12 @@ std::string Config::serialize() const {
         add("# Нажим пера: ослабляет силу кисти и напор аэрографа.");
         add(std::string("PenPressureBrush = ") + ruBool(penPressureBrush));
         add(std::string("PenPressureAir = ") + ruBool(penPressureAir));
+        add("");
+    }
+    if (onionColors != def.onionColors) {
+        add("# Цвета луковой кожи: 0 — красный и синий, 1 — оранжевый и голубой,");
+        add("# 2 — пурпурный и зелёный.");
+        add("OnionColors = " + std::to_string(onionColors));
         add("");
     }
     if (language != def.language) {

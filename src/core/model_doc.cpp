@@ -30,9 +30,8 @@ Color withOpacity(Color c, int opacity) {
 
 /// Подкраска соседнего кадра «луковой кожи»: прошлые — к красному,
 /// будущие — к синему, и полупрозрачно, чтобы не спорить с текущим.
-Color onionTint(Color c, bool past, int distance) {
+Color onionTint(Color c, Color t, int distance) {
     if (c.a == 0) return c;
-    const Color t = past ? rgb(220, 70, 70) : rgb(70, 110, 230);
     const int r = (c.r + t.r) / 2;
     const int g = (c.g + t.g) / 2;
     const int b = (c.b + t.b) / 2;
@@ -40,6 +39,14 @@ Color onionTint(Color c, bool past, int distance) {
 }
 
 }  // namespace
+
+Color Model::onionColor(int palette, bool past) {
+    switch (palette) {
+        case 1: return past ? rgb(235, 140, 30) : rgb(40, 160, 235);
+        case 2: return past ? rgb(200, 60, 200) : rgb(40, 170, 80);
+        default: return past ? rgb(220, 70, 70) : rgb(70, 110, 230);
+    }
+}
 
 void Model::resetDoc() {
     doc = SpriteDoc{};
@@ -297,11 +304,14 @@ Color Model::viewColorAt(int x, int y) const {
     for (int k = onionNext; k >= 1; --k) {
         const int f = activeFrame + k;
         if (f < doc.frameCount())
-            under = blendOver(onionTint(compositeAt(f, x, y), false, k), under);
+            under = blendOver(onionTint(compositeAt(f, x, y), onionColor(onionPalette, false), k),
+                              under);
     }
     for (int k = onionPrev; k >= 1; --k) {
         const int f = activeFrame - k;
-        if (f >= 0) under = blendOver(onionTint(compositeAt(f, x, y), true, k), under);
+        if (f >= 0)
+            under = blendOver(onionTint(compositeAt(f, x, y), onionColor(onionPalette, true), k),
+                              under);
     }
     return blendOver(cur, under);
 }

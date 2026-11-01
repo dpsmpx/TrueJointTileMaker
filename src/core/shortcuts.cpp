@@ -146,6 +146,9 @@ constexpr std::array kTable = {
     // В других редакторах Tab прячет панели; здесь он — тайл и карта, а
     // Shift+Tab — базовый или полный режим (C4).
     Shortcut{KEY_TAB, kShift, kBoth, UiMode, 0, kView, "Базовый или полный режим"},
+    // Строка меню с клавиатуры (D7, UX-19): стрелки ходят по меню и
+    // пунктам, Enter выбирает.
+    Shortcut{KEY_F10, 0, kBoth, MenuBar, 0, kView, "Строка меню"},
     Shortcut{KEY_F1, 0, kBoth, Cheatsheet, 0, kWin, "Эта шпаргалка"},
     Shortcut{KEY_SLASH, kShift, kBoth, Cheatsheet},
     Shortcut{KEY_H, 0, kBoth, Help, 0, kWin, "Справка"},
@@ -377,7 +380,7 @@ const char* intern(const std::string& s) {
 }
 
 /// Имена команд в Config.txt — по порядку перечисления Cmd.
-constexpr std::array<const char*, static_cast<std::size_t>(KeysScreen) + 1> kIds = {
+constexpr std::array<const char*, static_cast<std::size_t>(MenuBar) + 1> kIds = {
     "New",
     "Open",
     "Save",
@@ -461,6 +464,7 @@ constexpr std::array<const char*, static_cast<std::size_t>(KeysScreen) + 1> kIds
     "Export",
     "ExportAgain",
     "KeysScreen",
+    "MenuBar",
 };
 
 /// Названия действий, которые в шпаргалке делят строку: там «Кадр назад,

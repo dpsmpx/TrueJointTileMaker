@@ -73,6 +73,9 @@ struct Config {
     /// без полупрозрачности.
     bool penPressureBrush = false;
     bool penPressureAir = true;
+    /// Цвета луковой кожи (D7): 0 — красный и синий, 1 — оранжевый и
+    /// голубой, 2 — пурпурный и зелёный.
+    int onionColors = 0;
     /// Язык интерфейса (D4): «русский» или «english».
     std::string language = "русский";
     /// Набор клавиш (D3): «стандартный» или «как в Aseprite».

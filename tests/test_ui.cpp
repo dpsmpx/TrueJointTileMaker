@@ -936,4 +936,30 @@ TEST(UiPen, PressureScalesStrength) {
     EXPECT_EQ(Config{}.serialize().find("PenPressure"), std::string::npos);
 }
 
+// --- D7: доступность -------------------------------------------------------
+
+TEST(UiAccess, OnionPalettesAndMenuKey) {
+    // Пары цветов луковой кожи различимы и без красного с зелёным: у каждой
+    // пары прошлое и будущее разнятся по яркости или по синему каналу.
+    for (int k = 0; k < Model::kOnionPalettes; ++k) {
+        const Color p = Model::onionColor(k, true);
+        const Color f = Model::onionColor(k, false);
+        EXPECT_NE(p, f) << k;
+        EXPECT_GT(std::abs(static_cast<int>(p.b) - static_cast<int>(f.b)) +
+                      std::abs((p.r + p.g) - (f.r + f.g)),
+                  100)
+            << k;
+    }
+    // Нулевая пара — та, что была до выбора: эталоны анимации не меняются.
+    EXPECT_EQ(Model::onionColor(0, true), rgb(220, 70, 70));
+    EXPECT_EQ(Model::onionColor(0, false), rgb(70, 110, 230));
+    Config c;
+    c.applyLines({"OnionColors = 1"});
+    EXPECT_EQ(c.onionColors, 1);
+    EXPECT_NE(c.serialize().find("OnionColors = 1"), std::string::npos);
+    EXPECT_EQ(Config{}.serialize().find("OnionColors"), std::string::npos);
+    // Строка меню — с клавиатуры.
+    EXPECT_EQ(findShortcut(KEY_F10, 0, true)->cmd, Cmd::MenuBar);
+}
+
 }  // namespace tjtm

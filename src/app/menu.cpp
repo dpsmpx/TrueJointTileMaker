@@ -742,7 +742,9 @@ void Editor::showStartScreen() {
             if (!baseDir_.empty() && dir.starts_with(baseDir_))
                 dir = "…" + dir.substr(baseDir_.size());
             textOut(tx + 48, ry + 22, fitTextEnd(dir, RW - 60), cTextDim);
-            if (takeButtonClick(RX, ry, RW, kRowH - 4, true)) {
+            // Строка списка берёт фокус с клавиатуры, как кнопка (D7).
+            const bool focused = focusSlot(RX, ry, RW, kRowH - 4);
+            if (takeButtonClick(RX, ry, RW, kRowH - 4, true) || focusPressed(focused)) {
                 openPath = f;
                 done = true;
             }
@@ -1214,6 +1216,14 @@ bool Editor::showTilesetScreen() {
             const bool object = tsetKind_ == TS_BASE && !tsetBaseIsTerrain(k);
             uiLabel(cx, cy + 52, TSET_CELL_W, 16, fitText(tsetLabels_[kk], TSET_CELL_W - 4),
                     object ? cAccent : cText);
+            // Объект от местности — и формой, не только цветом подписи
+            // (D7, UX-51): кружок в углу миниатюры.
+            if (object && active.modern) {
+                const int ox = tx + TSET_THUMB - 9;
+                const int oy = cy + 4;
+                fb_.fillRoundRect(ox - 1, oy - 1, ox + 8, oy + 8, 9, 9, cWindow);
+                fb_.fillRoundRect(ox, oy, ox + 7, oy + 7, 7, 7, cAccent);
+            }
             uiLabel(cx, cy + 68, TSET_CELL_W, 16, fitText(tsetFiles_[kk] + ".png", TSET_CELL_W - 4),
                     cTextDim);
         }
