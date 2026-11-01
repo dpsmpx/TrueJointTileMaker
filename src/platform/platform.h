@@ -74,6 +74,8 @@ struct Input {
     /// у мыши — 1. pen — последний ввод был от пера.
     float pressure = 1.0F;
     bool pen = false;
+    /// Система сменила светлую тему на тёмную или обратно (D8).
+    bool themeChanged = false;
     bool quitRequested = false;
 };
 
@@ -171,6 +173,9 @@ public:
     /// Сценарий был и весь пройден: программе пора закрываться.
     [[nodiscard]] bool scriptFinished() const { return scripted_ && scriptDone_; }
     [[nodiscard]] bool scripted() const { return scripted_; }
+    /// У системы тёмная тема — для «как в системе» (D8). Неизвестно —
+    /// светлая.
+    [[nodiscard]] static bool systemDark();
     /// Папка настроек пользователя (SDL_GetPrefPath); пусто — нет такой.
     [[nodiscard]] static std::string prefDir();
 

@@ -28,6 +28,7 @@
 #include "core/i18n.h"
 #include "core/logo.h"
 #include "core/png.h"
+#include "core/text.h"
 
 namespace tjtm {
 
@@ -50,9 +51,45 @@ void Editor::applyLanguage() {
     m.needRepaint = true;
 }
 
+void Editor::loadThemeFiles() {
+    themeFiles_.clear();
+    std::vector<std::string> dirs = {resolvePath("Resources/Themes")};
+    if (const std::string pref = Platform::prefDir(); !pref.empty() && !pf_.scripted())
+        dirs.push_back(pathCombine(pref, "Themes"));
+    for (const std::string& dir : dirs) {
+        for (const std::string& f : listFiles(dir)) {
+            if (pathExtLower(f) != ".txt") continue;
+            const auto text = readFile(pathCombine(dir, f));
+            if (!text) continue;
+            theme::ThemeFile tf;
+            std::vector<std::string> problems;
+            if (!theme::parseThemeFile(*text, tf, problems)) continue;
+            // Ошибка в теме — уведомлением; неверная строка пропущена, и
+            // тема берёт значение у своей базы.
+            if (!problems.empty())
+                notify(
+                    "Тема «" + tf.name + "»",
+                    problems.front() + (problems.size() > 1
+                                            ? " (и ещё " + std::to_string(problems.size() - 1) + ")"
+                                            : ""));
+            tf.path = pathCombine(dir, f);
+            // Тема с тем же именем из папки пользователя заменяет встроенную.
+            std::erase_if(themeFiles_, [&](const theme::ThemeFile& o) {
+                return netToLower(o.name) == netToLower(tf.name);
+            });
+            themeFiles_.push_back(tf);
+        }
+    }
+}
+
 void Editor::applyTheme() {
-    // Сценарии оригинала сверяются с обликом 1.6 — «Классикой».
-    theme::active = classicUi_ ? theme::classicTheme() : theme::themeByName(cfg.theme);
+    // Сценарии оригинала сверяются с обликом 1.6 — «Классикой». Новые темы
+    // считаются из акцента (D8).
+    Color seed = theme::kDefaultSeed;
+    if (!cfg.themeAccent.empty()) theme::parseHexColor(cfg.themeAccent, seed);
+    theme::active = classicUi_ ? theme::classicTheme()
+                               : theme::buildTheme(netToLower(cfg.theme), seed,
+                                                   Platform::systemDark(), themeFiles_);
     m.checkerA = theme::active.checkA;
     m.checkerB = theme::active.checkB;
     applyBars();
@@ -209,6 +246,7 @@ bool Editor::appInit(int argc, char** argv) {
         m.undoMinSteps = 100;
         m.undoMaxSteps = 1000;
     }
+    loadThemeFiles();
     applyTheme();
     m.syncHSVFromColor();
     m.setDefaultPalette();

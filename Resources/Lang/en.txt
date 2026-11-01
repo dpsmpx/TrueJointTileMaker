@@ -1408,3 +1408,41 @@ TIFF в CMYK, YCbCr и Lab не поддержан: сохраните в RGB	TI
 Красный и синий	Red and blue
 Оранжевый и голубой	Orange and light blue
 Пурпурный и зелёный	Magenta and green
+Тема	Theme
+Перечитать темы из файлов	Reload themes from files
+Акцент — у новых тем	Accent — for the new themes
+Акцент	Accent
+Свой	Custom
+Подпись и текст	Caption and text
+Подсказка — тише текста	A hint is quieter than text
+Главная	Primary
+Обычная	Regular
+Выбрано	Selected
+Недоступна	Unavailable
+Предупреждение	Warning
+контраст {}	contrast {}
+Тема и акцент…	Theme and accent…
+как в системе	as in the system
+Как в системе	As in the system
+Оформление…	Appearance…
+Светлая	Light
+Тёмная	Dark
+Светлая контрастная	Light high contrast
+Тёмная контрастная	Dark high contrast
+светлая контрастная	light high contrast
+тёмная контрастная	dark high contrast
+Бирюзовый	Teal
+Янтарный	Amber
+Оранжевый	Orange
+Розовый	Pink
+Фиолетовый	Violet
+Графит	Graphite
+Сумерки	Dusk
+Хвоя	Pine
+строка {}: нет «=»	line {}: no "="
+строка {}: seed — не цвет	line {}: seed is not a color
+строка {}: нет роли {}	line {}: no role {}
+строка {}: неизвестный ключ {}	line {}: unknown key {}
+строка {}: {} — не цвет	line {}: {} is not a color
+Тема «{}»	Theme "{}"
+{} (и ещё {})	{} (and {} more)

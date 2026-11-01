@@ -193,3 +193,6 @@ uid        09_pressure_stroke 0 0  780  560
 uid        10_menu_f10      0    0  780  560
 uid        11_onion_colors  0    0  780  560
 uid        12_onion_timeline 0   0  780  560
+uid        13_appearance_contrast 0 0 780 560
+uid        14_appearance_file 0 0  780  560
+uid        15_appearance_cancel 0 0 780 560

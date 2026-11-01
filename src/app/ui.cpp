@@ -63,6 +63,11 @@ void Editor::setPage(bool screen) {
 
 void Editor::beginFrameInput(bool screen) {
     pf_.pump();
+    // Система сменила тему, а выбрано «как в системе» — следом (D8).
+    if (pf_.input().themeChanged) {
+        pf_.input().themeChanged = false;
+        if (cfg.theme == "как в системе") applyTheme();
+    }
     // Нажим пера — модели: мазок берёт его в каждой точке (D6).
     m.penPressure = pf_.input().pen ? pf_.input().pressure : 1.0F;
     syncFrameSize();

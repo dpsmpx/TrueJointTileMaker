@@ -20,7 +20,7 @@ SOURCES = sorted((ROOT / "src" / "app").glob("*.cpp")) + [
     for f in ("shortcuts.cpp", "mapdoc.cpp", "mapobj.cpp", "gameset.cpp", "filters.cpp",
               "imageops.cpp", "model.cpp", "model_art.cpp", "model_doc.cpp", "model_layers.cpp",
               "anim.cpp", "palette.cpp", "vector.cpp", "project.cpp", "rasterfmt.cpp", "gif.cpp",
-              "png.cpp", "zlib.cpp")
+              "png.cpp", "zlib.cpp", "scheme.cpp")
 ]
 CYR = re.compile("[А-Яа-яЁё]")
 # Не переводятся: название языка пишется на нём самом, «пробел» — запасное

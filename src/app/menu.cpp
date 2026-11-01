@@ -516,12 +516,21 @@ void Editor::showSettingsScreen() {
             toggleRow(410, y, "Рамка клетки под курсором", v.cellFrame);
         }
         uiLabelLeft(ox, y, 30, "Оформление", cText);
-        const bool dark = v.theme == "тёмная";
-        const bool classic = v.theme == "классика";
-        const int tx = active.modern ? 130 : 410 + 104;
-        if (uiToggle(tx, y, 80, 30, "Светлое", !dark && !classic)) v.theme = "светлая";
-        if (uiToggle(tx + 84, y, 80, 30, "Тёмное", dark)) v.theme = "тёмная";
-        if (uiToggle(tx + 168, y, 80, 30, "Классика", classic)) v.theme = "классика";
+        if (active.modern && !classicUi_) {
+            // Тем и акцентов стало много (D8): свой экран с предпросмотром.
+            if (uiButton(130, y, 248, 30, "Тема и акцент…", true)) {
+                showAppearance();
+                v.theme = cfg.theme;
+                v.themeAccent = cfg.themeAccent;
+            }
+        } else {
+            const bool dark = v.theme == "тёмная";
+            const bool classic = v.theme == "классика";
+            const int tx = active.modern ? 130 : 410 + 104;
+            if (uiToggle(tx, y, 80, 30, "Светлое", !dark && !classic)) v.theme = "светлая";
+            if (uiToggle(tx + 84, y, 80, 30, "Тёмное", dark)) v.theme = "тёмная";
+            if (uiToggle(tx + 168, y, 80, 30, "Классика", classic)) v.theme = "классика";
+        }
 
         y += 40;
         if (active.modern) {

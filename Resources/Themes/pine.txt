@@ -1,0 +1,5 @@
+# Тема True Joint Tile Maker: светлая, зелёный акцент, прямые углы.
+name = Хвоя
+base = светлая
+seed = #036D30
+shape.corners = square

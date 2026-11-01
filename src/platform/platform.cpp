@@ -299,6 +299,10 @@ void Platform::present(const gfx::Surface& frame) {
     SDL_RenderPresent(renderer_);
 }
 
+bool Platform::systemDark() {
+    return SDL_GetSystemTheme() == SDL_SYSTEM_THEME_DARK;
+}
+
 void Platform::notePointer(std::uint32_t which) {
     // Мышь после пера: нажим снова полный.
     if (which != SDL_PEN_MOUSEID) {
@@ -397,6 +401,7 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
         case SDL_EVENT_DROP_FILE:
             if (e.drop.data != nullptr) in_.drops.emplace_back(e.drop.data);
             break;
+        case SDL_EVENT_SYSTEM_THEME_CHANGED: in_.themeChanged = true; break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             // Отпускание после ухода фокуса придёт уже не нам: клавиши
             // осталась бы «нажатыми» навсегда.

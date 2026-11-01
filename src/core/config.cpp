@@ -101,6 +101,8 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             penPressureAir = parseBool(val, penPressureAir);
         } else if (key == "onioncolors") {
             onionColors = parseInt(val, onionColors, 0, 2);
+        } else if (key == "themeaccent") {
+            themeAccent = netTrim(val);
         } else if (key == "language") {
             const std::string v = netToLower(netTrim(val));
             language = v.starts_with("en") || v.starts_with("англ") ? "english" : "русский";
@@ -143,6 +145,13 @@ int Config::applyLines(const std::vector<std::string>& lines) {
                 theme = "светлая";
             } else if (t == "dark" || t == "темная") {
                 theme = "тёмная";
+            } else if (t == "system" || t == "как в системе") {
+                theme = "как в системе";
+            } else if (t == "light contrast" || t == "светлая контрастная") {
+                theme = "светлая контрастная";
+            } else if (t == "dark contrast" || t == "темная контрастная" ||
+                       t == "тёмная контрастная") {
+                theme = "тёмная контрастная";
             } else {
                 theme = t;
             }
@@ -226,6 +235,11 @@ std::string Config::serialize() const {
     add("PaletteFile = " + paletteFile);
     add("");
     const Config def;
+    if (!themeAccent.empty()) {
+        add("# Акцент оформления: из него считаются все цвета темы.");
+        add("ThemeAccent = " + themeAccent);
+        add("");
+    }
     if (theme != def.theme) {
         add("# Тема окна: светлая, тёмная или классика (облик 1.6).");
         add("Theme = " + theme);

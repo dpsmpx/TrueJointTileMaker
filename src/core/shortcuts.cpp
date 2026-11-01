@@ -228,6 +228,8 @@ constexpr std::array kMenu = {
     MenuItem{"Вид"},
     MenuItem{"Вид", "Тайл в окружении карты", MapContext, 0, kTile, true},
     MenuItem{"Вид", "Карта картинками набора", MapTiles, 0, kMap, true},
+    MenuItem{"Вид"},
+    MenuItem{"Вид", "Оформление…", Appearance},
     MenuItem{"Карта", "К редактору карт", SwitchMode, 0, kTile},
     MenuItem{"Карта", "К редактору тайлов", SwitchMode, 0, kMap},
     MenuItem{"Карта", "Свойства и проверка локации…", MapProperties, 0, kMap, true},
@@ -380,7 +382,7 @@ const char* intern(const std::string& s) {
 }
 
 /// Имена команд в Config.txt — по порядку перечисления Cmd.
-constexpr std::array<const char*, static_cast<std::size_t>(MenuBar) + 1> kIds = {
+constexpr std::array<const char*, static_cast<std::size_t>(Appearance) + 1> kIds = {
     "New",
     "Open",
     "Save",
@@ -465,6 +467,7 @@ constexpr std::array<const char*, static_cast<std::size_t>(MenuBar) + 1> kIds = 
     "ExportAgain",
     "KeysScreen",
     "MenuBar",
+    "Appearance",
 };
 
 /// Названия действий, которые в шпаргалке делят строку: там «Кадр назад,

@@ -358,6 +358,9 @@ void Editor::runCommand(Cmd c, int arg) {
         case Cmd::Recent: openRecentAsk(); break;
         case Cmd::Settings: showSettingsScreen(); break;
         case Cmd::KeysScreen: showKeysScreen(); break;
+        case Cmd::Appearance:
+            if (!classicUi_) showAppearance();
+            break;
         case Cmd::MenuBar:
             if (gLayout.top >= MENU_BAR_H && !menuSlots().empty())
                 openMenu(menuSlots().front().menu);

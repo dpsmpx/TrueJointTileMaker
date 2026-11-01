@@ -19,6 +19,7 @@
 #include "core/config.h"
 #include "core/grid.h"
 #include "core/model.h"
+#include "core/scheme.h"
 #include "core/shortcuts.h"
 #include "gfx/font.h"
 #include "gfx/surface.h"
@@ -348,6 +349,11 @@ private:
     void showOnionOptions();
     /// Язык интерфейса из настроек (D4); «Классика» (--classic) — русский.
     void applyLanguage();
+    /// Темы из файлов (D8): Resources/Themes и Themes в папке пользователя.
+    std::vector<theme::ThemeFile> themeFiles_;
+    void loadThemeFiles();
+    /// Экран «Оформление» (D8): тема, акцент, предпросмотр.
+    void showAppearance();
     /// Название действия на экране клавиш; у цифр — инструменты тайла и карты.
     std::string keyActionTitle(const KeyAction& a) const;
     /// Экран клавиш ждёт сочетание: Tab и стрелки — ему, а не фокусу.

@@ -147,3 +147,27 @@ sleep 0.3
 move 770 300
 sleep 0.2
 shot 12_onion_timeline
+# D8: оформление — тема и акцент на выбор, экран сам себе предпросмотр.
+key ctrl+k
+sleep 0.2
+type Оформление
+sleep 0.2
+key Return
+sleep 0.4
+click 540 176                # акцент «Фиолетовый»
+sleep 0.2
+click 170 162                # «Светлая контрастная»
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 13_appearance_contrast
+click 170 298                # тема из файла «Сумерки»
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 14_appearance_file
+click 542 527                # «Отмена» — всё как было
+sleep 0.4
+move 770 550
+sleep 0.2
+shot 15_appearance_cancel

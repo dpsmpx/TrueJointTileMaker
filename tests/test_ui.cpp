@@ -12,6 +12,7 @@
 #include "core/i18n.h"
 #include "core/mapdoc.h"
 #include "core/model.h"
+#include "core/scheme.h"
 #include "core/shortcuts.h"
 #include "core/theme.h"
 
@@ -960,6 +961,103 @@ TEST(UiAccess, OnionPalettesAndMenuKey) {
     EXPECT_EQ(Config{}.serialize().find("OnionColors"), std::string::npos);
     // Строка меню — с клавиатуры.
     EXPECT_EQ(findShortcut(KEY_F10, 0, true)->cmd, Cmd::MenuBar);
+}
+
+// --- D8: схема из акцента, контрастные темы, файлы тем ----------------------
+
+TEST(UiScheme, GeneratorMatchesTable) {
+    // Генератор повторяет таблицу приложения А (docs/ui-design-system.md) с
+    // точностью до единицы-двух в канале: тон L* CIELAB, оттенок OKLCH.
+    using namespace theme;
+    auto near = [](Color a, Color b) {
+        return std::abs(a.r - b.r) <= 2 && std::abs(a.g - b.g) <= 2 && std::abs(a.b - b.b) <= 2;
+    };
+    const Theme l = lightTheme();
+    const Theme d = darkTheme();
+    EXPECT_TRUE(near(neutralTone(kDefaultSeed, 98, 0.006), l.window));
+    EXPECT_TRUE(near(neutralTone(kDefaultSeed, 10, 0.006), l.text));
+    EXPECT_TRUE(near(neutralTone(kDefaultSeed, 30, 0.012), l.textDim));
+    EXPECT_TRUE(near(neutralTone(kDefaultSeed, 50, 0.012), l.outline));
+    EXPECT_TRUE(near(toneOf(kDefaultSeed, 40), l.accent));
+    EXPECT_TRUE(near(toneOf(kDefaultSeed, 90), l.accentContainer));
+    EXPECT_TRUE(near(toneOf(kDefaultSeed, 80), d.accent));
+    EXPECT_TRUE(near(toneOf(kDefaultSeed, 30), d.accentContainer));
+    // При акценте 1.9 светлая и тёмная — прежние таблицы точка в точку.
+    EXPECT_EQ(schemeTheme(kDefaultSeed, Variant::Light).accent, l.accent);
+    EXPECT_EQ(schemeTheme(kDefaultSeed, Variant::Dark).window, d.window);
+}
+
+TEST(UiScheme, ContrastForEveryAccentAndVariant) {
+    // Нормы WCAG 2.1 из ui-design-system.md: текст 4,5:1, границы 3:1.
+    using namespace theme;
+    std::vector<Color> seeds;
+    for (const Accent& a : accents())
+        seeds.push_back(a.seed);
+    seeds.push_back(rgb(0xFF, 0xE0, 0x00));  // свой: жёлтый, самый трудный
+    seeds.push_back(rgb(0x80, 0x80, 0x80));  // свой: серый без цветности
+    for (const Color seed : seeds) {
+        for (const Variant v :
+             {Variant::Light, Variant::Dark, Variant::LightContrast, Variant::DarkContrast}) {
+            const Theme t = schemeTheme(seed, v);
+            const std::string what = hexColor(seed) + " " + t.name;
+            EXPECT_GE(contrastRatio(t.text, t.window), 4.5) << what;
+            EXPECT_GE(contrastRatio(t.text, t.back), 4.5) << what;
+            EXPECT_GE(contrastRatio(t.textDim, t.back), 4.5) << what;
+            EXPECT_GE(contrastRatio(t.textDim, t.face), 4.5) << what;
+            EXPECT_GE(contrastRatio(t.outline, t.window), 3.0) << what;
+            EXPECT_GE(contrastRatio(t.onAccent, t.accent), 4.5) << what;
+            EXPECT_GE(contrastRatio(t.onAccentContainer, t.accentContainer), 4.5) << what;
+            EXPECT_GE(contrastRatio(t.accent, t.window), 3.0) << what;
+            EXPECT_GE(contrastRatio(t.warn, t.window), 3.0) << what;
+        }
+    }
+    // Контрастные — заметно контрастнее обычных.
+    const Theme l = schemeTheme(kDefaultSeed, Variant::Light);
+    const Theme lc = schemeTheme(kDefaultSeed, Variant::LightContrast);
+    EXPECT_GT(contrastRatio(lc.outline, lc.window), contrastRatio(l.outline, l.window) + 3);
+}
+
+TEST(UiScheme, ThemeFiles) {
+    using namespace theme;
+    ThemeFile f;
+    std::vector<std::string> problems;
+    ASSERT_TRUE(
+        parseThemeFile("name = Проба\nbase = тёмная   # комментарий\nseed = #7445B4\n"
+                       "shape.corners = square\ncolor.canvas.backdrop = #2B2B2B\n"
+                       "color.нет_такой = #000000\nмусор\n",
+                       f, problems));
+    EXPECT_EQ(f.name, "Проба");
+    EXPECT_EQ(problems.size(), 2u);
+    const Theme t = buildTheme("проба", kDefaultSeed, false, {f});
+    EXPECT_STREQ(t.name, "Проба");
+    EXPECT_EQ(t.canvas, rgb(0x2B, 0x2B, 0x2B));
+    EXPECT_EQ(t.radius, 0);
+    EXPECT_LT(t.window.r, 40);  // тёмная база
+    EXPECT_EQ(t.accent, schemeTheme(rgb(0x74, 0x45, 0xB4), Variant::Dark).accent);
+    // Без name — не тема.
+    ThemeFile g;
+    EXPECT_FALSE(parseThemeFile("seed = #123456\n", g, problems));
+    // Встроенные файлы тем разбираются без замечаний.
+    for (const char* file : {"Resources/Themes/dusk.txt", "Resources/Themes/pine.txt"}) {
+        ThemeFile h;
+        std::vector<std::string> bad;
+        EXPECT_TRUE(parseThemeFile(readSource(file), h, bad)) << file;
+        EXPECT_TRUE(bad.empty()) << file << ": " << (bad.empty() ? "" : bad[0]);
+    }
+    // «Как в системе» следует системе.
+    EXPECT_LT(buildTheme("как в системе", kDefaultSeed, true, {}).window.r, 40);
+    EXPECT_GT(buildTheme("как в системе", kDefaultSeed, false, {}).window.r, 200);
+    Color c;
+    EXPECT_TRUE(parseHexColor("#7445b4", c));
+    EXPECT_EQ(hexColor(c), "#7445B4");
+    EXPECT_FALSE(parseHexColor("7445", c));
+
+    Config cfg;
+    cfg.applyLines({"Theme = dark contrast", "ThemeAccent = #7445B4"});
+    EXPECT_EQ(cfg.theme, "тёмная контрастная");
+    EXPECT_EQ(cfg.themeAccent, "#7445B4");
+    EXPECT_NE(cfg.serialize().find("ThemeAccent = #7445B4"), std::string::npos);
+    EXPECT_EQ(Config{}.serialize().find("ThemeAccent"), std::string::npos);
 }
 
 }  // namespace tjtm

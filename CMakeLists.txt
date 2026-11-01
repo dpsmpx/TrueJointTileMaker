@@ -77,6 +77,7 @@ add_library(tjtm_core STATIC
     src/core/png.cpp
     src/core/project.cpp
     src/core/rasterfmt.cpp
+    src/core/scheme.cpp
     src/core/shortcuts.cpp
     src/core/text.cpp
     src/core/tilemap.cpp
@@ -101,6 +102,7 @@ if(TJTM_BUILD_APP)
     target_link_libraries(tjtm_gfx PUBLIC tjtm_core SDL3::SDL3 SDL3_ttf::SDL3_ttf)
 
     add_executable(tjtm
+        src/app/appearance_ui.cpp
         src/app/art_ui.cpp
         src/app/bars.cpp
         src/app/canvas.cpp
