@@ -141,6 +141,7 @@ constexpr std::array kTable = {
     Shortcut{KEY_F1, 0, kBoth, Cheatsheet, 0, kWin, "Эта шпаргалка"},
     Shortcut{KEY_SLASH, kShift, kBoth, Cheatsheet},
     Shortcut{KEY_H, 0, kBoth, Help, 0, kWin, "Справка"},
+    Shortcut{KEY_K, kCtrl, kBoth, CommandSearch, 0, kWin, "Найти команду"},
 };
 
 constexpr const char* kMenuTitles[] = {"Файл",     "Правка", "Выделение", "Изображение",
@@ -218,6 +219,7 @@ constexpr std::array kMenu = {
     MenuItem{"Карта", "К редактору тайлов", SwitchMode, 0, kMap},
     MenuItem{"Карта", "Свойства и проверка локации…", MapProperties, 0, kMap, true},
     MenuItem{"Карта", "Форма объекта под курсором", ObjectForm, 0, kMap},
+    MenuItem{"Справка", "Найти команду…", CommandSearch},
     MenuItem{"Справка", "Клавиши", Cheatsheet},
     MenuItem{"Справка", "Справка", Help},
     MenuItem{"Справка", "Главное меню", MainMenu},

@@ -310,6 +310,11 @@ void Editor::appStep() {
 
     const int key = takeKey();
     if (key != 0) handleEditorKey(key);
+    if (pendingCmd_) {
+        const auto [c, arg] = *pendingCmd_;
+        pendingCmd_.reset();
+        runCommand(c, arg);
+    }
     // Клавиша могла открыть экран: дальше снова кадр главного окна, без
     // страницы по середине.
     setPage(false);

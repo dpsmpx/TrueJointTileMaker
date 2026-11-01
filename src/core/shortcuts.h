@@ -110,6 +110,7 @@ enum class Cmd {
     MapProperties,
     Dock,
     UiMode,
+    CommandSearch,
 };
 
 struct Shortcut {

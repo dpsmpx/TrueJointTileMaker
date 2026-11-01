@@ -64,3 +64,12 @@ key Escape
 sleep 0.2
 key shift+Tab
 sleep 4.5
+# C6: поиск команды (Ctrl+K) — пункты меню с клавишами, Enter выполняет.
+key ctrl+k
+sleep 0.3
+type сетк
+move 770 300
+sleep 0.2
+shot 11_search
+key Escape
+sleep 0.2

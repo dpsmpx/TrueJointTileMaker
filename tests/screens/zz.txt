@@ -1,13 +1,14 @@
 key Escape
 sleep 0.2
-key shift+Tab
-sleep 4.5
+key ctrl+k
+sleep 0.3
+type сетк
+sleep 0.2
 move 770 550
 sleep 0.2
-shot a_base
-click 205 13
+shot a_search
+key Return
 sleep 0.3
-move 250 120
+move 770 550
 sleep 0.2
-shot b_base_menu
-key Escape
+shot b_after

@@ -168,3 +168,4 @@ uic        07_axis          0    0  780  560
 uic        08_axis_moved    0    0  780  560
 uic        09_base          0    0  780  560
 uic        10_base_menu     0    0  780  560
+uic        11_search        0    0  780  560
