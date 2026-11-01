@@ -58,8 +58,11 @@ static void helpKeyLines(std::vector<std::string>& p, bool en) {
                             : s.where == KeyWhere::Map ? (en ? " (map)" : " (карта)")
                                                        : "";
         const std::string keys = shortcutKeys(all, i);
+        // Подписи клавиш («Стрелки», «Shift+стрелки») — тоже на языке
+        // справки.
         if (!keys.empty())
-            p.push_back(keys + " — " + netToLower(en ? i18n::tr(s.text) : s.text) + where);
+            p.push_back((en ? i18n::tr(keys) : keys) + " — " +
+                        netToLower(en ? i18n::tr(s.text) : s.text) + where);
     }
 }
 

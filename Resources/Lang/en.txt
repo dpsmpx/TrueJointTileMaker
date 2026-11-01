@@ -1446,3 +1446,42 @@ English — в настройках, темы — «Вид → Оформлен�
 Свои клавиши и набор «как в Aseprite»	Your own keys and the "Like Aseprite" preset
 Справка с оглавлением и поиском, «?» на экранах	Help with contents and search, "?" on screens
 Нажим пера, F10 — меню, цвета луковой кожи	Pen pressure, F10 — menu, onion skin colors
+{} : {}  {}\n{}  {}  объектов {}	{} : {}  {}\n{}  {}  objects {}
+—\n{}  {}  объектов {}	—\n{}  {}  objects {}
+{} : {}   {}   ·   {}	{} : {}   {}   ·   {}
+{}   {}   объектов {}	{}   {}   objects {}
+«{}»	"{}"
+• {}	• {}
+{} — теперь «{}»	{} is now "{}"
+Enter — «{}»,   Escape — «{}»	Enter — "{}",   Escape — "{}"
+Шестнадцать файлов {}_0.png … {}_15.png — в папке набора. Карта картинками уже подбирает их по соседям.	Sixteen files {}_0.png … {}_15.png are in the tileset folder. The map drawn with tiles already picks them by neighbors.
+В {} есть изменения, которых нет в файле. {}	The {} has changes that are not in the file. {}
+Открыть {}?	Open {}?
+Открыть тайл {}?	Open tile {}?
+Заготовка стыков «{}»	Joints template "{}"
+Заготовка: {}	Template: {}
+Разрезать на варианты «{}»	Split into variants "{}"
+Заменено клеток: {}. Отменить — Z.	Cells replaced: {}. Undo — Z.
+Записать в слот «{}»	Write to slot "{}"
+Красный: {}	Red: {}
+Зелёный: {}	Green: {}
+Синий: {}	Blue: {}
+Прозрачность: {}	Opacity: {}
+Меню — тайл *	Menu — tile *
+Меню — карта *	Menu — map *
+Окна	General
+По точкам, без сглаживания; {}	By pixels, without smoothing; {}
+Размер от {} до {} пикселей	Size from {} to {} pixels
+Свои сочетания ({}) сбросятся: набор ставит клавиши заново.	Your combinations ({}) will be reset: the preset assigns keys anew.
+Вектор {}	Vector {}
+Группа {}	Group {}
+Тайлы {}	Tiles {}
+Слой {}	Layer {}
+Метка {}	Tag {}
+Экспорт: «{}»	Export: "{}"
+все объекты: {}	all objects: {}
+да	yes
+новая карта   {}	new map   {}
+новый тайл   {}	new tile   {}
+Медианный разрез цветов {}; прозрачность точек остаётся	Median cut of colors {}; pixel transparency stays
+Точек, чей цвет не совпадает ни с одной ячейкой палитры: {}. Свести их к ближайшим цветам палитры или добавить их цвета в палитру?	Pixels whose color matches no palette cell: {}. Reduce them to the nearest palette colors or add their colors to the palette?

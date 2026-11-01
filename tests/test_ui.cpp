@@ -1122,4 +1122,28 @@ TEST(UiDefaults, ReleasePaletteIsResurrect64) {
     EXPECT_EQ(Config{}.paletteFile, "Resources/Palitra.png");
 }
 
+TEST(UiI18n, NestedPatternsAndOrder) {
+    const LangGuard guard;
+    i18n::loadCatalogText(
+        "Слой «{}»\tLayer \"{}\"\n"
+        "Вектор {}\tVector {}\n"
+        "«{}»\t\"{}\"\n"
+        "Новый документ\tNew document\n"
+        "У {} это сочетание снято.\t{} no longer has this combination.\n"
+        "стоячая вода\tstill water\n"
+        "{} стоячая вода\t{} still water\n"
+        "Заготовка: {}\tTemplate: {}\n"
+        "Диагональ \\\\\tDiagonal \\\\\n");
+    i18n::setLanguage("en");
+    // Подставленное переводится тем же путём: шаблоном внутри шаблона.
+    EXPECT_EQ(i18n::text("Слой «Вектор 2»"), "Layer \"Vector 2\"");
+    EXPECT_EQ(i18n::text("У «Новый документ» это сочетание снято."),
+              "\"New document\" no longer has this combination.");
+    // Шаблон с текстом в начале — раньше шаблона с подстановкой в начале.
+    EXPECT_EQ(i18n::text("Заготовка: стоячая вода"), "Template: still water");
+    EXPECT_EQ(i18n::text("~ стоячая вода"), "~ still water");
+    // «\\» в таблице — одна обратная черта, как её пишет tools/i18n.py.
+    EXPECT_EQ(i18n::text("Диагональ \\"), "Diagonal \\");
+}
+
 }  // namespace tjtm
