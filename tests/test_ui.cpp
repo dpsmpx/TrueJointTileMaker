@@ -12,6 +12,7 @@
 #include "core/i18n.h"
 #include "core/mapdoc.h"
 #include "core/model.h"
+#include "core/palette.h"
 #include "core/png.h"
 #include "core/scheme.h"
 #include "core/shortcuts.h"
@@ -1092,6 +1093,33 @@ TEST(UiIcons, ModernSetIsComplete) {
             std::string(TJTM_SOURCE_DIR) + "/Resources/Icons/" + iconFile(i) + ".png", g, error))
             << iconFile(i);
     }
+}
+
+// --- A9: палитра по умолчанию -------------------------------------------------
+
+TEST(UiDefaults, ReleasePaletteIsResurrect64) {
+    // Выпуск запускается с Resurrect 64: 64 разных цвета, без пустых белых
+    // ячеек палитры оригинала (UX-34). Цвета — из файла Lospec, присланного
+    // владельцем; первый и последний сверены с ним.
+    std::vector<Color> p;
+    std::string error;
+    ASSERT_TRUE(pal::parseHex(readSource("Resources/Resurrect-64.hex"), p, error)) << error;
+    ASSERT_EQ(p.size(), 64u);
+    EXPECT_EQ(p.front(), rgb(0x2E, 0x22, 0x2F));
+    EXPECT_EQ(p.back(), rgb(0xFD, 0xCB, 0xB0));
+    for (std::size_t i = 0; i < p.size(); ++i) {
+        for (std::size_t j = i + 1; j < p.size(); ++j)
+            EXPECT_NE(p[i], p[j]) << i << " и " << j;
+    }
+    Config release;
+    std::vector<std::string> lines;
+    std::istringstream in(readSource("Config.txt"));
+    for (std::string l; std::getline(in, l);)
+        lines.push_back(l);
+    release.applyLines(lines);
+    EXPECT_EQ(release.paletteFile, "Resources/Resurrect-64.hex");
+    // Сценарии и оригинал — с палитрой 1.6: на ней стоят эталоны.
+    EXPECT_EQ(Config{}.paletteFile, "Resources/Palitra.png");
 }
 
 }  // namespace tjtm

@@ -262,9 +262,15 @@ void Editor::showPaletteScreen() {
             if (removed > 0) notify("Повторы", "Убрано ячеек: " + std::to_string(removed) + ".");
         }
         if (uiButton(RX + BW + 6, y, BW, BH, "Стандартная", true)) {
-            m.pushUndo();
-            Model def;
-            m.setPalette(def.palette);
+            // Стандартная — та, с которой программа запускается (A9): в
+            // выпуске — Resurrect 64; «Классика» и Config.txt оригинала —
+            // палитра 1.6.
+            const std::string def0 = resolvePath(cfg.paletteFile);
+            if (classicUi_ || cfg.paletteFile.empty() || !loadPaletteFile(def0, true, false)) {
+                m.pushUndo();
+                Model def;
+                m.setPalette(def.palette);
+            }
         }
 
         // --- сортировка ---

@@ -47,8 +47,10 @@ StartupImage =
 # Открывать последний файл вместо стартового изображения.
 AutoLoadLastFile = да
 
-# Файл палитры 8x8, загружаемый при запуске.
-PaletteFile = Resources/Palitra.png
+# Файл палитры, загружаемый при запуске: PNG 8x8 (точка — ячейка), GIMP
+# .gpl, Lospec .hex или JASC .pal. Resurrect 64 (Kerrie Lake, Lospec) —
+# 64 цвета без пустых ячеек; палитра оригинала — Resources/Palitra.png.
+PaletteFile = Resources/Resurrect-64.hex
 
 # Заполняется программой.
 LastFile =

@@ -57,6 +57,10 @@ Linux, со всем планом `RoadToProLevel` и тем, что сдела�
     файлы тем («Вид → Оформление»); тени и движение с настройкой
     «Уменьшить движение».
 
+Версия 2.0.1 добавляет значки инструментов одного стиля, окрашенные
+темой, и палитру по умолчанию Resurrect 64 — последние пункты плана
+«Интерфейс».
+
 **English.** True Joint Tile Maker is a pixel art, animation and tile map
 editor. Switch the interface to English in Settings → Language (or
 `Language = english` in `Config.txt`); the built-in help is translated too.
@@ -432,7 +436,7 @@ python3 tools/gen_maps.py && make embed && make
 | `IconsFolder` | папка значков кнопок; пусто — кнопки с подписями |
 | `StartupImage` | картинка, открываемая при запуске; пусто — не открывать |
 | `AutoLoadLastFile` | открывать последний файл вместо стартовой картинки |
-| `PaletteFile` | палитра 8×8, загружаемая при запуске |
+| `PaletteFile` | палитра, загружаемая при запуске: PNG 8×8, `.gpl`, `.hex`, `.pal`; в выпуске — Resurrect 64, у оригинала — `Resources/Palitra.png` |
 | `LastFile`, `LastMapFile`, `LastFolder` | заполняются программой |
 
 При запуске открывается последний файл (`AutoLoadLastFile`), а если его нет —
@@ -453,6 +457,9 @@ GNU General Public License версии 3, см. файл `LICENSE`.
 которой построен весь интерфейс редактора.
 
 Игре Andors-Love за формат карт, ради которого сделан режим локаций.
+
+Kerrie Lake за палитру [Resurrect 64](https://lospec.com/palette-list/resurrect-64)
+— палитру по умолчанию (`Resources/Resurrect-64.hex`).
 
 Группе [vk.com/programmer_ne_lamer](https://vk.com/programmer_ne_lamer) за
 сообщество и поддержку.
