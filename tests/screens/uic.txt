@@ -97,3 +97,20 @@ sleep 0.2
 shot 14_export
 key Escape
 sleep 0.2
+# C5: поворот на любой угол — панелью у холста, итог на самом холсте.
+key k
+sleep 0.4
+click 390 248               # «Повернуть на любой угол…»
+sleep 0.4
+click 444 163               # +15
+sleep 0.3
+click 444 163               # +15 — 30°
+sleep 0.5
+move 770 550
+sleep 0.2
+shot 15_rotate_preview
+key Escape                  # отмена: картинка прежняя
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 16_rotate_cancel

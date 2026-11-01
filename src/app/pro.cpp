@@ -595,6 +595,11 @@ bool Editor::askNumbers(const std::string& title, const std::string& hint,
 
 /// Поворот на любой угол: угол, способ, рост холста.
 void Editor::showRotateDialog() {
+    // В новых темах — панелью у холста, с поворотом на самом холсте (C5).
+    if (active.modern && !classicUi_) {
+        rotatePreviewPanel();
+        return;
+    }
     int deg = rotateDeg_;
     bool done = false;
     bool ok = false;
@@ -664,6 +669,10 @@ void Editor::showRotateDialog() {
 
 /// Контур первым цветом: снаружи или внутри, толщина, соседи.
 void Editor::showOutlineDialog() {
+    if (active.modern && !classicUi_) {
+        outlinePreviewPanel();
+        return;
+    }
     bool done = false;
     bool ok = false;
     dropInput();

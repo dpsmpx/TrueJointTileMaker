@@ -115,6 +115,7 @@ if(TJTM_BUILD_APP)
         src/app/menu.cpp
         src/app/palette_ui.cpp
         src/app/panel.cpp
+        src/app/preview_ui.cpp
         src/app/pro.cpp
         src/app/screens.cpp
         src/app/timeline.cpp

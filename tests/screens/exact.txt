@@ -172,3 +172,5 @@ uic        11_search        0    0  780  560
 uic        12_tileset       0    0  780  560
 uic        13_write_slot    0    0  780  560
 uic        14_export        0    0  780  560
+uic        15_rotate_preview 0    0  780  560
+uic        16_rotate_cancel 0    0  780  560

@@ -560,6 +560,14 @@ private:
     void showToolOptions();
     void showImageScreen();
     void showRotateDialog();
+    /// Диалог панелью у правого края холста, итог — на самом холсте (C5).
+    /// controls рисует параметры и говорит, сменились ли они; apply
+    /// применяет операцию (она сама кладёт шаг истории). true — применено.
+    bool previewPanel(const std::string& title, int height,
+                      const std::function<bool(int x, int y)>& controls,
+                      const std::function<bool()>& apply, const std::string& okText);
+    bool rotatePreviewPanel();
+    bool outlinePreviewPanel();
     void showOutlineDialog();
     /// Два числа со ступенями ±1 и ±8; anchor — сетка якоря 3x3 (номер
     /// ay * 3 + ax) или nullptr.
