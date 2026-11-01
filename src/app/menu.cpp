@@ -764,14 +764,14 @@ void Editor::showStartScreen() {
         const int ny = 132 + 6 * kRowH + 4;
         uiTitle(RX, ny, RX + RW, ny + 24, std::string("Что нового в ") + kAppVersion);
         static constexpr const char* kNews[] = {
-            "Окно растягивается, F11 — во весь экран",
-            "Строка меню, параметры инструмента, история",
-            "Базовый режим — Shift+Tab, поиск команд — Ctrl+K",
-            "Экспорт в одном окне, «Экспортировать снова»",
+            "English — в настройках, темы — «Вид → Оформление»",
+            "Свои клавиши и набор «как в Aseprite»",
+            "Справка с оглавлением и поиском, «?» на экранах",
+            "Нажим пера, F10 — меню, цвета луковой кожи",
         };
         int ly = ny + 30;
         for (const char* n : kNews) {
-            uiLabelLeft(RX + 8, ly, 20, "·  " + i18n::tr(n), cTextDim);
+            uiLabelLeft(RX + 8, ly, 20, fitTextEnd("·  " + i18n::tr(n), RW - 12), cTextDim);
             ly += 20;
         }
         // Флажок «показывать при запуске» (UX-47).

@@ -529,10 +529,6 @@ X и Y — целые числа	X and Y are whole numbers
 Выход	Quit
 Пока пусто: открытые и сохранённые файлы появятся здесь	Empty for now: opened and saved files will appear here
 ~Что нового в 	What's new in 
-Окно растягивается, F11 — во весь экран	The window resizes, F11 — full screen
-Строка меню, параметры инструмента, история	Menu bar, tool options, history
-Базовый режим — Shift+Tab, поиск команд — Ctrl+K	Basic mode — Shift+Tab, command search — Ctrl+K
-Экспорт в одном окне, «Экспортировать снова»	Export in one window, "Export again"
 Показывать при запуске	Show at startup
 ~версия 	version 
 ~   ·   Escape — к редактору	   ·   Escape — to the editor
@@ -939,7 +935,6 @@ Enter — готово, Escape — отмена. Работают выделен
 Луковая кожа   F3	Onion skin   F3
 Кадров до и после…	Frames before and after…
 Луковая кожа	Onion skin
-Прошлые кадры — красноватые, будущие — синеватые	Past frames are reddish, future ones bluish
 Кадров до	Frames before
 Кадров после	Frames after
 Экспорт: «	Export: "
@@ -1447,3 +1442,7 @@ TIFF в CMYK, YCbCr и Lab не поддержан: сохраните в RGB	TI
 Тема «{}»	Theme "{}"
 {} (и ещё {})	{} (and {} more)
 Уменьшить движение	Reduce motion
+English — в настройках, темы — «Вид → Оформление»	English in Settings, themes in "View → Appearance"
+Свои клавиши и набор «как в Aseprite»	Your own keys and the "Like Aseprite" preset
+Справка с оглавлением и поиском, «?» на экранах	Help with contents and search, "?" on screens
+Нажим пера, F10 — меню, цвета луковой кожи	Pen pressure, F10 — menu, onion skin colors
