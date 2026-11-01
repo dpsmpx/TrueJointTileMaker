@@ -951,6 +951,12 @@ std::string Editor::tilesDir() const {
 
 /// Папка значков — своя, а не общая с игрой: значки — имущество редактора.
 std::string Editor::iconsDir() const {
+    // Новые темы — с набором 2.0 одного стиля (C7, UX-31), пока папка не
+    // сменена в настройках; «Классика» — значки 1.6, на них стоит сверка.
+    if (active.modern && !classicUi_ && cfg.iconsFolder == Config{}.iconsFolder) {
+        const std::string m2 = resolvePath(pathCombine(cfg.iconsFolder, "modern"));
+        if (!m2.empty() && dirExists(m2)) return m2;
+    }
     const std::string r = resolvePath(cfg.iconsFolder);
     return (!r.empty() && dirExists(r)) ? r : std::string();
 }
@@ -970,6 +976,7 @@ void Editor::ensureIcons() {
     if (!iconsDirty_) return;
     iconsDirty_ = false;
     iconBmp_.assign(static_cast<std::size_t>(iconCount()), Grid<Color>{});
+    iconSel_.assign(static_cast<std::size_t>(iconCount()), Grid<Color>{});
     for (int i = 0; i < iconCount(); ++i) {
         const std::string path = tsetPathOf(TS_ICON, iconFile(i));
         if (path.empty() || !fileExists(path)) continue;
@@ -989,16 +996,33 @@ void Editor::ensureIcons() {
         // берут цвет текста темы, от светлых к фону панели, а цветные
         // акценты остаются: в тёмной теме чёрные линии иначе не видны
         // (docs/ui-design-system.md, «Значки»).
+        // Цветное — акцент: вторая маска, окрашенная акцентом темы (C7,
+        // ДС-4), так значки следуют и выбранному акценту (D8).
+        Grid<Color> sel = icon;
         if (active.modern) {
             for (Color& c : icon.d) {
                 if (c.a == 0) continue;
                 const int hi = std::max({c.r, c.g, c.b});
                 const int lo = std::min({c.r, c.g, c.b});
-                if (hi - lo > 48) continue;
-                const Color t = theme::mix(cText, cPanel, (c.r * 77 + c.g * 150 + c.b * 29) / 256);
+                const Color t = hi - lo > 48 ? cAccent
+                                             : theme::mix(cText, cPanel,
+                                                          (c.r * 77 + c.g * 150 + c.b * 29) / 256);
                 c = argb(c.a, t.r, t.g, t.b);
             }
+            const Color on = active.onAccentContainer;
+            for (Color& c : sel.d) {
+                if (c.a != 0) c = argb(c.a, on.r, on.g, on.b);
+            }
+            // Акцент на выбранном — тоном между подписью и контейнером:
+            // форма читается, акцент остаётся заметным.
+            const Color mid = theme::mix(on, active.accentContainer, 110);
+            for (std::size_t k = 0; k < sel.d.size(); ++k) {
+                const Color c = icon.d[k];
+                if (c.a != 0 && c == argb(c.a, cAccent.r, cAccent.g, cAccent.b))
+                    sel.d[k] = argb(c.a, mid.r, mid.g, mid.b);
+            }
         }
+        iconSel_[static_cast<std::size_t>(i)] = std::move(sel);
         iconBmp_[static_cast<std::size_t>(i)] = std::move(icon);
     }
     m.needRepaint = true;
