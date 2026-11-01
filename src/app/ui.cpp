@@ -724,4 +724,32 @@ std::vector<std::string> Editor::layoutText(const std::vector<std::string>& para
     return out;
 }
 
+void Editor::drawElevation(int x0, int y0, int x1, int y1, int r, int level) {
+    if (!active.modern || classicUi_) return;
+    // Размытая тень — стопкой расширяющихся полупрозрачных прямоугольников:
+    // середина набирает полную плотность, край тает (ДС-6: уровень 2 —
+    // смещение 2, размытие 6, 15 %; уровень 3 — 8, 24, 20 %).
+    // У уровня 2 размытие чуть шире ДС-6 (10 вместо 6): в программном
+    // кадре без настоящего размытия узкая тень пряталась под самим меню.
+    const int off = level >= 3 ? 8 : 3;
+    const int blur = level >= 3 ? 24 : 10;
+    const int peak = level >= 3 ? 51 : 44;
+    const int layers = level >= 3 ? 8 : 4;
+    for (int k = layers; k >= 1; --k) {
+        const int e = blur * k / layers / 2;
+        fb_.fillRoundRect(x0 - e, y0 - e + off, x1 + e, y1 + e + off, r + e * 2, r + e * 2,
+                          argb(std::max(1, peak / layers), 0, 0, 0));
+    }
+}
+
+float Editor::motion(int startMs, int durationMs) {
+    if (cfg.reduceMotion || classicUi_ || durationMs <= 0) return 1.0F;
+    const float t = std::clamp(
+        static_cast<float>(pf_.milliseconds() - startMs) / static_cast<float>(durationMs), 0.0F,
+        1.0F);
+    // Замедление к концу, как cubic-bezier(0.2, 0, 0, 1) у Material 3.
+    const float u = 1.0F - t;
+    return 1.0F - u * u * u;
+}
+
 }  // namespace tjtm

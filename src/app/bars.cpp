@@ -116,6 +116,8 @@ void Editor::openMenu(int menu) {
     const gfx::Surface under = fb_;
     const bool tile = m.docMode == DOC_TILE;
     int open = menu;
+    int shown = -1;  // список, который уже раскрылся
+    int openedAt = 0;  // когда раскрылся: список выезжает за 120 мс (D9)
     int hot = -1;  // пункт под курсором или выбранный стрелками
     Cmd run = Cmd::MainMenu;
     int runArg = 0;
@@ -215,7 +217,15 @@ void Editor::openMenu(int menu) {
 
         fb_ = under;
         drawMenuBar(open);
-        fb_.fillRoundRect(x0 + 2, kMenuBarH + 2, x1 + 2, y1 + 3, 10, 10, active.shadow);
+        if (shown != open) {
+            shown = open;
+            openedAt = pf_.milliseconds();
+        }
+        const float t = motion(openedAt, 120);
+        fb_.setClip(
+            gfx::Rect{0, kMenuBarH, gLayout.w,
+                      kMenuBarH + static_cast<int>(static_cast<float>(y1 + 40 - kMenuBarH) * t)});
+        drawElevation(x0, kMenuBarH, x1, y1, 10, 2);
         fb_.fillRoundRect(x0, kMenuBarH, x1, y1, 10, 10, cBorder);
         fb_.fillRoundRect(x0 + 1, kMenuBarH + 1, x1 - 1, y1 - 1, 9, 9, cFace);
         for (std::size_t k = 0; k < rows.size(); ++k) {
@@ -233,6 +243,7 @@ void Editor::openMenu(int menu) {
             const std::string keys = commandKeys(r.item->cmd, r.item->arg, tile);
             if (!keys.empty()) textOut(x1 - 14 - textWidth(keys), ty, keys, cTextDim);
         }
+        fb_.resetClip();
         redraw();
 
         if (frameClick_) {

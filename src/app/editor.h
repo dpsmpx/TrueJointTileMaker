@@ -295,7 +295,15 @@ private:
     struct CardBack {
         gfx::Surface dim;  // снимок с затемнением — фон карточки
         gfx::Surface orig;  // снимок как был — вернуть в кадр после диалога
+        int start = 0;  // когда появилась: затемнение проявляется (D9)
     };
+    /// Тень под всплывающим (D9, ДС-6): уровень 2 — меню, подсказки,
+    /// уведомления; 3 — диалоги. В «Классике» теней нет.
+    void drawElevation(int x0, int y0, int x1, int y1, int r, int level);
+    /// Доля пройденного движения 0..1 с замедлением к концу; «Уменьшить
+    /// движение» и «Классика» — сразу 1.
+    float motion(int startMs, int durationMs);
+    int toastStart_ = 0;
     std::optional<CardBack> cardBackdrop();
     /// Начало кадра диалога: притушенный снимок и карточка, или страница.
     void dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0, int x1, int y1);

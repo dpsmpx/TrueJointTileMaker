@@ -273,7 +273,7 @@ std::string Editor::keysHint(const std::string& enter, const std::string& escape
 
 std::optional<Editor::CardBack> Editor::cardBackdrop() {
     if (!active.modern) return std::nullopt;
-    CardBack b{fb_, fb_};
+    CardBack b{fb_, fb_, pf_.milliseconds()};
     // Притушить всё окно, а не одну страницу.
     b.dim.setOrigin(0, 0);
     b.dim.fillRect(0, 0, b.dim.width(), b.dim.height(), active.scrim);
@@ -289,9 +289,21 @@ void Editor::dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0,
         fb_.clear(cWindow);
         return;
     }
-    fb_ = backdrop->dim;
+    // Затемнение проявляется за 150 мс (D9): окно не гаснет рывком.
+    const float t = motion(backdrop->start, 150);
+    if (t < 1.0F) {
+        fb_ = backdrop->orig;
+        fb_.setOrigin(0, 0);
+        const Color s = active.scrim;
+        fb_.fillRect(0, 0, fb_.width(), fb_.height(),
+                     argb(static_cast<int>(static_cast<float>(s.a) * t), s.r, s.g, s.b));
+        m.needRepaint = true;
+    } else {
+        fb_ = backdrop->dim;
+    }
     fb_.setOrigin(pageX_, pageY_);
     const int r = active.radius * 4;
+    drawElevation(x0, y0, x1, y1, r, 3);
     fb_.fillRoundRect(x0, y0, x1, y1, r, r, cBorder);
     fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 2, r - 2, cFace);
 }
@@ -304,6 +316,7 @@ void Editor::notify(const std::string& title, const std::string& text) {
     toastTitle_ = title;
     toastText_ = text;
     toastUntil_ = pf_.milliseconds() + 4000;
+    toastStart_ = pf_.milliseconds();
     m.needRepaint = true;
 }
 
@@ -319,11 +332,15 @@ void Editor::drawToast() {
     // Внизу холста, над лентой кадров: там, куда смотрят после действия,
     // и не поверх панели с инструментами.
     const int x = std::max(8, (m.W - w) / 2);
-    const int y = m.H - h - 14;
+    // Въезжает снизу за 200 мс (D9).
+    const float t = motion(toastStart_, 200);
+    const int y = m.H - h - 14 + static_cast<int>((1.0F - t) * 24.0F);
+    if (t < 1.0F) m.needRepaint = true;
     // Место — на холсте окна, и поверх экрана-страницы тоже.
     const int ox = fb_.originX();
     const int oy = fb_.originY();
     fb_.setOrigin(0, 0);
+    drawElevation(x, y, x + w, y + h, 12, 2);
     fb_.fillRoundRect(x, y, x + w, y + h, 12, 12, active.inverseSurface);
     textOut(x + 14, y + 8, toastTitle_, active.inverseOnSurface);
     for (std::size_t i = 0; i < lines.size(); ++i)

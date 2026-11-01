@@ -17,6 +17,7 @@ using namespace theme;
 void Editor::showAppearance() {
     const std::string oldTheme = cfg.theme;
     const std::string oldAccent = cfg.themeAccent;
+    const bool oldCalm = cfg.reduceMotion;
     std::string custom = cfg.themeAccent.empty() ? hexColor(kDefaultSeed) : cfg.themeAccent;
     bool done = false;
     bool ok = false;
@@ -115,6 +116,11 @@ void Editor::showAppearance() {
                     std::to_string(static_cast<int>(cr * 10) % 10) + ":1",
                 cr >= 4.5 ? cTextDim : cWarn);
 
+        // Движение (D9): уведомления въезжают, меню раскрывается, окно
+        // под диалогом гаснет плавно. Кому это мешает — выключает.
+        bool calm = cfg.reduceMotion;
+        uiSwitch(RX, py + 162, 412, "Уменьшить движение", calm);
+        cfg.reduceMotion = calm;
         if (uiButton(WIN_W - 24 - 284, WIN_H - 52, 140, 36, "Отмена", true)) done = true;
         if (uiPrimary(WIN_W - 24 - 140, WIN_H - 52, 140, 36, "Готово", true)) {
             ok = true;
@@ -135,6 +141,7 @@ void Editor::showAppearance() {
     } else {
         cfg.theme = oldTheme;
         cfg.themeAccent = oldAccent;
+        cfg.reduceMotion = oldCalm;
         applyTheme();
     }
     m.needRepaint = true;

@@ -71,6 +71,7 @@ void Editor::drawTip() {
     const int maxY = screenFrame_ ? WIN_H : gLayout.h;
     if (x + w > maxX - 4) x = std::max(4, maxX - 4 - w);
     if (y + h > maxY - 4) y = std::max(4, tipY_ - h - 8);
+    drawElevation(x, y, x + w, y + h, 8, 2);
     fb_.fillRoundRect(x, y, x + w, y + h, 8, 8, active.inverseSurface);
     for (std::size_t i = 0; i < lines.size(); ++i)
         textOut(x + 8, y + 5 + static_cast<int>(i) * lh, lines[i], active.inverseOnSurface);

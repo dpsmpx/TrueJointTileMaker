@@ -101,6 +101,8 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             penPressureAir = parseBool(val, penPressureAir);
         } else if (key == "onioncolors") {
             onionColors = parseInt(val, onionColors, 0, 2);
+        } else if (key == "reducemotion") {
+            reduceMotion = parseBool(val, reduceMotion);
         } else if (key == "themeaccent") {
             themeAccent = netTrim(val);
         } else if (key == "language") {
@@ -235,6 +237,11 @@ std::string Config::serialize() const {
     add("PaletteFile = " + paletteFile);
     add("");
     const Config def;
+    if (reduceMotion != def.reduceMotion) {
+        add("# Уменьшить движение: окна и уведомления появляются сразу.");
+        add(std::string("ReduceMotion = ") + ruBool(reduceMotion));
+        add("");
+    }
     if (!themeAccent.empty()) {
         add("# Акцент оформления: из него считаются все цвета темы.");
         add("ThemeAccent = " + themeAccent);

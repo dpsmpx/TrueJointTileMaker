@@ -1446,3 +1446,4 @@ TIFF в CMYK, YCbCr и Lab не поддержан: сохраните в RGB	TI
 строка {}: {} — не цвет	line {}: {} is not a color
 Тема «{}»	Theme "{}"
 {} (и ещё {})	{} (and {} more)
+Уменьшить движение	Reduce motion
