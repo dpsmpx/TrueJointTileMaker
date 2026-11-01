@@ -754,6 +754,21 @@ private:
     std::string askExportFile(const std::string& title, const std::string& suggested,
                               const std::string& ext, const std::string& filterName);
     void exportSheetAsk();
+    /// Задание выгрузки (C8, UX-50): что, какие кадры, увеличение и куда.
+    /// Запоминается в метаданных проекта — «Экспортировать снова» повторяет
+    /// его без вопросов.
+    struct ExportJob {
+        std::string kind;  // png, sheet, gif, apng, frames
+        int first = 1, last = 1, scale = 1, plays = 0;
+        std::string path;
+    };
+    void runExport(const ExportJob& job);
+    void rememberExport(const ExportJob& job);
+    [[nodiscard]] std::optional<ExportJob> lastExport() const;
+    void exportPngAsk();
+    void exportAgain();
+    /// Окно «Экспорт»: все виды выгрузки в одном месте.
+    void showExportCard();
     void exportAnimationAsk(bool gif);
     void exportFramesAsk();
     /// Первый кадр сведённым PNG — в слот набора тайлов из метаданных.

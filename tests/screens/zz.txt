@@ -1,13 +1,8 @@
 key Escape
 sleep 0.2
-key t
-sleep 0.4
-click 100 160
+key ctrl+shift+e
+sleep 0.3
+move 770 550
 sleep 0.2
-move 700 300
-sleep 0.2
-shot a_tset
-click 640 103
-type стен
-sleep 0.2
-shot b_search
+shot a_export
+key Escape

@@ -334,6 +334,8 @@ void Editor::runCommand(Cmd c, int arg) {
             break;
         }
         case Cmd::MapFind: showMapFindScreen(); break;
+        case Cmd::Export: showExportCard(); break;
+        case Cmd::ExportAgain: exportAgain(); break;
         case Cmd::DeleteObject: {
             // Удаление — клавишей над объектом (UX-44): правая кнопка у
             // остальных инструментов берёт, а не портит.

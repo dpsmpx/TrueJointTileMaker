@@ -171,3 +171,4 @@ uic        10_base_menu     0    0  780  560
 uic        11_search        0    0  780  560
 uic        12_tileset       0    0  780  560
 uic        13_write_slot    0    0  780  560
+uic        14_export        0    0  780  560

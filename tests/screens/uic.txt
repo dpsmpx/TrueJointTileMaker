@@ -89,3 +89,11 @@ key Escape
 sleep 0.2
 key Escape
 sleep 0.2
+# C8: окно «Экспорт» (Ctrl+Shift+E) — все виды выгрузки в одном месте.
+key ctrl+shift+e
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 14_export
+key Escape
+sleep 0.2

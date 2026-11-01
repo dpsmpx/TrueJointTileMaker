@@ -112,6 +112,8 @@ enum class Cmd {
     UiMode,
     CommandSearch,
     DeleteObject,
+    Export,
+    ExportAgain,
 };
 
 struct Shortcut {

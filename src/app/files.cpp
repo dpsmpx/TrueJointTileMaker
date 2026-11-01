@@ -468,6 +468,58 @@ void Editor::exportSheetAsk() {
     const std::string path = askExportFile("Сохранить лист спрайтов",
                                            exportBase(m.currentFile) + "_sheet.png", "png", "PNG");
     if (path.empty()) return;
+    const ExportJob job{"sheet", first, last, scale, 0, path};
+    runExport(job);
+    rememberExport(job);
+}
+
+namespace {
+
+/// Раскладка листа — строкой в метаданных: «Экспортировать снова» кладёт
+/// лист так же.
+std::string sheetLayoutText(int cols, int margin, int spacing, int padding, int bg) {
+    return std::to_string(cols) + "," + std::to_string(margin) + "," + std::to_string(spacing) +
+           "," + std::to_string(padding) + "," + std::to_string(bg);
+}
+
+}  // namespace
+
+void Editor::runExport(const ExportJob& job) {
+    const int nf = m.doc.frameCount();
+    const int first = std::clamp(std::min(job.first, job.last), 1, std::max(1, nf));
+    const int last = std::clamp(std::max(job.first, job.last), 1, std::max(1, nf));
+    const std::string& path = job.path;
+    std::string err;
+    if (job.kind == "gif" || job.kind == "apng") {
+        saveAnimationTo(path, first - 1, last - 1, job.scale, job.plays, false);
+        return;
+    }
+    if (job.kind == "png") {
+        const auto frames = scaleFrames(m.animationFrames(first - 1, first - 1), job.scale);
+        if (frames.empty() || !pngSave(path, frames.front().image, err))
+            errorSave("Не удалось сохранить картинку", path + ": " + err);
+        return;
+    }
+    if (job.kind == "frames") {
+        const std::string stem = path.substr(0, path.size() - pathExtLower(path).size());
+        const auto frames = scaleFrames(m.animationFrames(first - 1, last - 1), job.scale);
+        std::string failed;
+        for (std::size_t k = 0; k < frames.size() && failed.empty(); ++k) {
+            char num[16];
+            std::snprintf(num, sizeof num, "_%03d.png", first + static_cast<int>(k));
+            std::string name = stem;
+            name += num;
+            if (!pngSave(name, frames[k].image, err)) failed = name;
+        }
+        if (!failed.empty()) errorSave("Не удалось сохранить кадр", failed + ": " + err);
+        return;
+    }
+    if (job.kind != "sheet") return;
+    const int cols = sheetCols_;
+    const int margin = sheetMargin_;
+    const int spacing = sheetSpacing_;
+    const int padding = sheetPadding_;
+    const int scale = job.scale;
     SheetOptions o;
     o.layout = cols == 0 ? SHEET_ROW : (cols == 1 ? SHEET_COLUMN : SHEET_GRID);
     o.columns = cols;
@@ -477,7 +529,6 @@ void Editor::exportSheetAsk() {
     o.scale = scale;
     o.background = sheetBg_ == 1 ? m.secondColor : (sheetBg_ == 2 ? m.firstColor : kClear);
     const SpriteSheet sheet = buildSheet(m.animationFrames(first - 1, last - 1), o);
-    std::string err;
     if (!pngSave(path, sheet.image, err)) {
         errorSave("Не удалось сохранить лист", path + ": " + err);
         return;
@@ -493,6 +544,124 @@ void Editor::exportSheetAsk() {
     const std::string jsonPath = replaceExtension(path, ".json");
     if (!writeFile(jsonPath, json))
         errorSave("Не удалось сохранить описание", jsonPath + ": не удалось записать файл.");
+}
+
+void Editor::rememberExport(const ExportJob& job) {
+    m.setMeta("export.kind", job.kind);
+    m.setMeta("export.frames", std::to_string(job.first) + "," + std::to_string(job.last) + "," +
+                                   std::to_string(job.scale) + "," + std::to_string(job.plays));
+    m.setMeta("export.path", job.path);
+    if (job.kind == "sheet")
+        m.setMeta("export.sheet", sheetLayoutText(sheetCols_, sheetMargin_, sheetSpacing_,
+                                                  sheetPadding_, sheetBg_));
+}
+
+std::optional<Editor::ExportJob> Editor::lastExport() const {
+    ExportJob job;
+    job.kind = m.metaValue("export.kind");
+    job.path = m.metaValue("export.path");
+    if (job.kind.empty() || job.path.empty()) return std::nullopt;
+    const std::string f = m.metaValue("export.frames");
+    std::sscanf(f.c_str(), "%d,%d,%d,%d", &job.first, &job.last, &job.scale, &job.plays);
+    return job;
+}
+
+void Editor::exportPngAsk() {
+    int frame = m.activeFrame + 1;
+    int scale = 1;
+    const int nf = m.doc.frameCount();
+    if (!askNumbers("Картинка PNG", "Кадр целиком, слои сведены; увеличение — без сглаживания",
+                    {{"Кадр", &frame, 1, std::max(1, nf)}, {"Увеличение", &scale, 1, 8}}, "Дальше…",
+                    nullptr))
+        return;
+    const std::string path = askExportFile("Сохранить картинку",
+                                           exportBase(m.currentFile) + "_export.png", "png", "PNG");
+    if (path.empty()) return;
+    const ExportJob job{"png", frame, frame, scale, 0, path};
+    runExport(job);
+    rememberExport(job);
+}
+
+void Editor::exportAgain() {
+    const std::optional<ExportJob> job = lastExport();
+    if (!job) {
+        notify("Экспортировать снова",
+               "Этот документ ещё не выгружали — сначала «Файл → Экспорт…» (Ctrl+Shift+E).");
+        return;
+    }
+    // Раскладка листа — та, что была при выгрузке.
+    const std::string layout = m.metaValue("export.sheet");
+    if (job->kind == "sheet" && !layout.empty())
+        std::sscanf(layout.c_str(), "%d,%d,%d,%d,%d", &sheetCols_, &sheetMargin_, &sheetSpacing_,
+                    &sheetPadding_, &sheetBg_);
+    runExport(*job);
+    notify("Экспортировано снова", pathFileName(job->path));
+}
+
+void Editor::showExportCard() {
+    const auto backdrop = cardBackdrop();
+    constexpr int kW = 520;
+    constexpr int kH = 420;
+    const int x0 = (WIN_W - kW) / 2;
+    const int y0 = (WIN_H - kH) / 2;
+    const std::optional<ExportJob> again = lastExport();
+    int pick = -1;
+    bool done = false;
+    dropInput();
+    pf_.input().keys.clear();
+    struct Kind {
+        const char* title;
+        const char* hint;
+    };
+    static constexpr Kind kKinds[] = {
+        {"Картинка PNG", "кадр целиком, слои сведены"},
+        {"Лист спрайтов и JSON", "кадры одной картинкой с описанием для движков"},
+        {"Анимация GIF", "до 256 цветов, прозрачность только полная"},
+        {"Анимация APNG", "все цвета и полупрозрачность"},
+        {"Каждый кадр в PNG", "имя_001.png, имя_002.png…"},
+        {"Лист 8×8 для игры", "основные тайлы набора одной картинкой"},
+    };
+    constexpr int kCount = static_cast<int>(sizeof kKinds / sizeof kKinds[0]);
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        dialogBack(backdrop, x0, y0, x0 + kW, y0 + kH);
+        uiTitle(x0, y0 + 12, x0 + kW, y0 + 40, "Экспорт");
+        int y = y0 + 52;
+        if (again) {
+            if (uiPrimary(x0 + 20, y, kW - 40, 34,
+                          "Экспортировать снова: " + fitText(pathFileName(again->path), 220),
+                          true)) {
+                pick = 100;
+                done = true;
+            }
+            y += 44;
+        }
+        for (int k = 0; k < kCount; ++k) {
+            if (uiButton(x0 + 20, y, 190, 34, kKinds[k].title, true)) {
+                pick = k;
+                done = true;
+            }
+            uiLabelLeft(x0 + 222, y, 34, fitTextEnd(kKinds[k].hint, kW - 242), cTextDim);
+            y += 40;
+        }
+        if (uiButton(x0 + kW / 2 - 85, y0 + kH - 50, 170, 36, "Отмена", true)) done = true;
+        redraw();
+        if (takeKey() == KEY_ESC) done = true;
+        idle();
+    }
+    waitMouseRelease();
+    endCard(backdrop);
+    m.needRepaint = true;
+    switch (pick) {
+        case 0: exportPngAsk(); break;
+        case 1: exportSheetAsk(); break;
+        case 2: exportAnimationAsk(true); break;
+        case 3: exportAnimationAsk(false); break;
+        case 4: exportFramesAsk(); break;
+        case 5: exportGameSheet(); break;
+        case 100: exportAgain(); break;
+        default: break;
+    }
 }
 
 void Editor::exportAnimationAsk(bool gif) {
@@ -517,7 +686,10 @@ void Editor::exportAnimationAsk(bool gif) {
     const std::string path = askExportFile(gif ? "Сохранить GIF" : "Сохранить APNG",
                                            exportBase(m.currentFile) + (gif ? ".gif" : ".png"),
                                            gif ? "gif" : "png", gif ? "GIF" : "APNG");
-    if (!path.empty()) saveAnimationTo(path, first - 1, last - 1, scale, plays, false);
+    if (path.empty()) return;
+    const ExportJob job{gif ? "gif" : "apng", first, last, scale, plays, path};
+    runExport(job);
+    rememberExport(job);
 }
 
 void Editor::exportFramesAsk() {
@@ -537,18 +709,9 @@ void Editor::exportFramesAsk() {
     const std::string path =
         askExportFile("Основа имён кадров", exportBase(m.currentFile) + ".png", "png", "PNG");
     if (path.empty()) return;
-    const std::string stem = path.substr(0, path.size() - pathExtLower(path).size());
-    const auto frames = scaleFrames(m.animationFrames(first - 1, last - 1), scale);
-    std::string err;
-    std::string failed;
-    for (std::size_t k = 0; k < frames.size() && failed.empty(); ++k) {
-        char num[16];
-        std::snprintf(num, sizeof num, "_%03d.png", first + static_cast<int>(k));
-        std::string name = stem;
-        name += num;
-        if (!pngSave(name, frames[k].image, err)) failed = name;
-    }
-    if (!failed.empty()) errorSave("Не удалось сохранить кадр", failed + ": " + err);
+    const ExportJob job{"frames", first, last, scale, 0, path};
+    runExport(job);
+    rememberExport(job);
 }
 
 void Editor::exportToTilesetSlot() {

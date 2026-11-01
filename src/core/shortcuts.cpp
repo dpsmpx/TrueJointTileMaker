@@ -32,6 +32,8 @@ constexpr std::array kTable = {
     Shortcut{KEY_O, kCtrl, kBoth, Open, 0, kFile, "Открыть"},
     Shortcut{KEY_S, kCtrl, kBoth, Save, 0, kFile, "Сохранить"},
     Shortcut{KEY_S, kCtrlShift, kBoth, SaveAs, 0, kFile, "Сохранить как"},
+    Shortcut{KEY_E, kCtrlShift, kTile, Export, 0, kFile, "Экспорт"},
+    Shortcut{KEY_E, MOD_CTRL | MOD_ALT, kTile, ExportAgain, 0, kFile, "Экспортировать снова"},
     Shortcut{KEY_A, 0, kBoth, SaveSelection, 0, kFile, "Выделение в файл"},
     // Правка
     Shortcut{KEY_Z, kCtrl, kBoth, Undo, 0, kEdit, "Отменить"},
@@ -157,6 +159,8 @@ constexpr std::array kMenu = {
     MenuItem{"Файл"},
     MenuItem{"Файл", "Сохранить", Save},
     MenuItem{"Файл", "Сохранить как…", SaveAs},
+    MenuItem{"Файл", "Экспорт…", Export, 0, kTile},
+    MenuItem{"Файл", "Экспортировать снова", ExportAgain, 0, kTile},
     MenuItem{"Файл", "Выделение в файл…", SaveSelection, 0, kTile, true},
     MenuItem{"Файл"},
     MenuItem{"Файл", "Настройки…", Settings},
