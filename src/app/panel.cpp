@@ -237,8 +237,11 @@ void Editor::drawObjectKindSection() {
         fb_.fillRoundRect(x0, y0, x0 + MSEL_CW - 2, y0 + MOBJ_CH - 2, 4, 4, cBorder);
         fb_.fillRoundRect(x0 + 1, y0 + 1, x0 + MSEL_CW - 3, y0 + MOBJ_CH - 3, 4, 4,
                           m.mapObjKind == i ? cAccent : cBack);
-        textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MOBJ_CH - 2,
-                     mapObjGlyph(mapKindName(i)) + " " + mapKindName(i),
+        // Виды по-русски (UX-42), код игры — в подсказке.
+        const std::string label = active.modern
+                                      ? mapKindTitle(mapKindName(i))
+                                      : mapObjGlyph(mapKindName(i)) + " " + mapKindName(i);
+        textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MOBJ_CH - 2, label,
                      m.mapObjKind == i ? active.onAccent : cText);
     }
 }

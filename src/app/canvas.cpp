@@ -202,7 +202,23 @@ void Editor::drawMapCells() {
             textCentered(sx, sy, sx + m.pixelSize, sy + m.pixelSize, mapObjGlyph(o.kind),
                          active.mapLabelText);
     }
+    // Замечания проверки — рамками на самой карте (UX-44), пока карту не
+    // правили.
+    if (mapIssuesShown()) {
+        for (const auto& [ix, iy] : mapIssues_) {
+            const int sx = m.tileToScreenX(ix);
+            const int sy = m.tileToScreenY(iy);
+            const int cp = m.cellPx();
+            fb_.frameRect(sx - 2, sy - 2, sx + cp + 2, sy + cp + 2, active.warn);
+            fb_.frameRect(sx - 1, sy - 1, sx + cp + 1, sy + cp + 1, active.warn);
+        }
+    }
     fb_.resetClip();
+}
+
+bool Editor::mapIssuesShown() const {
+    return !mapIssues_.empty() && m.docMode == DOC_MAP &&
+           m.mapUndo.size() + 100000 * m.mapRedo.size() == mapIssuesStamp_;
 }
 
 /// Рамка выделения «бегущими муравьями»: сплошная светлая линия и поверх

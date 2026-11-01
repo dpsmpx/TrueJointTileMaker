@@ -59,6 +59,9 @@ std::string mapKindTemplate(int i);
 bool mapKindKnown(const std::string& kind);
 /// Строка объекта в том виде, в каком она попадёт в файл.
 std::string mapObjectLine(const MapObject& o);
+/// Вид объекта по-русски (план «Интерфейс», C10, UX-42): «Житель» для
+/// npc. Пусто — вид незнакомый.
+std::string mapKindTitle(const std::string& kind);
 
 struct MapDoc {
     std::string name;
@@ -91,6 +94,9 @@ struct MapDoc {
     std::string serialize() const;
     /// Замечания проверки, по одному на строку; пусто — замечаний нет.
     std::vector<std::string> validate() const;
+    /// Клетки объектов, которые проверка не пропускает: на непроходимой
+    /// клетке. Их показывают на самой карте (UX-44).
+    [[nodiscard]] std::vector<std::pair<int, int>> problemCells() const;
 
     friend bool operator==(const MapDoc&, const MapDoc&) = default;
 };

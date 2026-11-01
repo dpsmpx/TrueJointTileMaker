@@ -130,6 +130,7 @@ constexpr std::array kTable = {
     // Карта
     Shortcut{KEY_ENTER, 0, kMap, ObjectForm, 0, kMapG, "Форма объекта"},
     Shortcut{KEY_F, kCtrl, kMap, MapFind, 0, kMapG, "Найти и заменить"},
+    Shortcut{KEY_DELETE, 0, kMap, DeleteObject, 0, kMapG, "Удалить объект под курсором"},
     Shortcut{KEY_B, kShift, kMap, MapTiles, 0, kMapG, "Картинками или клетками"},
     // Окна
     Shortcut{KEY_ESC, 0, kBoth, MainMenu, 0, kWin, "Главное меню"},
@@ -219,6 +220,7 @@ constexpr std::array kMenu = {
     MenuItem{"Карта", "К редактору тайлов", SwitchMode, 0, kMap},
     MenuItem{"Карта", "Свойства и проверка локации…", MapProperties, 0, kMap, true},
     MenuItem{"Карта", "Форма объекта под курсором", ObjectForm, 0, kMap},
+    MenuItem{"Карта", "Удалить объект под курсором", DeleteObject, 0, kMap},
     MenuItem{"Справка", "Найти команду…", CommandSearch},
     MenuItem{"Справка", "Клавиши", Cheatsheet},
     MenuItem{"Справка", "Справка", Help},

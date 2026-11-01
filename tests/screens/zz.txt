@@ -1,14 +1,8 @@
 key Escape
 sleep 0.2
-key ctrl+k
+key Tab
 sleep 0.3
-type сетк
-sleep 0.2
+key 4
 move 770 550
 sleep 0.2
-shot a_search
-key Return
-sleep 0.3
-move 770 550
-sleep 0.2
-shot b_after
+shot a_map

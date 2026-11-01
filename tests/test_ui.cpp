@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "core/config.h"
+#include "core/mapdoc.h"
 #include "core/model.h"
 #include "core/shortcuts.h"
 #include "core/theme.h"
@@ -636,6 +637,22 @@ TEST(UiModes, ConfigAndMenu) {
     // Переключатель — Shift+Tab, а Tab остаётся тайлом и картой.
     EXPECT_EQ(findShortcut(KEY_TAB, MOD_SHIFT, true)->cmd, Cmd::UiMode);
     EXPECT_EQ(findShortcut(KEY_TAB, 0, true)->cmd, Cmd::SwitchMode);
+}
+
+// --- C10: карта ----------------------------------------------------------------
+
+TEST(UiMap, KindTitlesAndProblemCells) {
+    for (int k = 0; k < mapKindCount(); ++k)
+        EXPECT_FALSE(mapKindTitle(mapKindName(k)).empty()) << mapKindName(k);
+    EXPECT_EQ(mapKindTitle("npc"), "Житель");
+    MapDoc d;
+    d.reset(4, 3);
+    d.at(1, 1) = static_cast<std::uint8_t>(mapCharTile(U'#'));
+    d.addObject("sign", 1, 1, "Стена");
+    d.addObject("npc", 2, 2, "elder");
+    const auto cells = d.problemCells();
+    ASSERT_EQ(cells.size(), 1U);
+    EXPECT_EQ(cells[0], (std::pair{1, 1}));
 }
 
 }  // namespace

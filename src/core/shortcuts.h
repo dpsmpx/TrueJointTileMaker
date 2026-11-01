@@ -111,6 +111,7 @@ enum class Cmd {
     Dock,
     UiMode,
     CommandSearch,
+    DeleteObject,
 };
 
 struct Shortcut {

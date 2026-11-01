@@ -255,7 +255,15 @@ void Editor::dragObject(int idx) {
 void Editor::doObjectTool(int mx, int my) {
     const int idx = m.map.objectAt(mx, my);
     if (frameClickButton_ == MB_RIGHT) {
-        if (idx >= 0) {
+        if (idx >= 0 && !classicUi_) {
+            // Правая кнопка берёт вид объекта, как пипетка — местность
+            // (UX-44); удалить — Delete над объектом.
+            const std::string kind = m.map.objects[static_cast<std::size_t>(idx)].kind;
+            for (int k = 0; k < mapKindCount(); ++k) {
+                if (mapKindName(k) == kind) m.mapObjKind = k;
+            }
+            m.needRepaint = true;
+        } else if (idx >= 0) {
             m.pushUndo();
             m.map.deleteObject(idx);
             m.needRepaint = true;

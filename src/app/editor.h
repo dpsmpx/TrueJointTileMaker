@@ -446,6 +446,11 @@ private:
     [[nodiscard]] bool baseUi() const {
         return !classicUi_ && theme::active.modern && cfg.uiMode == "базовый";
     }
+    /// Клетки замечаний проверки локации (C10): рамками на карте, пока
+    /// её не правили (отметка — по размерам истории).
+    std::vector<std::pair<int, int>> mapIssues_;
+    std::size_t mapIssuesStamp_ = 0;
+    [[nodiscard]] bool mapIssuesShown() const;
     /// Инструмент спрятан в базовом режиме: узор у тайла, выделение у карты.
     [[nodiscard]] bool toolHidden(int i) const {
         return baseUi() && (m.docMode == DOC_TILE ? i == T_DITHER : i == M_SELECT);

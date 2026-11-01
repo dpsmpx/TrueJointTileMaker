@@ -334,6 +334,19 @@ void Editor::runCommand(Cmd c, int arg) {
             break;
         }
         case Cmd::MapFind: showMapFindScreen(); break;
+        case Cmd::DeleteObject: {
+            // Удаление — клавишей над объектом (UX-44): правая кнопка у
+            // остальных инструментов берёт, а не портит.
+            const int mx = m.screenToTileX(mouseX());
+            const int my = m.screenToTileY(mouseY());
+            const int obj = m.inDoc(mx, my) ? m.map.objectAt(mx, my) : -1;
+            if (obj >= 0) {
+                m.pushUndo();
+                m.map.deleteObject(obj);
+                m.needRepaint = true;
+            }
+            break;
+        }
         case Cmd::MainMenu: showMainMenu(); break;
         case Cmd::Help: showHelpScreen(); break;
         case Cmd::Cheatsheet: showCheatsheet(); break;

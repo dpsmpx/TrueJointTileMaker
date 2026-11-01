@@ -853,6 +853,11 @@ void Editor::showColorOpsScreen() {
 
 void Editor::showMapReport() {
     const std::vector<std::string> report = m.map.validate();
+    // После отчёта замечания видны и на карте — до первой правки.
+    if (!classicUi_) {
+        mapIssues_ = m.map.problemCells();
+        mapIssuesStamp_ = m.mapUndo.size() + 100000 * m.mapRedo.size();
+    }
     std::vector<std::string> p;
     p.push_back("Локация: " + m.map.name);
     p.push_back("Размер: " + std::to_string(m.map.w) + " на " + std::to_string(m.map.h) +
