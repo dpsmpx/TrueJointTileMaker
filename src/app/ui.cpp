@@ -63,6 +63,8 @@ void Editor::setPage(bool screen) {
 
 void Editor::beginFrameInput(bool screen) {
     pf_.pump();
+    // Нажим пера — модели: мазок берёт его в каждой точке (D6).
+    m.penPressure = pf_.input().pen ? pf_.input().pressure : 1.0F;
     syncFrameSize();
     setPage(screen);
     Input& in = pf_.input();

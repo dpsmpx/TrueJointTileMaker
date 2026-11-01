@@ -47,6 +47,10 @@ void Editor::showBrushOptions() {
                         cTextDim);
             uiLabelLeft(LX, 150, 22, "пиксель-перфект, сила кисти — в параметрах инструментов.",
                         cTextDim);
+            // Перо (D6): сила кисти — по нажиму. Выключено по умолчанию:
+            // полупрозрачные точки — не пиксель-арт.
+            if (!classicUi_)
+                uiSwitch(LX, 184, 470, "Сила кисти — по нажиму пера", m.pressureStrength);
         } else if (mode == PEN_AIRBRUSH) {
             uiLabel(0, 108, WIN_W, 20, "Аэрограф — не пиксель-арт: мягкий край и смесь цветов.",
                     cWarn);
@@ -61,6 +65,7 @@ void Editor::showBrushOptions() {
                         cTextDim);
             uiLabelLeft(LX, 296, 22, "копится за мазок: проведите по месту ещё раз — гуще.",
                         cTextDim);
+            if (!classicUi_) uiSwitch(LX, 326, 380, "Напор — по нажиму пера", m.pressureFlow);
             // Отпечаток первым цветом по точке экрана на четыре точки шахматки.
             const Grid<float> dab = fx::softDab(m.airSize, m.airHardness);
             const int cell = std::max(1, std::min(8, 200 / std::max(1, dab.w)));
@@ -143,6 +148,13 @@ void Editor::showBrushOptions() {
         idle();
     }
     waitMouseRelease();
+    // Нажим пера — привычка руки, а не свойство документа: в Config.txt.
+    if (!classicUi_ &&
+        (cfg.penPressureBrush != m.pressureStrength || cfg.penPressureAir != m.pressureFlow)) {
+        cfg.penPressureBrush = m.pressureStrength;
+        cfg.penPressureAir = m.pressureFlow;
+        saveConfig();
+    }
     m.needRepaint = true;
 }
 

@@ -64,3 +64,26 @@ sleep 0.2
 move 770 550
 sleep 0.2
 shot 07_tool_by_letter
+# D6: нажим пера. Сила кисти — по нажиму (переключатель на экране
+# карандаша, правая кнопка по нему); мазок пером с нажимом 30 % ложится
+# полупрозрачно, нажим виден в строке состояния.
+key ctrl+0                   # вписать картинку
+sleep 0.2
+click 622 20                 # карандаш (цифры у набора Aseprite — масштаб)
+sleep 0.2
+click 622 20 3               # правая кнопка по карандашу
+sleep 0.4
+click 300 199                # «Сила кисти — по нажиму пера»
+sleep 0.2
+shot 08_pressure_switch
+key Escape
+sleep 0.3
+pressure 0.3
+drag 100 200 400 200
+sleep 0.2
+move 250 260
+sleep 0.2
+shot 09_pressure_stroke
+pressure 1
+move 250 270
+sleep 0.2

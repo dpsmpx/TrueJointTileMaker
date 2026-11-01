@@ -910,4 +910,30 @@ TEST(UiI18n, ConfigLanguage) {
     EXPECT_EQ(Config{}.serialize().find("Language"), std::string::npos);
 }
 
+// --- D6: нажим пера --------------------------------------------------------
+
+TEST(UiPen, PressureScalesStrength) {
+    Model m;
+    m.brushOpacity = 255;
+    m.penPressure = 0.3F;
+    // У модели по умолчанию — как у оригинала: нажим не действует.
+    EXPECT_EQ(m.strokeOpacity(), 255);
+    m.pressureStrength = true;
+    EXPECT_EQ(m.strokeOpacity(), 77);
+    m.penPressure = 0.0F;
+    EXPECT_EQ(m.strokeOpacity(), 1);  // касание всё же кладёт цвет
+    m.penPressure = 1.0F;
+    m.brushOpacity = 128;
+    EXPECT_EQ(m.strokeOpacity(), 128);
+
+    Config c;
+    EXPECT_FALSE(c.penPressureBrush);
+    EXPECT_TRUE(c.penPressureAir);
+    c.applyLines({"PenPressureBrush = да", "PenPressureAir = нет"});
+    EXPECT_TRUE(c.penPressureBrush);
+    EXPECT_FALSE(c.penPressureAir);
+    EXPECT_NE(c.serialize().find("PenPressureBrush = да"), std::string::npos);
+    EXPECT_EQ(Config{}.serialize().find("PenPressure"), std::string::npos);
+}
+
 }  // namespace tjtm

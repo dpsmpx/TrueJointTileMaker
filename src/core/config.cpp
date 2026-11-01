@@ -95,6 +95,10 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             uiMode = v == "базовый" || v == "basic" ? "базовый" : "полный";
         } else if (key == "dock") {
             dock = parseBool(val, dock);
+        } else if (key == "penpressurebrush") {
+            penPressureBrush = parseBool(val, penPressureBrush);
+        } else if (key == "penpressureair") {
+            penPressureAir = parseBool(val, penPressureAir);
         } else if (key == "language") {
             const std::string v = netToLower(netTrim(val));
             language = v.starts_with("en") || v.starts_with("англ") ? "english" : "русский";
@@ -253,6 +257,12 @@ std::string Config::serialize() const {
     if (dock != def.dock) {
         add("# Боковая панель со слоями и историей.");
         add(std::string("Dock = ") + ruBool(dock));
+        add("");
+    }
+    if (penPressureBrush != def.penPressureBrush || penPressureAir != def.penPressureAir) {
+        add("# Нажим пера: ослабляет силу кисти и напор аэрографа.");
+        add(std::string("PenPressureBrush = ") + ruBool(penPressureBrush));
+        add(std::string("PenPressureAir = ") + ruBool(penPressureAir));
         add("");
     }
     if (language != def.language) {

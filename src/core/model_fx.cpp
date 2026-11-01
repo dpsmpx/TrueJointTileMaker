@@ -123,7 +123,9 @@ void Model::airbrushTo(int x, int y) {
 void Model::airbrushDab(int cx, int cy) {
     if (!airAcc.sameSize(tile.w, tile.h) || !activeLayerEditable()) return;
     const Grid<float> dab = fx::softDab(airSize, airHardness);
-    const float flow = static_cast<float>(std::clamp(airFlow, 1, 100)) / 100.0F;
+    float flow = static_cast<float>(std::clamp(airFlow, 1, 100)) / 100.0F;
+    // Перо: напор — по нажиму, как у краски из баллончика.
+    if (pressureFlow) flow *= std::clamp(penPressure, 0.0F, 1.0F);
     const int ox = cx - (dab.w - 1) / 2;
     const int oy = cy - (dab.h - 1) / 2;
     const bool strict = strictIndexedOn();
@@ -131,7 +133,7 @@ void Model::airbrushDab(int cx, int cy) {
     for (int j = 0; j < dab.h; ++j) {
         for (int i = 0; i < dab.w; ++i) {
             const float v = dab.at(i, j) * flow;
-            if (v <= 0) continue;
+            if (v <= 0.0F) continue;
             int x = ox + i;
             int y = oy + j;
             if (wrapOn) {

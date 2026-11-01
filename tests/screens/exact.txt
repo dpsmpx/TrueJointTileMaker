@@ -188,3 +188,5 @@ uie        02_menu_file     0    0  780  560
 uie        03_cheatsheet    0    0  780  560
 uie        04_help          0    0  780  560
 uie        05_palette       0    0  780  560
+uid        08_pressure_switch 0 0  780  560
+uid        09_pressure_stroke 0 0  780  560

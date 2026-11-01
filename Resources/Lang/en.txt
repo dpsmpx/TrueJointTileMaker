@@ -1398,3 +1398,6 @@ TIFF в CMYK, YCbCr и Lab не поддержан: сохраните в RGB	TI
 Тайлы слоя «{}»	Tiles of layer "{}"
 ~«	"
 ~»	"
+Сила кисти — по нажиму пера	Brush strength — by pen pressure
+Напор — по нажиму пера	Flow — by pen pressure
+~   ·   нажим 	   ·   pressure 

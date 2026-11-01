@@ -70,6 +70,10 @@ struct Input {
     /// движение двумя пальцами удваивало масштаб несколько раз подряд.
     bool fineWheel = false;
     float wheelAccY = 0, wheelAccX = 0;
+    /// Нажим пера (план «Интерфейс», D6, UX-12): 0..1, пока рисуют пером;
+    /// у мыши — 1. pen — последний ввод был от пера.
+    float pressure = 1.0F;
+    bool pen = false;
     bool quitRequested = false;
 };
 
@@ -174,6 +178,8 @@ private:
     /// convert — пересчитать координаты окна в координаты кадра. События
     /// сценария уже в координатах кадра.
     void handle(const SDL_Event& e, bool convert = true);
+    /// Событие мыши не от пера сбрасывает нажим (which — SDL_MouseID).
+    void notePointer(std::uint32_t which);
     void scriptStep();
     std::string runDialog(int kind, const std::string& title,
                           const std::vector<FileFilter>& filters, const std::string& location);

@@ -177,6 +177,9 @@ bool Editor::appInit(int argc, char** argv) {
     // Набор и свои клавиши (D3); «Классика» разбирает клавиши по-старому.
     applyKeymap(cfg.keyPreset, cfg.keys);
     applyLanguage();
+    // Нажим пера (D6): у оригинала пера не было.
+    m.pressureStrength = !classic && cfg.penPressureBrush;
+    m.pressureFlow = !classic && cfg.penPressureAir;
     m.keepSelectionPerDoc = !classic;
     m.zoomSteps = !classic;
     m.gridAutoZoom = classic ? 0 : cfg.gridAutoZoom;
