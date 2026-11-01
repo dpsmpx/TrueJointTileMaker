@@ -143,6 +143,20 @@ void Platform::setCursor(Cursor c) {
     if (slot != nullptr) SDL_SetCursor(slot);
 }
 
+void Platform::setIcon(const Grid<Color>& icon) {
+    if (window_ == nullptr || icon.empty()) return;
+    SDL_Surface* s = SDL_CreateSurface(icon.w, icon.h, SDL_PIXELFORMAT_ARGB8888);
+    if (s == nullptr) return;
+    for (int y = 0; y < icon.h; ++y) {
+        auto* row = reinterpret_cast<std::uint32_t*>(static_cast<std::uint8_t*>(s->pixels) +
+                                                     static_cast<std::ptrdiff_t>(y) * s->pitch);
+        for (int x = 0; x < icon.w; ++x)
+            row[x] = icon.at(x, y).argb();
+    }
+    SDL_SetWindowIcon(window_, s);
+    SDL_DestroySurface(s);
+}
+
 void Platform::setTitle(const std::string& title) {
     if (window_ != nullptr) SDL_SetWindowTitle(window_, title.c_str());
 }

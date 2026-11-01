@@ -91,6 +91,8 @@ public:
     void shutdown();
 
     void setTitle(const std::string& title);
+    /// Значок окна (и панели задач).
+    void setIcon(const Grid<Color>& icon);
     /// Вывести кадр в окно (Redraw оригинала). Кадр любого размера: окно
     /// растягивается, и кадр следует за ним.
     void present(const gfx::Surface& frame);

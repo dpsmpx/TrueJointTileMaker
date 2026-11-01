@@ -5,6 +5,7 @@
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/logo.h"
 #include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -574,7 +575,172 @@ void Editor::showSettingsScreen() {
 // Главное меню
 // ---------------------------------------------------------------------------
 
+void Editor::showStartScreen() {
+    bool done = false;
+    dropInput();
+    pf_.input().keys.clear();
+    // Миниатюры недавних — один раз при входе: файлы читаются с диска.
+    std::vector<Grid<Color>> thumbs;
+    for (const std::string& f : cfg.recentFiles) {
+        Grid<Color> g;
+        if (pathExtLower(f) != ".map" && fileExists(f) && readImageGrid(f, g, true)) {
+            thumbs.push_back(std::move(g));
+        } else {
+            thumbs.emplace_back();
+        }
+    }
+    const Grid<Color> logo = appIcon();
+    constexpr int LX = 30;
+    constexpr int LW = 300;
+    constexpr int RX = 360;
+    constexpr int RW = WIN_W - RX - 30;
+    constexpr int kRowH = 46;
+    // Открыть недавний — после цикла: файл открывается на место документа.
+    std::string openPath;
+
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        focusArrows_ = true;
+        const bool isMap = m.docMode == DOC_MAP;
+        fb_.clear(cWindow);
+        fb_.drawImage(logo, LX, 20, 64, 64);
+        uiHeadline(LX + 76, 22, LX + 76 + 380, 52, kAppTitle);
+        std::string info = (isMap ? fileNameOnly(m.currentMapFile) : fileNameOnly(m.currentFile));
+        if (info.empty()) info = isMap ? "новая карта" : "новый тайл";
+        info += "   " + std::to_string(m.docW()) + " на " + std::to_string(m.docH());
+        if (m.isModified()) info += "   · есть несохранённые изменения";
+        uiLabelLeft(LX + 78, 54, 24, info, cTextDim);
+
+        int y = 104;
+        if (uiPrimary(LX, y, LW, 36, "Продолжить редактирование", true)) done = true;
+        y += 46;
+        auto item = [&](const std::string& caption, bool enabled) {
+            const bool hit = uiButton(LX, y, LW, 32, caption, enabled);
+            y += 36;
+            return hit;
+        };
+        if (item("Новый тайл…", true)) {
+            if (isMap) m.switchMode(DOC_TILE);
+            commandNew();
+            done = true;
+        }
+        if (item("Новая карта…", true)) {
+            if (!isMap) m.switchMode(DOC_MAP);
+            commandNew();
+            done = true;
+        }
+        if (item(isMap ? "Открыть карту…" : "Открыть файл…", true)) {
+            commandOpen();
+            done = true;
+        }
+        if (item("Сохранить", true) && commandSave()) done = true;
+        if (item("Сохранить как…", true) && commandSaveAs()) done = true;
+        if (item("Экспорт…", !isMap)) {
+            showExportCard();
+            done = true;
+        }
+        if (item(isMap ? "К редактору тайлов" : "К редактору карт", true)) {
+            m.switchMode(isMap ? DOC_TILE : DOC_MAP);
+            done = true;
+        }
+        if (item("Настройки…", true)) showSettingsScreen();
+        {
+            const int hw = (LW - 6) / 2;
+            if (uiButton(LX, y, hw, 32, "Справка", true)) showHelpScreen();
+            if (uiButton(LX + hw + 6, y, LW - hw - 6, 32, "Клавиши  F1", true)) showCheatsheet();
+            y += 36;
+            if (uiButton(LX, y, hw, 32, pf_.fullscreen() ? "Обычное окно" : "Во весь экран", true))
+                pf_.setFullscreen(!pf_.fullscreen());
+            if (uiButton(LX + hw + 6, y, LW - hw - 6, 32, "Выход", true)) commandExit();
+        }
+
+        // Недавние файлы — с миниатюрами (UX-24, UX-47).
+        uiTitle(RX, 100, RX + RW, 124, "Недавние файлы");
+        int ry = 132;
+        if (cfg.recentFiles.empty())
+            uiLabelLeft(RX, ry, 30, "Пока пусто: открытые и сохранённые файлы появятся здесь",
+                        cTextDim);
+        for (std::size_t i = 0; i < cfg.recentFiles.size() && i < 6; ++i) {
+            const std::string& f = cfg.recentFiles[i];
+            const bool over =
+                mouseX() >= RX && mouseX() < RX + RW && mouseY() >= ry && mouseY() < ry + kRowH - 4;
+            if (over)
+                fb_.fillRoundRect(RX, ry, RX + RW, ry + kRowH - 4, active.radius * 2,
+                                  active.radius * 2, cHover);
+            const int tx = RX + 4;
+            const int ty = ry + 2;
+            fb_.fillRect(tx, ty, tx + 38, ty + 38, cFace);
+            if (i < thumbs.size() && !thumbs[i].empty()) {
+                const Grid<Color>& g = thumbs[i];
+                const int s = std::max(g.w, g.h);
+                const int w = std::max(1, g.w * 38 / s);
+                const int h = std::max(1, g.h * 38 / s);
+                drawChecker(tx + (38 - w) / 2, ty + (38 - h) / 2, tx + (38 + w) / 2,
+                            ty + (38 + h) / 2);
+                fb_.drawImage(g, tx + (38 - w) / 2, ty + (38 - h) / 2, w, h);
+            } else {
+                uiLabel(tx, ty, 38, 38, pathExtLower(f) == ".map" ? "карта" : "—", cTextDim);
+            }
+            fb_.frameRect(tx - 1, ty - 1, tx + 39, ty + 39, cBorder);
+            textOut(tx + 48, ry + 4, fitTextEnd(fileNameOnly(f), RW - 60), cText);
+            // Папка внутри каталога программы — от него: переносной
+            // редактор переезжает вместе с картинками.
+            std::string dir = pathDirName(f);
+            if (!baseDir_.empty() && dir.starts_with(baseDir_))
+                dir = "…" + dir.substr(baseDir_.size());
+            textOut(tx + 48, ry + 22, fitTextEnd(dir, RW - 60), cTextDim);
+            if (takeButtonClick(RX, ry, RW, kRowH - 4, true)) {
+                openPath = f;
+                done = true;
+            }
+            ry += kRowH;
+        }
+
+        // Что нового — коротко, чтобы обновлённый редактор не удивлял.
+        const int ny = 132 + 6 * kRowH + 4;
+        uiTitle(RX, ny, RX + RW, ny + 24, std::string("Что нового в ") + kAppVersion);
+        static constexpr const char* kNews[] = {
+            "Окно растягивается, F11 — во весь экран",
+            "Строка меню, параметры инструмента, история",
+            "Базовый режим — Shift+Tab, поиск команд — Ctrl+K",
+            "Экспорт в одном окне, «Экспортировать снова»",
+        };
+        int ly = ny + 30;
+        for (const char* n : kNews) {
+            uiLabelLeft(RX + 8, ly, 20, std::string("·  ") + n, cTextDim);
+            ly += 20;
+        }
+        // Флажок «показывать при запуске» (UX-47).
+        bool show = cfg.showMenuOnStart;
+        uiSwitch(LX, WIN_H - 40, LW, "Показывать при запуске", show);
+        if (show != cfg.showMenuOnStart) {
+            cfg.showMenuOnStart = show;
+            saveConfig();
+        }
+        uiLabel(RX, WIN_H - 40, RW, 30,
+                std::string("версия ") + kAppVersion + "   ·   Escape — к редактору", cTextDim);
+        redraw();
+        if (takeKey() == KEY_ESC) done = true;
+        idle();
+    }
+    waitMouseRelease();
+    m.needRepaint = true;
+    if (!openPath.empty()) {
+        if (fileExists(openPath)) {
+            openAnyFile(openPath);
+        } else {
+            errorOpen("Файл не найден", openPath);
+        }
+    }
+}
+
 void Editor::showMainMenu() {
+    // В новых темах — стартовый экран (D1): меню-хаб из двенадцати кнопок
+    // заменили строка меню и поиск команд.
+    if (active.modern && !classicUi_) {
+        showStartScreen();
+        return;
+    }
     bool done = false;
     dropInput();
     pf_.input().keys.clear();

@@ -1,7 +1,4 @@
-key Escape
-sleep 0.2
-key Tab
 sleep 0.3
 move 770 550
 sleep 0.2
-shot a_map
+shot a_start

@@ -61,6 +61,7 @@ add_library(tjtm_core STATIC
     src/core/gameset.cpp
     src/core/gif.cpp
     src/core/imageops.cpp
+    src/core/logo.cpp
     src/core/mapdoc.cpp
     src/core/mapobj.cpp
     src/core/model.cpp

@@ -25,6 +25,7 @@
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/logo.h"
 #include "core/png.h"
 
 namespace tjtm {
@@ -55,13 +56,15 @@ void Editor::applyTheme() {
 }
 
 void Editor::syncTitle() {
-    std::string t = std::string(kAppTitle) + " " + kAppVersion + " — ";
-    if (m.docMode == DOC_MAP) {
-        t += m.currentMapFile.empty() ? "новая карта" : fileNameOnly(m.currentMapFile);
-    } else {
-        t += m.currentFile.empty() ? "новый тайл" : fileNameOnly(m.currentFile);
-    }
-    if (m.isModified()) t += " *";
+    std::string doc =
+        m.docMode == DOC_MAP
+            ? (m.currentMapFile.empty() ? "новая карта" : fileNameOnly(m.currentMapFile))
+            : (m.currentFile.empty() ? "новый тайл" : fileNameOnly(m.currentFile));
+    if (m.isModified()) doc += " *";
+    // Имя файла — впереди (D5, UX-36): в панели задач видно начало
+    // заголовка, и программа с версией его не заслоняют.
+    std::string t = classicUi_ ? std::string(kAppTitle) + " " + kAppVersion + " — " + doc
+                               : doc + " — " + kAppTitle;
     if (t != lastTitle_) {
         lastTitle_ = t;
         pf_.setTitle(t);
@@ -185,6 +188,7 @@ bool Editor::appInit(int argc, char** argv) {
     }
     syncFrameSize();
     if (!classic) {
+        pf_.setIcon(appIcon());
         m.undoBudget = std::int64_t{256} * 1024 * 1024;
         m.undoBytesPerPx = 6;
         m.undoMinSteps = 100;
