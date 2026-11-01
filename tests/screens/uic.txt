@@ -73,3 +73,19 @@ sleep 0.2
 shot 11_search
 key Escape
 sleep 0.2
+# C9: наборы тайлов — щелчок выбирает, запись — кнопкой с карточкой
+# «было — станет», поиск по имени.
+key t
+sleep 0.4
+click 100 160               # слот «пол» — выбран, не записан
+sleep 0.2
+move 700 300
+sleep 0.2
+shot 12_tileset
+click 126 472               # «Записать в слот» — карточка
+sleep 0.3
+shot 13_write_slot
+key Escape
+sleep 0.2
+key Escape
+sleep 0.2

@@ -111,6 +111,16 @@ private:
     std::vector<Grid<Color>> tsetBmp_;
     int tsetKind_ = TS_BASE;
     int tsetPage_ = 0;
+    /// Экран наборов в новых темах (C9, UX-21, UX-43): выбранный слот,
+    /// поиск по имени; запись — отдельной кнопкой.
+    int tsetSel_ = -1;
+    std::string tsetQuery_;
+    int tsetLastClick_ = -1;
+    int tsetLastMs_ = -100000;
+    /// Слоты, подходящие под поиск, по порядку набора.
+    [[nodiscard]] std::vector<int> tsetView() const;
+    /// Карточка «было — станет» перед записью текущего тайла в слот.
+    bool askWriteSlot(int slot);
 
     // --- утилиты (TJTM.pas: «Мелкие утилиты», «Ввод») ---
     void idle();

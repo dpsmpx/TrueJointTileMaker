@@ -819,8 +819,20 @@ void Editor::tsetBuild() {
     if (tsetPage_ * TSET_PAGE >= static_cast<int>(tsetFiles_.size())) tsetPage_ = 0;
 }
 
+std::vector<int> Editor::tsetView() const {
+    std::vector<int> v;
+    const std::string want = netToLower(netTrim(tsetQuery_));
+    for (std::size_t i = 0; i < tsetFiles_.size(); ++i) {
+        if (!want.empty() &&
+            netToLower(tsetLabels_[i] + " " + tsetFiles_[i]).find(want) == std::string::npos)
+            continue;
+        v.push_back(static_cast<int>(i));
+    }
+    return v;
+}
+
 int Editor::tsetPages() const {
-    return std::max(1, (static_cast<int>(tsetFiles_.size()) + TSET_PAGE - 1) / TSET_PAGE);
+    return std::max(1, (static_cast<int>(tsetView().size()) + TSET_PAGE - 1) / TSET_PAGE);
 }
 
 int Editor::tsetCellX(int k) {
@@ -832,8 +844,64 @@ int Editor::tsetCellY(int k) {
 }
 
 int Editor::tsetAt(int k) const {
+    const std::vector<int> v = tsetView();
     const int r = tsetPage_ * TSET_PAGE + k;
-    return (r < 0 || r >= static_cast<int>(tsetFiles_.size())) ? -1 : r;
+    return (r < 0 || r >= static_cast<int>(v.size())) ? -1 : v[static_cast<std::size_t>(r)];
+}
+
+bool Editor::askWriteSlot(int slot) {
+    const auto backdrop = cardBackdrop();
+    constexpr int kW = 460;
+    constexpr int kH = 260;
+    constexpr int kThumb = 96;
+    const int x0 = (WIN_W - kW) / 2;
+    const int y0 = (WIN_H - kH) / 2;
+    const auto ks = static_cast<std::size_t>(slot);
+    bool done = false;
+    bool ok = false;
+    dropInput();
+    pf_.input().keys.clear();
+    // Миниатюра в квадрат kThumb с сохранением пропорций.
+    auto thumb = [&](const Grid<Color>& g, int x, int y) {
+        fb_.fillRect(x, y, x + kThumb, y + kThumb, cFace);
+        if (g.empty()) {
+            uiLabel(x, y, kThumb, kThumb, "нет файла", cTextDim);
+        } else {
+            const int s = std::max(g.w, g.h);
+            const int w = g.w * kThumb / s;
+            const int h = g.h * kThumb / s;
+            drawChecker(x + (kThumb - w) / 2, y + (kThumb - h) / 2, x + (kThumb + w) / 2,
+                        y + (kThumb + h) / 2);
+            fb_.drawImage(g, x + (kThumb - w) / 2, y + (kThumb - h) / 2, w, h);
+        }
+        fb_.frameRect(x - 1, y - 1, x + kThumb + 1, y + kThumb + 1, cBorder);
+    };
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        dialogBack(backdrop, x0, y0, x0 + kW, y0 + kH);
+        uiTitle(x0, y0 + 12, x0 + kW, y0 + 40, "Записать в слот «" + tsetLabels_[ks] + "»");
+        uiLabel(x0 + 60, y0 + 46, kThumb, 18, "было", cTextDim);
+        uiLabel(x0 + kW - 60 - kThumb, y0 + 46, kThumb, 18, "станет", cTextDim);
+        thumb(tsetBmp_[ks], x0 + 60, y0 + 66);
+        thumb(m.tile, x0 + kW - 60 - kThumb, y0 + 66);
+        uiLabel(x0 + 60 + kThumb, y0 + 66, kW - 120 - 2 * kThumb, kThumb, "→", cTextDim);
+        if (uiPrimary(x0 + kW / 2 - 175, y0 + kH - 52, 170, 36, "Записать", true)) {
+            ok = true;
+            done = true;
+        }
+        if (uiButton(x0 + kW / 2 + 5, y0 + kH - 52, 170, 36, "Отмена", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC) done = true;
+        if (key == KEY_ENTER) {
+            ok = true;
+            done = true;
+        }
+        idle();
+    }
+    waitMouseRelease();
+    endCard(backdrop);
+    return ok;
 }
 
 bool Editor::tsetHit(int px, int py, int& slot) const {
@@ -882,8 +950,21 @@ bool Editor::showTilesetScreen() {
         } else {
             uiLabel(0, 78, WIN_W, 18, fitText(dir, WIN_W - 40), cTextDim);
         }
-        uiLabel(0, 96, WIN_W, 18, "Правая кнопка открывает тайл, левая пишет на его место текущий",
-                cTextDim);
+        if (active.modern) {
+            uiLabel(0, 96, WIN_W - 250, 18, "Щелчок — выбрать, двойной щелчок или Enter — открыть",
+                    cTextDim);
+            // Поиск по имени (UX-43): у врагов игры слотов больше сотни.
+            const std::string was = tsetQuery_;
+            uiTextLine(WIN_W - 250, 90, 230, 26, tsetQuery_);
+            const bool typing = textEditId_ == reinterpret_cast<std::uintptr_t>(&tsetQuery_);
+            if (tsetQuery_.empty() && !typing)
+                textOut(WIN_W - 240, 95, "Найти по имени…", cTextDim);
+            if (typing) tsetQuery_ = u32ToUtf8(textEdit_.text);
+            if (tsetQuery_ != was) tsetPage_ = 0;
+        } else {
+            uiLabel(0, 96, WIN_W, 18,
+                    "Правая кнопка открывает тайл, левая пишет на его место текущий", cTextDim);
+        }
 
         for (int i = 0; i < TSET_PAGE; ++i) {
             const int k = tsetAt(i);
@@ -896,7 +977,8 @@ bool Editor::showTilesetScreen() {
             if (!tsetBmp_[kk].empty()) {
                 fb_.drawImage(tsetBmp_[kk], tx, cy + 2);
             } else {
-                uiLabel(cx, cy + 18, TSET_CELL_W, 16, "нет", cTextDim);
+                uiLabel(cx, cy + 18, TSET_CELL_W, 16, active.modern ? "нет файла" : "нет",
+                        cTextDim);
             }
             // Место под курсором обведено цветом выделения: попасть в нужное
             // из двух десятков мелких клеток иначе трудно.
@@ -904,6 +986,11 @@ bool Editor::showTilesetScreen() {
                               mouseY() < cy + TSET_CELL_H;
             fb_.frameRect(tx - 1, cy + 1, tx + TSET_THUMB + 1, cy + 3 + TSET_THUMB,
                           over ? cAccent : cBorder);
+            if (active.modern && k == tsetSel_) {
+                // Выбранный слот — рамкой акцента в две точки.
+                fb_.frameRect(tx - 3, cy - 1, tx + TSET_THUMB + 3, cy + 5 + TSET_THUMB, cAccent);
+                fb_.frameRect(tx - 2, cy, tx + TSET_THUMB + 2, cy + 4 + TSET_THUMB, cAccent);
+            }
             const bool object = tsetKind_ == TS_BASE && !tsetBaseIsTerrain(k);
             uiLabel(cx, cy + 52, TSET_CELL_W, 16, fitText(tsetLabels_[kk], TSET_CELL_W - 4),
                     object ? cAccent : cText);
@@ -915,14 +1002,25 @@ bool Editor::showTilesetScreen() {
         if (uiButton(TSET_X0, 398, 90, 28, "Назад", tsetPage_ > 0)) --tsetPage_;
         uiLabel(TSET_X0 + 96, 398, 200, 28,
                 "страница " + std::to_string(tsetPage_ + 1) + " из " + std::to_string(tsetPages()) +
-                    ",  тайлов " + std::to_string(tsetFiles_.size()),
+                    ",  тайлов " + std::to_string(tsetView().size()),
                 cTextDim);
         if (uiButton(TSET_X0 + 306, 398, 90, 28, "Дальше", tsetPage_ < tsetPages() - 1))
             ++tsetPage_;
 
         if (!note.empty()) uiLabel(0, 430, WIN_W, 18, note, cAccent);
 
-        if (uiButton(WIN_W / 2 - 340, 456, 220, 32, "Для игры…", true)) {
+        // Запись — отдельной кнопкой с карточкой «было — станет» (UX-21): у
+        // 1.6 левый щелчок по слоту молча писал туда текущий тайл.
+        const int bw = active.modern ? 170 : 220;
+        const int bx = active.modern ? WIN_W / 2 - 2 * bw - 9 : WIN_W / 2 - 340;
+        bool writeNow = false;
+        if (active.modern &&
+            uiPrimary(bx, 456, bw, 32, "Записать в слот",
+                      tsetSel_ >= 0 && tsetSel_ < static_cast<int>(tsetFiles_.size()) &&
+                          m.docMode == DOC_TILE))
+            writeNow = true;
+        const int b1 = active.modern ? bx + bw + 6 : bx;
+        if (uiButton(b1, 456, bw, 32, "Для игры…", true)) {
             if (showGameSetScreen()) {
                 result = true;
                 done = true;
@@ -930,7 +1028,7 @@ bool Editor::showTilesetScreen() {
                 tsetBuild();
             }
         }
-        if (uiButton(WIN_W / 2 - 110, 456, 220, 32, "Папка набора…", true)) {
+        if (uiButton(b1 + bw + (active.modern ? 6 : 10), 456, bw, 32, "Папка набора…", true)) {
             const std::string& cur = tsetKind_ == TS_ICON ? cfg.iconsFolder : cfg.tilesFolder;
             std::string picked;
             if (classicUi_) {
@@ -952,7 +1050,8 @@ bool Editor::showTilesetScreen() {
                 tsetBuild();
             }
         }
-        if (uiButton(WIN_W / 2 + 120, 456, 220, 32, "Закрыть", true)) done = true;
+        if (uiButton(b1 + 2 * bw + (active.modern ? 12 : 20), 456, bw, 32, "Закрыть", true))
+            done = true;
 
         uiLabel(0, WIN_H - 44, WIN_W, 18,
                 "Пустой слот игра рисует знаком шрифта — набор можно делать по одному тайлу",
@@ -962,8 +1061,38 @@ bool Editor::showTilesetScreen() {
                 cTextDim);
 
         int slot = -1;
-        if (frameClick_ && tsetHit(frameClickX_, frameClickY_, slot)) {
+        int key = 0;
+        if (active.modern) {
+            // Щелчок выбирает, двойной щелчок и Enter открывают, правая
+            // кнопка — тоже открывает; колесо листает страницы.
+            key = takeKey();
+            const int wheel = takeWheel();
+            if (wheel < 0 && tsetPage_ < tsetPages() - 1) ++tsetPage_;
+            if (wheel > 0 && tsetPage_ > 0) --tsetPage_;
+            bool open = false;
+            if (frameClick_ && tsetHit(frameClickX_, frameClickY_, slot)) {
+                frameClick_ = false;
+                const int now = pf_.milliseconds();
+                open = frameClickButton_ == MB_RIGHT ||
+                       (slot == tsetLastClick_ && now - tsetLastMs_ <= DOUBLE_CLICK_MS);
+                tsetLastMs_ = open ? -100000 : now;
+                tsetLastClick_ = slot;
+                tsetSel_ = slot;
+            }
+            if (key == KEY_ENTER && tsetSel_ >= 0) {
+                slot = tsetSel_;
+                open = true;
+            }
+            if (writeNow) slot = tsetSel_;
+            if (!open && !writeNow) slot = -1;
+            // Дальше — общий разбор: открыть (как правой кнопкой) или
+            // записать (как левой у 1.6), записать — после карточки.
+            if (slot >= 0) frameClickButton_ = open ? MB_RIGHT : MB_LEFT;
+            if (slot >= 0 && writeNow && !askWriteSlot(slot)) slot = -1;
+        } else if (frameClick_ && tsetHit(frameClickX_, frameClickY_, slot)) {
             frameClick_ = false;
+        }
+        if (slot >= 0) {
             const auto ks = static_cast<std::size_t>(slot);
             const std::string path = tsetPathOf(tsetKind_, tsetFiles_[ks]);
             if (path.empty()) {
@@ -983,7 +1112,7 @@ bool Editor::showTilesetScreen() {
             } else if (frameClickButton_ == MB_LEFT) {
                 if (m.docMode != DOC_TILE) {
                     note = "Записать можно только тайл, а сейчас открыта карта";
-                } else if (fileExists(path) &&
+                } else if (!active.modern && fileExists(path) &&
                            !askYesNo("Заменить тайл",
                                      "Файл " + tsetFiles_[ks] +
                                          ".png уже есть. Заменить его текущим тайлом " +
@@ -1001,7 +1130,8 @@ bool Editor::showTilesetScreen() {
             }
         }
         redraw();
-        if (takeKey() == KEY_ESC) done = true;
+        if (!active.modern) key = takeKey();
+        if (key == KEY_ESC) done = true;
         idle();
     }
     tsetFree();
