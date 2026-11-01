@@ -135,6 +135,7 @@ The program's author is dpsmpx, vk.com/dpsmpx.
 To the PascalABC.NET team for the language and the GraphABC library: the first version of the editor was written with them, and its look is kept in this one.
 To the SDL authors for the library the current editor is built on.
 To the Andors-Love game for the map format the location mode was made for.
+To Kerrie Lake for the Resurrect 64 palette (lospec.com), the default palette.
 To the vk.com/programmer_ne_lamer group for the community and support.
 To everyone who tried the editor, sent remarks and found bugs.
 
