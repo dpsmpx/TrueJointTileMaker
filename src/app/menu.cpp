@@ -747,9 +747,15 @@ void Editor::showStartScreen() {
             textOut(tx + 48, ry + 4, fitTextEnd(fileNameOnly(f), RW - 60), cText);
             // Папка внутри каталога программы — от него: переносной
             // редактор переезжает вместе с картинками.
-            std::string dir = pathDirName(f);
-            if (!baseDir_.empty() && dir.starts_with(baseDir_))
-                dir = "…" + dir.substr(baseDir_.size());
+            // Разделители — косой чертой: на Windows путь и каталог
+            // программы приходят с обратной, а то и вперемешку.
+            auto slash = [](std::string p) {
+                std::replace(p.begin(), p.end(), '\\', '/');
+                return p;
+            };
+            std::string dir = slash(pathDirName(f));
+            const std::string home = slash(baseDir_);
+            if (!home.empty() && dir.starts_with(home)) dir = "…" + dir.substr(home.size());
             textOut(tx + 48, ry + 22, fitTextEnd(dir, RW - 60), cTextDim);
             // Строка списка берёт фокус с клавиатуры, как кнопка (D7).
             const bool focused = focusSlot(RX, ry, RW, kRowH - 4);
