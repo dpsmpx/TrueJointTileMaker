@@ -12,6 +12,7 @@
 #include "core/i18n.h"
 #include "core/mapdoc.h"
 #include "core/model.h"
+#include "core/png.h"
 #include "core/scheme.h"
 #include "core/shortcuts.h"
 #include "core/theme.h"
@@ -1058,6 +1059,39 @@ TEST(UiScheme, ThemeFiles) {
     EXPECT_EQ(cfg.themeAccent, "#7445B4");
     EXPECT_NE(cfg.serialize().find("ThemeAccent = #7445B4"), std::string::npos);
     EXPECT_EQ(Config{}.serialize().find("ThemeAccent"), std::string::npos);
+}
+
+// --- C7: значки одного стиля -----------------------------------------------
+
+TEST(UiIcons, ModernSetIsComplete) {
+    // Набор 2.0 (tools/icons.py): у каждого инструмента — значок 16×16,
+    // показ ровно ×2; две маски — форма и акцент, остальное прозрачно.
+    for (int i = 0; i < iconCount(); ++i) {
+        const std::string path =
+            std::string(TJTM_SOURCE_DIR) + "/Resources/Icons/modern/" + iconFile(i) + ".png";
+        Grid<Color> g;
+        std::string error;
+        ASSERT_TRUE(pngLoad(path, g, error)) << iconFile(i) << ": " << error;
+        EXPECT_EQ(g.w, 16) << iconFile(i);
+        EXPECT_EQ(g.h, 16) << iconFile(i);
+        std::vector<Color> colors;
+        int opaque = 0;
+        for (const Color c : g.d) {
+            if (c.a == 0) continue;
+            ++opaque;
+            if (std::find(colors.begin(), colors.end(), c) == colors.end()) colors.push_back(c);
+        }
+        EXPECT_LE(colors.size(), 2u) << iconFile(i) << ": форма и акцент";
+        EXPECT_GT(opaque, 16) << iconFile(i);
+    }
+    // Значки 1.6 на месте: на них стоит «Классика» и сверка с оригиналом.
+    for (int i = 0; i < iconCount(); ++i) {
+        Grid<Color> g;
+        std::string error;
+        EXPECT_TRUE(pngLoad(
+            std::string(TJTM_SOURCE_DIR) + "/Resources/Icons/" + iconFile(i) + ".png", g, error))
+            << iconFile(i);
+    }
 }
 
 }  // namespace tjtm

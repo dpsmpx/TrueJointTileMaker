@@ -107,7 +107,11 @@ void Editor::drawToolsSection() {
                               (m.docMode == DOC_MAP && i == M_PAINT && m.mapMix);
         if (!airLabel && ic >= 0 && ic < static_cast<int>(iconBmp_.size()) &&
             !iconBmp_[static_cast<std::size_t>(ic)].empty()) {
-            const Grid<Color>& icon = iconBmp_[static_cast<std::size_t>(ic)];
+            const bool picked = active.modern && m.curTool() == i &&
+                                ic < static_cast<int>(iconSel_.size()) &&
+                                !iconSel_[static_cast<std::size_t>(ic)].empty();
+            const Grid<Color>& icon = picked ? iconSel_[static_cast<std::size_t>(ic)]
+                                             : iconBmp_[static_cast<std::size_t>(ic)];
             fb_.drawImage(icon, x0 + (TOOL_CW - 2 - icon.w) / 2, y0 + (TOOL_CH - 2 - icon.h) / 2);
         } else {
             const Color sel = active.modern ? active.onAccentContainer : active.onAccent;
