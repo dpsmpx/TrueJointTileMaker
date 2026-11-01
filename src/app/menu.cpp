@@ -2,9 +2,11 @@
 // настройки, главное меню», «Наборы тайлов Andors-Love»).
 
 #include <algorithm>
+#include <sstream>
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/i18n.h"
 #include "core/logo.h"
 #include "core/pmath.h"
 #include "core/text.h"
@@ -39,8 +41,56 @@ Grid<Color> gridFromBgra(const std::vector<std::uint8_t>& raw, int size) {
 // Справка
 // ---------------------------------------------------------------------------
 
+/// Клавиши из действующей таблицы — строками справки (UX-09, UX-18): список
+/// от руки отставал от кода.
+static void helpKeyLines(std::vector<std::string>& p, bool en) {
+    const std::span<const Shortcut> all = shortcuts();
+    const char* group = nullptr;
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        const Shortcut& s = all[i];
+        if (s.text == nullptr) continue;
+        if (group == nullptr || std::string_view(group) != s.group) {
+            group = s.group;
+            p.emplace_back();
+            p.push_back((en ? i18n::tr(s.group) : std::string(s.group)) + ":");
+        }
+        const char* where = s.where == KeyWhere::Tile  ? (en ? " (tile)" : " (тайл)")
+                            : s.where == KeyWhere::Map ? (en ? " (map)" : " (карта)")
+                                                       : "";
+        const std::string keys = shortcutKeys(all, i);
+        if (!keys.empty())
+            p.push_back(keys + " — " + netToLower(en ? i18n::tr(s.text) : s.text) + where);
+    }
+}
+
 void Editor::showHelpScreen(const std::string& section) {
     std::vector<std::string> p;
+    // По-английски справка — своим файлом: её абзацы здесь склеиваются из
+    // строк исходника, и переводить их строками таблицы не выходит (D4).
+    if (i18n::language() == "en") {
+        if (const auto text = readFile(resolvePath("Resources/Lang/help.en.txt"))) {
+            // Пустые строки — пустые абзацы: splitLines их бы выбросил.
+            std::istringstream in(*text);
+            std::string line;
+            while (std::getline(in, line)) {
+                if (!line.empty() && line.back() == '\r') line.pop_back();
+                if (line.starts_with("#")) continue;
+                if (line == "{KEYS}") {
+                    helpKeyLines(p, true);
+                    continue;
+                }
+                if (const std::size_t v = line.find("{VERSION}"); v != std::string::npos)
+                    line.replace(v, 9, kAppVersion);
+                p.push_back(line);
+            }
+            if (active.modern && !classicUi_) {
+                showHelpBrowser(p, section);
+            } else {
+                showTextScreen("Справка", p);
+            }
+            return;
+        }
+    }
     // Набираемый абзац: строки прозы склеиваются и переносятся потом по
     // ширине окна, а не по ширине набора в исходнике.
     std::string cur;
@@ -331,28 +381,11 @@ void Editor::showHelpScreen(const std::string& section) {
     par("строка состояния и боковая панель — в светлой и тёмной темах;");
     par("«Классика» сохраняет раскладку 1.6.");
     add("");
-    // Клавиши — из той же таблицы, что их разбирает (UX-09, UX-18): список
-    // от руки отставал от кода.
     add("КЛАВИШИ");
-    add("F1 или ? — шпаргалка поверх холста, с поиском.");
-    {
-        const std::span<const Shortcut> all = shortcuts();
-        const char* group = nullptr;
-        for (std::size_t i = 0; i < all.size(); ++i) {
-            const Shortcut& s = all[i];
-            if (s.text == nullptr) continue;
-            if (group == nullptr || std::string_view(group) != s.group) {
-                group = s.group;
-                add("");
-                add(std::string(s.group) + ":");
-            }
-            const char* where = s.where == KeyWhere::Tile  ? " (тайл)"
-                                : s.where == KeyWhere::Map ? " (карта)"
-                                                           : "";
-            const std::string keys = shortcutKeys(all, i);
-            if (!keys.empty()) add(keys + " — " + netToLower(s.text) + where);
-        }
-    }
+    par("F1 или ? — шпаргалка поверх холста, с поиском. Клавиши настраиваются");
+    par("в «Справка → Настроить клавиши»: любое действие и набор «как в Aseprite».");
+    flush();
+    helpKeyLines(p, false);
     add("");
     add("Shift с роликом — прокрутка вбок, пробел с протяжкой — рука.");
     add("Alt, зажатый над холстом, временно включает пипетку (кроме выделения).");
@@ -382,7 +415,7 @@ void Editor::showHelpScreen(const std::string& section) {
     add("НАСТРОЙКИ");
     par("Все параметры хранятся в файле Config.txt рядом с программой в");
     par("кодировке UTF-8, по строке на параметр в виде «ключ = значение».");
-    add("Файл можно править вручную или через пункт «Настройки» в меню.");
+    add("Файл можно править вручную или через пункт «Настройки» в меню. Там же — язык.");
     par("При запуске открывается последний файл (настройка «Открывать последний");
     par("файл»), а если его нет — стартовое изображение. Размер из настроек нужен");
     par("только тогда, когда открыть нечего: тогда создаётся пустой тайл.");
@@ -512,6 +545,15 @@ void Editor::showSettingsScreen() {
             bool autoGrid = v.gridAutoZoom > 0;
             uiSwitch(30, y, 450, "Сетка точек сама с масштаба 1200 %", autoGrid);
             v.gridAutoZoom = autoGrid ? (v.gridAutoZoom > 0 ? v.gridAutoZoom : 12) : 0;
+            // Язык (D4): названия языков — каждое на своём языке.
+            uiLabelLeft(500, y, 30, "Язык", cText);
+            {
+                const i18n::Raw raw;
+                if (uiToggle(580, y, 86, 30, "Русский", v.language != "english"))
+                    v.language = "русский";
+                if (uiToggle(670, y, 86, 30, "English", v.language == "english"))
+                    v.language = "english";
+            }
         } else {
             stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
             y += 36;
@@ -557,6 +599,7 @@ void Editor::showSettingsScreen() {
             v.keys = cfg.keys;
             cfg = v;
             applyTheme();
+            applyLanguage();
             if (!classicUi_) {
                 pf_.setUiScale(cfg.uiScale);
                 m.gridAutoZoom = cfg.gridAutoZoom;
@@ -617,7 +660,7 @@ void Editor::showStartScreen() {
         uiHeadline(LX + 76, 22, LX + 76 + 380, 52, kAppTitle);
         std::string info = (isMap ? fileNameOnly(m.currentMapFile) : fileNameOnly(m.currentFile));
         if (info.empty()) info = isMap ? "новая карта" : "новый тайл";
-        info += "   " + std::to_string(m.docW()) + " на " + std::to_string(m.docH());
+        info += "   " + std::to_string(m.docW()) + "×" + std::to_string(m.docH());
         if (m.isModified()) info += "   · есть несохранённые изменения";
         uiLabelLeft(LX + 78, 54, 24, info, cTextDim);
 
@@ -717,7 +760,7 @@ void Editor::showStartScreen() {
         };
         int ly = ny + 30;
         for (const char* n : kNews) {
-            uiLabelLeft(RX + 8, ly, 20, std::string("·  ") + n, cTextDim);
+            uiLabelLeft(RX + 8, ly, 20, "·  " + i18n::tr(n), cTextDim);
             ly += 20;
         }
         // Флажок «показывать при запуске» (UX-47).
@@ -785,7 +828,7 @@ void Editor::showMainMenu() {
         }
         const bool lastOk = fileExists(lastPath);
         std::string info =
-            curName + "   " + std::to_string(m.docW()) + " на " + std::to_string(m.docH());
+            curName + "   " + std::to_string(m.docW()) + "×" + std::to_string(m.docH());
         if (isMap) info += "   объектов " + std::to_string(m.map.objects.size());
         if (m.isModified()) info += "   есть несохранённые изменения";
 
@@ -1293,8 +1336,8 @@ bool Editor::showTilesetScreen() {
                            !askYesNo("Заменить тайл",
                                      "Файл " + tsetFiles_[ks] +
                                          ".png уже есть. Заменить его текущим тайлом " +
-                                         std::to_string(m.tile.w) + " на " +
-                                         std::to_string(m.tile.h) + "?",
+                                         std::to_string(m.tile.w) + "×" + std::to_string(m.tile.h) +
+                                         "?",
                                      "Заменить", "Отмена")) {
                     note.clear();
                 } else if (saveTileTo(path)) {

@@ -9,6 +9,7 @@
 #include <deque>
 
 #include "app/editor.h"
+#include "core/i18n.h"
 #include "core/imageops.h"
 #include "core/pmath.h"
 #include "core/text.h"
@@ -446,8 +447,10 @@ void Editor::showCommandSearch() {
         for (const MenuItem& mi : menuItems()) {
             if (mi.text == nullptr || mi.cmd == Cmd::CommandSearch) continue;
             if (mi.where != KeyWhere::Both && (mi.where == KeyWhere::Tile) != tile) continue;
-            const std::string hay = netToLower(std::string(mi.text) + " " + mi.menu + " " +
-                                               commandKeys(mi.cmd, mi.arg, tile));
+            // Ищется и по-русски, и на языке интерфейса (D4).
+            const std::string hay =
+                netToLower(std::string(mi.text) + " " + mi.menu + " " + i18n::tr(mi.text) + " " +
+                           i18n::tr(mi.menu) + " " + commandKeys(mi.cmd, mi.arg, tile));
             if (want.empty() || hay.find(want) != std::string::npos) out.push_back(&mi);
         }
         return out;
@@ -622,7 +625,7 @@ void Editor::showCheatsheet() {
             r.keysW = textWidth(r.keys) + 12;
             const int besideW = colW - r.keysW - 10;
             r.keysBelow = besideW < kMinText;
-            r.text = wrapWords(s.text, r.keysBelow ? colW : besideW,
+            r.text = wrapWords(i18n::tr(s.text), r.keysBelow ? colW : besideW,
                                [&](const std::string& t) { return textWidth(t); });
             r.lines = static_cast<int>(r.text.size()) + (r.keysBelow ? 1 : 0);
             rows.push_back(r);

@@ -344,6 +344,8 @@ private:
     void showSettingsScreen();
     /// Правка клавиш и набор «как в Aseprite» (D3).
     void showKeysScreen();
+    /// Язык интерфейса из настроек (D4); «Классика» (--classic) — русский.
+    void applyLanguage();
     /// Название действия на экране клавиш; у цифр — инструменты тайла и карты.
     std::string keyActionTitle(const KeyAction& a) const;
     /// Экран клавиш ждёт сочетание: Tab и стрелки — ему, а не фокусу.

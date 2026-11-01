@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include "core/fsutil.h"
+#include "core/i18n.h"
 
 namespace tjtm::gfx {
 
@@ -88,6 +89,18 @@ const Font::Glyph& Font::glyph(std::uint32_t ch) const {
 }
 
 int Font::rawWidth(const std::string& s) const {
+    return measure(i18n::text(s));
+}
+
+void Font::draw(Surface& dst, int x, int y, const std::string& s, Color c) const {
+    drawAs(dst, x, y, i18n::text(s), c);
+}
+
+std::vector<std::string> Font::layoutBox(const std::string& s, int maxWidth) const {
+    return layoutAs(i18n::text(s), maxWidth);
+}
+
+int Font::measure(const std::string& s) const {
     // Сумма целых ширин знаков — так меряет GraphABC: на выборке строк из
     // интерфейса TextWidth оригинала совпал с ней до точки.
     int w = 0;
@@ -95,7 +108,7 @@ int Font::rawWidth(const std::string& s) const {
     return w;
 }
 
-void Font::draw(Surface& dst, int x, int y, const std::string& s, Color c) const {
+void Font::drawAs(Surface& dst, int x, int y, const std::string& s, Color c) const {
     // Знаки ставятся по тем же целым ширинам, по которым строка измерена:
     // иначе центровка и перенос считались бы по одной строке, а рисовалась
     // бы другая.
@@ -119,7 +132,7 @@ void Font::draw(Surface& dst, int x, int y, const std::string& s, Color c) const
     });
 }
 
-std::vector<std::string> Font::layoutBox(const std::string& s, int maxWidth) const {
+std::vector<std::string> Font::layoutAs(const std::string& s, int maxWidth) const {
     // GDI+ (DrawString в прямоугольник) переносит не так, как экран справки:
     // строка, которая влезает, остаётся как есть, с двойными пробелами;
     // перенос — только по пробелу, и пробелы на месте переноса пропадают.
@@ -143,7 +156,7 @@ std::vector<std::string> Font::layoutBox(const std::string& s, int maxWidth) con
         if (!para.empty() && para.back() == '\r') para.pop_back();
         while (true) {
             const std::string whole = rtrim(para);
-            if (rawWidth(whole) <= maxWidth) {
+            if (measure(whole) <= maxWidth) {
                 lines.push_back(whole);
                 break;
             }
@@ -152,7 +165,7 @@ std::vector<std::string> Font::layoutBox(const std::string& s, int maxWidth) con
                  p = para.find(' ', p + 1)) {
                 const std::string head = rtrim(para.substr(0, p));
                 if (head.empty()) continue;
-                if (rawWidth(head) > maxWidth) break;
+                if (measure(head) > maxWidth) break;
                 cut = p;
             }
             if (cut == std::string::npos) {
@@ -160,7 +173,7 @@ std::vector<std::string> Font::layoutBox(const std::string& s, int maxWidth) con
                 std::size_t p = nextChar(para, 0);
                 while (p < para.size()) {
                     const std::size_t q = nextChar(para, p);
-                    if (rawWidth(para.substr(0, q)) > maxWidth) break;
+                    if (measure(para.substr(0, q)) > maxWidth) break;
                     p = q;
                 }
                 lines.push_back(para.substr(0, p));
@@ -184,7 +197,7 @@ void Font::drawCentered(Surface& dst, int x0, int y0, int x1, int y1, const std:
     const int w = x1 - x0;
     const int h = y1 - y0;
     // Блок строк ставится по центру; лишнее срезается краем прямоугольника.
-    const std::vector<std::string> lines = layoutBox(s, w);
+    const std::vector<std::string> lines = layoutAs(i18n::text(s), w);
     const int blockH = static_cast<int>(lines.size()) * lineSkip_;
     const int top = y0 + (h - blockH) / 2;
     const Rect old = dst.clip();
@@ -198,11 +211,11 @@ void Font::drawCentered(Surface& dst, int x0, int y0, int x1, int y1, const std:
     dst.setClip(r.empty() ? Rect{0, 0, 1, 1} : r);
     if (!r.empty()) {
         for (std::size_t i = 0; i < lines.size(); ++i) {
-            const int lw = rawWidth(lines[i]);
+            const int lw = measure(lines[i]);
             // Строка стоит в своей ячейке высотой lineSkip; FreeType кладёт
             // базовую линию ниже верха картинки на ascent.
             const int ly = top + static_cast<int>(i) * lineSkip_ + (lineSkip_ - height_) / 2;
-            draw(dst, x0 + (w - lw) / 2, ly, lines[i], c);
+            drawAs(dst, x0 + (w - lw) / 2, ly, lines[i], c);
         }
     }
     if (old.empty()) {

@@ -12,6 +12,7 @@
 #include <algorithm>
 
 #include "app/editor.h"
+#include "core/i18n.h"
 #include "core/text.h"
 #include "core/theme.h"
 
@@ -55,7 +56,7 @@ void Editor::tipEvaluate() {
 
 void Editor::drawTip() {
     if (tipWant_.empty()) return;
-    const std::vector<std::string> lines = splitLines(tipWant_);
+    const std::vector<std::string> lines = splitLines(i18n::tr(tipWant_));
     int w = 0;
     for (const std::string& l : lines)
         w = std::max(w, textWidth(l));
@@ -79,37 +80,42 @@ std::string Editor::toolTip(int i) const {
     // Клавиша — из действующей таблицы: её могли переназначить (D3).
     const std::string keys = commandKeys(Cmd::Tool, i, m.docMode == DOC_TILE);
     const std::string k = keys.empty() ? "" : " · " + keys;
+    // Название и описание переводятся порознь: клавиша между ними — своя
+    // у каждого набора.
+    auto tip = [&](const char* name, const std::string& rest) {
+        return i18n::tr(name) + k + "\n" + i18n::tr(rest);
+    };
     if (m.docMode == DOC_MAP) {
         switch (i) {
             case M_PAINT:
-                return "Местность" + k +
-                       "\nЛевая — рисовать, правая — взять местность\nПравая по кнопке — кисть "
-                       "смесью";
-            case M_FILL: return "Заливка местностью" + k + "\nПравая по кнопке — смесью";
-            case M_RECT: return "Прямоугольник местности" + k + "\nПравая по кнопке — смесью";
+                return tip("Местность",
+                           "Левая — рисовать, правая — взять местность\nПравая по кнопке — кисть "
+                           "смесью");
+            case M_FILL: return tip("Заливка местностью", "Правая по кнопке — смесью");
+            case M_RECT: return tip("Прямоугольник местности", "Правая по кнопке — смесью");
             case M_OBJ:
-                return "Объекты" + k +
-                       "\nЛевая — поставить или перенести, правая — убрать\nДвойной щелчок или "
-                       "Enter — форма объекта";
-            default: return "Выделение" + k + "\nПротяжка — выделить, щелчок — вставить";
+                return tip("Объекты",
+                           "Левая — поставить или перенести, правая — убрать\nДвойной щелчок или "
+                           "Enter — форма объекта");
+            default: return tip("Выделение", "Протяжка — выделить, щелчок — вставить");
         }
     }
     switch (i) {
         case T_PEN:
-            return "Карандаш" + k +
-                   "\nЛевая — рисовать, правая или Alt — взять цвет; [ и ] — размер\nПравая по "
-                   "кнопке — вид: точки, аэрограф, кисть, затенение";
-        case T_ERASER: return "Ластик" + k + "\nСтирает до прозрачного; [ и ] — размер";
-        case T_FILL: return "Заливка" + k + "\nПравая по кнопке — градиент узором";
-        case T_PICK: return "Пипетка" + k + "\nБерёт цвет из картинки";
-        case T_LINE: return "Линия" + k + "\nПравая по кнопке — параметры фигур";
-        case T_RECT: return "Прямоугольник" + k + "\nCtrl — залитый, Shift — квадрат";
-        case T_ELLIPSE: return "Овал" + k + "\nCtrl — залитый, Shift — круг";
-        case T_DITHER: return "Узор" + k + "\n[ и ] — размер, Shift+[ и ] — сменить узор";
+            return tip("Карандаш",
+                       "Левая — рисовать, правая или Alt — взять цвет; [ и ] — размер\nПравая по "
+                       "кнопке — вид: точки, аэрограф, кисть, затенение");
+        case T_ERASER: return tip("Ластик", "Стирает до прозрачного; [ и ] — размер");
+        case T_FILL: return tip("Заливка", "Правая по кнопке — градиент узором");
+        case T_PICK: return tip("Пипетка", "Берёт цвет из картинки");
+        case T_LINE: return tip("Линия", "Правая по кнопке — параметры фигур");
+        case T_RECT: return tip("Прямоугольник", "Ctrl — залитый, Shift — квадрат");
+        case T_ELLIPSE: return tip("Овал", "Ctrl — залитый, Shift — круг");
+        case T_DITHER: return tip("Узор", "[ и ] — размер, Shift+[ и ] — сменить узор");
         default:
-            return "Выделение" + k +
-                   "\nПротяжка — выделить, по выделенному — перенести\nВид выделения — в "
-                   "параметрах (O)";
+            return tip("Выделение",
+                       "Протяжка — выделить, по выделенному — перенести\nВид выделения — в "
+                       "параметрах (O)");
     }
 }
 

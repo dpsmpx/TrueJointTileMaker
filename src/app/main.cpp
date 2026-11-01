@@ -25,6 +25,7 @@
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/i18n.h"
 #include "core/logo.h"
 #include "core/png.h"
 
@@ -40,6 +41,13 @@ constexpr int kAutosaveMs = 2 * 60 * 1000;
 Editor::Editor() {
     m.drawTilePixel = [this](int x, int y) { drawTilePixel(x, y); };
     m.drawPreviewPixel = [this](int x, int y) { drawPreviewPixel(x, y); };
+}
+
+void Editor::applyLanguage() {
+    const bool en = !classicUi_ && cfg.language == "english";
+    i18n::setLanguage(en ? "en" : "ru");
+    if (en) i18n::loadCatalog(resolvePath("Resources/Lang/en.txt"));
+    m.needRepaint = true;
 }
 
 void Editor::applyTheme() {
@@ -168,6 +176,7 @@ bool Editor::appInit(int argc, char** argv) {
     classicUi_ = classic;
     // Набор и свои клавиши (D3); «Классика» разбирает клавиши по-старому.
     applyKeymap(cfg.keyPreset, cfg.keys);
+    applyLanguage();
     m.keepSelectionPerDoc = !classic;
     m.zoomSteps = !classic;
     m.gridAutoZoom = classic ? 0 : cfg.gridAutoZoom;

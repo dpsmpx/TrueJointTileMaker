@@ -8,6 +8,7 @@
 
 #include "app/editor.h"
 #include "app/textfield.h"
+#include "core/i18n.h"
 #include "core/logo.h"
 #include "core/pmath.h"
 #include "core/text.h"
@@ -80,7 +81,7 @@ bool helpHeader(const std::string& s) {
     bool letter = false;
     for (const char32_t c : utf8ToU32(s)) {
         if ((c >= U'а' && c <= U'я') || c == U'ё' || (c >= U'a' && c <= U'z')) return false;
-        if ((c >= U'А' && c <= U'Я') || c == U'Ё') letter = true;
+        if ((c >= U'А' && c <= U'Я') || c == U'Ё' || (c >= U'A' && c <= U'Z')) letter = true;
     }
     return letter;
 }
@@ -91,6 +92,7 @@ std::string sentenceCase(const std::string& s) {
     if (!u.empty()) {
         if (u[0] >= U'а' && u[0] <= U'я') u[0] = u[0] - U'а' + U'А';
         if (u[0] == U'ё') u[0] = U'Ё';
+        if (u[0] >= U'a' && u[0] <= U'z') u[0] = u[0] - U'a' + U'A';
     }
     return u32ToUtf8(u);
 }
@@ -174,7 +176,8 @@ void Editor::showHelpBrowser(const std::vector<std::string>& paragraphs,
             layout(live);
             top = 0;
             // Открыта кнопкой «?» экрана — сразу на его разделе.
-            const std::string want = sentenceCase(section);
+            // Раздел назван по-русски; по-английски — его перевод.
+            const std::string want = sentenceCase(i18n::tr(section));
             for (const auto& [name, line] : toc) {
                 if (jump && name == want) top = line;
             }

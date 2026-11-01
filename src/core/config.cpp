@@ -95,6 +95,9 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             uiMode = v == "базовый" || v == "basic" ? "базовый" : "полный";
         } else if (key == "dock") {
             dock = parseBool(val, dock);
+        } else if (key == "language") {
+            const std::string v = netToLower(netTrim(val));
+            language = v.starts_with("en") || v.starts_with("англ") ? "english" : "русский";
         } else if (key == "keypreset") {
             keyPreset = netToLower(val).find("aseprite") != std::string::npos ? "как в Aseprite"
                                                                               : "стандартный";
@@ -250,6 +253,11 @@ std::string Config::serialize() const {
     if (dock != def.dock) {
         add("# Боковая панель со слоями и историей.");
         add(std::string("Dock = ") + ruBool(dock));
+        add("");
+    }
+    if (language != def.language) {
+        add("# Язык интерфейса: русский или english.");
+        add("Language = " + language);
         add("");
     }
     if (keyPreset != def.keyPreset || !keys.empty()) {

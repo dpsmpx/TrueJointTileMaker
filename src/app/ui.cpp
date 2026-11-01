@@ -5,6 +5,7 @@
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/i18n.h"
 #include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -546,6 +547,8 @@ bool Editor::uiTextLine(int x, int y, int w, int h, std::string& value) {
         in.keys.clear();
     }
     const bool editing = textEditId_ == id;
+    // Набранное — данные человека: не переводится.
+    const i18n::Raw raw;
     const int r = active.radius * 2;
     fb_.fillRoundRect(x, y, x + w, y + h, r, r, active.field);
     fb_.strokeRoundRect(x, y, x + w, y + h, r, r,
@@ -665,7 +668,8 @@ void Editor::textOut(int x, int y, const std::string& s, Color c) {
 }
 
 /// Обрезает строку слева до ширины maxW, ставя многоточие.
-std::string Editor::fitText(const std::string& s, int maxW) const {
+std::string Editor::fitText(const std::string& src, int maxW) const {
+    std::string s = i18n::tr(src);
     if (textWidth(s) <= maxW) return s;
     std::u32string u = utf8ToU32(s);
     while (u.size() > 1 && textWidth("…" + u32ToUtf8(u)) > maxW)
@@ -675,7 +679,9 @@ std::string Editor::fitText(const std::string& s, int maxW) const {
 
 /// Обрезает строку справа до ширины maxW, ставя многоточие. Строка из
 /// нескольких строк (\n) не трогается: её переносит рисование.
-std::string Editor::fitTextEnd(const std::string& s, int maxW) const {
+std::string Editor::fitTextEnd(const std::string& src, int maxW) const {
+    // Режется переведённая строка: обрезанную перевод уже не узнал бы.
+    std::string s = i18n::tr(src);
     if (s.find('\n') != std::string::npos || textWidth(s) <= maxW) return s;
     std::u32string u = utf8ToU32(s);
     while (u.size() > 1 && textWidth(u32ToUtf8(u) + "…") > maxW)
@@ -688,7 +694,8 @@ std::vector<std::string> Editor::layoutText(const std::vector<std::string>& para
                                             int maxWidth) const {
     std::vector<std::string> out;
     for (const std::string& p : paragraphs) {
-        const std::vector<std::string> words = splitWords(p);
+        // Абзац переводится целиком, до переноса по словам.
+        const std::vector<std::string> words = splitWords(i18n::tr(p));
         if (words.empty()) {
             out.emplace_back();
             continue;

@@ -4,9 +4,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <sstream>
 #include <vector>
 
 #include "core/config.h"
+#include "core/i18n.h"
 #include "core/mapdoc.h"
 #include "core/model.h"
 #include "core/shortcuts.h"
@@ -805,6 +808,106 @@ TEST(UiKeymap, ConfigKeys) {
     EXPECT_NE(text.find("Key.Save = F2 | Ctrl+S"), std::string::npos);
     // По умолчанию — ни строки: файл как у оригинала.
     EXPECT_EQ(Config{}.serialize().find("Key"), std::string::npos);
+}
+
+// --- D4: английский интерфейс ---------------------------------------------
+
+namespace {
+
+/// Язык и таблица — одни на процесс: тест возвращает русский.
+struct LangGuard {
+    LangGuard() = default;
+    LangGuard(const LangGuard&) = delete;
+    LangGuard& operator=(const LangGuard&) = delete;
+    ~LangGuard() {
+        i18n::setLanguage("ru");
+        i18n::loadCatalogText({});
+    }
+};
+
+std::string readSource(const std::string& rel) {
+    std::ifstream f(std::string(TJTM_SOURCE_DIR) + "/" + rel, std::ios::binary);
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+}  // namespace
+
+TEST(UiI18n, CatalogRules) {
+    const LangGuard guard;
+    i18n::loadCatalogText(
+        "# комментарий\n"
+        "Сохранить\tSave\n"
+        "тайл\ttile\n"
+        "строки {}–{} из {}\tlines {}–{} of {}\n"
+        "страница {} из {}\tpage {} of {}\n"
+        "страница {} из {},  тайлов {}\tpage {} of {},  {} tiles\n"
+        "Вид: {}\tKind: {}\n"
+        "~Пробел\tSpace\n"
+        "Две строки\\nвторая\tTwo lines\\nsecond\n");
+    // По-русски — как в коде.
+    EXPECT_EQ(i18n::text("Сохранить"), "Сохранить");
+    i18n::setLanguage("en");
+    EXPECT_EQ(i18n::text("Сохранить"), "Save");
+    EXPECT_EQ(i18n::text("Нет в таблице"), "Нет в таблице");
+    EXPECT_EQ(i18n::text("Already English"), "Already English");
+    EXPECT_EQ(i18n::text("строки 1–23 из 399"), "lines 1–23 of 399");
+    // Точный шаблон — раньше общего.
+    EXPECT_EQ(i18n::text("страница 1 из 2,  тайлов 17"), "page 1 of 2,  17 tiles");
+    EXPECT_EQ(i18n::text("страница 1 из 2"), "page 1 of 2");
+    // Подставленное переводится тоже.
+    EXPECT_EQ(i18n::text("Вид: тайл"), "Kind: tile");
+    EXPECT_EQ(i18n::text("Ctrl+Пробел"), "Ctrl+Space");
+    EXPECT_EQ(i18n::text("Две строки\nвторая"), "Two lines\nsecond");
+    {
+        const i18n::Raw raw;
+        EXPECT_EQ(i18n::text("Сохранить"), "Сохранить");
+    }
+    EXPECT_TRUE(i18n::has("Сохранить"));
+    EXPECT_FALSE(i18n::has("Нет в таблице"));
+}
+
+TEST(UiI18n, ShippedCatalogIsClean) {
+    const std::string text = readSource("Resources/Lang/en.txt");
+    ASSERT_FALSE(text.empty());
+    const auto bad = i18n::catalogProblems(text);
+    EXPECT_TRUE(bad.empty()) << bad.size() << " строк, первая: " << (bad.empty() ? "" : bad[0]);
+    const LangGuard guard;
+    EXPECT_GT(i18n::loadCatalogText(text), 1000);
+    i18n::setLanguage("en");
+    EXPECT_EQ(i18n::text("Файл"), "File");
+    EXPECT_EQ(i18n::text("Настроить клавиши…"), "Customize keys…");
+}
+
+TEST(UiI18n, HelpSectionsExistInEnglishHelp) {
+    // Кнопка «?» экрана открывает справку на разделе по его русскому
+    // заголовку; по-английски раздел ищется по переводу заголовка.
+    const LangGuard guard;
+    i18n::loadCatalogText(readSource("Resources/Lang/en.txt"));
+    i18n::setLanguage("en");
+    const std::string help = readSource("Resources/Lang/help.en.txt");
+    ASSERT_FALSE(help.empty());
+    for (const char* section :
+         {"НАБОР ДЛЯ ИГРЫ", "ЛИНЕЙКИ, НАПРАВЛЯЮЩИЕ, СЕТКА", "НАСТРОЙКИ", "НАБОРЫ ТАЙЛОВ",
+          "СЛОИ, КАДРЫ И АНИМАЦИЯ", "ВНЕ ПИКСЕЛЬ-АРТА", "ИНСТРУМЕНТЫ РЕЖИМА ТАЙЛА",
+          "ВЫДЕЛЕНИЕ И ПРЕОБРАЗОВАНИЯ", "РЕДАКТОР КАРТ", "ИНСТРУМЕНТЫ РЕЖИМА КАРТЫ", "ПАЛИТРА",
+          "КЛАВИШИ"}) {
+        const std::string en = i18n::tr(section);
+        EXPECT_NE(en, section);
+        EXPECT_NE(help.find("\n" + en + "\n"), std::string::npos) << en;
+    }
+    EXPECT_NE(help.find("{KEYS}"), std::string::npos);
+    EXPECT_NE(help.find("{VERSION}"), std::string::npos);
+}
+
+TEST(UiI18n, ConfigLanguage) {
+    Config c;
+    EXPECT_EQ(c.language, "русский");
+    c.applyLines({"Language = English"});
+    EXPECT_EQ(c.language, "english");
+    EXPECT_NE(c.serialize().find("Language = english"), std::string::npos);
+    EXPECT_EQ(Config{}.serialize().find("Language"), std::string::npos);
 }
 
 }  // namespace tjtm

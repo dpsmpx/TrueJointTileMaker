@@ -36,6 +36,9 @@ public:
     [[nodiscard]] bool ok() const { return font_ != nullptr; }
     [[nodiscard]] const std::string& path() const { return path_; }
 
+    // Строки интерфейса переводятся здесь (core/i18n.h): рисуется и
+    // меряется одна и та же — переведённая — строка.
+
     /// Ширина строки по набору знаков, без запаса.
     int rawWidth(const std::string& s) const;
     /// TextWidth из GraphABC: ширина плюс точка («без неё рисует, занимая
@@ -56,6 +59,11 @@ public:
     std::vector<std::string> layoutBox(const std::string& s, int maxWidth) const;
 
 private:
+    /// Без перевода: строка уже переведена.
+    int measure(const std::string& s) const;
+    void drawAs(Surface& dst, int x, int y, const std::string& s, Color c) const;
+    std::vector<std::string> layoutAs(const std::string& s, int maxWidth) const;
+
     struct Glyph {
         int adv = 0;   // ширина знака, целая
         int minx = 0;  // левый край картинки от пера

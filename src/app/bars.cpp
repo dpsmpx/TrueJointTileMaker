@@ -13,6 +13,7 @@
 #include <ranges>
 
 #include "app/editor.h"
+#include "core/i18n.h"
 #include "core/imageops.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -317,7 +318,7 @@ std::vector<Editor::BarItem> Editor::optionsItems() {
                [this] { m.brushRound = false; });
     };
     // Название инструмента — первая строка его подсказки, без клавиши.
-    std::string name = splitLines(toolTip(tool)).front();
+    std::string name = splitLines(i18n::tr(toolTip(tool))).front();
     if (const std::size_t dot = name.find(" · "); dot != std::string::npos) name.resize(dot);
     label(name);
     if (tile) {
@@ -530,7 +531,7 @@ void Editor::drawStatusBar() {
     // Что делают кнопки мыши у инструмента (UX-08): строки подсказки
     // инструмента после названия — одной строкой.
     const int tool = m.docMode == DOC_TILE ? m.toolTile : m.toolMap;
-    const std::vector<std::string> lines = splitLines(toolTip(tool));
+    const std::vector<std::string> lines = splitLines(i18n::tr(toolTip(tool)));
     std::string hint;
     for (std::size_t i = 1; i < lines.size(); ++i) {
         if (!hint.empty()) hint += "  ·  ";

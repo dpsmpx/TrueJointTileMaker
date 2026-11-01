@@ -1,0 +1,141 @@
+# Справка на английском (план «Интерфейс», D4). Строка — абзац, пустая
+# строка — пустой абзац; заголовок раздела — заглавными. {VERSION} —
+# версия программы, строка {KEYS} — список клавиш из действующей таблицы.
+# Правится вместе с русской справкой в Editor::showHelpScreen (menu.cpp).
+True Joint Tile Maker, version {VERSION}.
+A pixel art, tileset and location map editor.
+
+TWO MODES
+Tile is for drawing an image. Map is a location of the Andors-Love game in the data/maps/*.map format. Switch with the Tab key or from the menu; both documents live at the same time, and going back and forth loses nothing.
+
+GENERAL MOUSE RULE
+The left button applies: draws, fills, lays a color, places an object.
+The right button takes: picks a color or a terrain, removes an object.
+The wheel as a button: dragging moves the image, a click without dragging swaps the working colors.
+Turning the wheel zooms around the cursor.
+
+OVERVIEW PANEL
+At the bottom of the right panel the document is shown whole, and a yellow frame marks the part visible on the canvas. Dragging the overview with the middle button moves the canvas, and panning the canvas moves the frame: the overview and the editor always look at the same place of the document, only at different zooms.
+
+TILE MODE TOOLS
+The pencil draws with the first color and replaces the pixel's color. The E key switches it to blending: a semi-transparent color is laid on top.
+The eraser erases to transparency.
+The fill fills a connected area of one color.
+The eyedropper takes a pixel's color.
+Line, rectangle and ellipse are built by dragging: while the button is held, a preview is shown. Ctrl while dragging makes the shape filled, Shift makes it a square or a circle.
+The pattern tool lays the first and second colors in the chosen pattern: checkerboard, 25 and 75 percent dots, rows, columns, diagonals, cells, cluster. Patterns are browsed with the [ and ] keys and chosen in the tool options.
+Selection: the frame runs with "marching ants", so it is visible on any background.
+Drag a frame to select an area and copy it to the clipboard. A click without dragging pastes the clipboard. Dragging the selection moves it, with Ctrl — copies it. The brush, shapes and fill do not go beyond the selection.
+
+MAP MODE TOOLS
+Terrain paints with the chosen cell kind, the right button takes the kind from under the cursor. Fill and rectangle work with the same kind.
+Object: the left button places an object of the chosen kind or drags one already standing, the right one removes it; a double click, Enter or the middle button open the object form.
+The line is edited with an input field: selection, Ctrl+C and Ctrl+V work, so long lines move between locations whole.
+Selection copies and pastes pieces of terrain.
+
+TILESETS
+The T key opens the tilesets. There are four:
+  Main — the seventeen slots of the game: floor, wall, water, hero and others.
+  Residents and Enemies — an image per creature: npc_elder, mob_wolf.
+  Icons — the images on the editor's own tool buttons.
+The right button opens a tile in the editor, the left one writes the current tile in its place. A tile opened from a tileset becomes the current file, so Ctrl+S saves it back to the same place.
+
+The names of the main slots are part of the contract with the game: it looks for tiles by file name, and a slot named differently will simply not be found. But the editor does not keep the list of residents and enemies: it looks at which files are in the folder. The folder is the list — add a new enemy to the game, and it shows up here by itself, without changing the editor.
+
+An empty place is not an error: the game draws such a tile the old way, with a fill and a font glyph, so a tileset can be made one tile at a time.
+The same goes for icons: until there is a file, the button looks like a caption.
+
+FROM THE MAP STRAIGHT TO A TILE
+A double click on a map cell opens the tile it is drawn with.
+A resident under the cursor opens its own tile, an enemy from a spawn point — its tile; an empty cell — the tile of the terrain itself. If there is no file yet, the editor offers to create it right away with the right name, so that Save puts the tile where the game looks.
+The second click of the pair does not do the tool's usual job: otherwise a double click with the objects tool would place two objects at once.
+
+PALETTE
+A palette has from one to 256 colors. The panel shows an eight by eight window, and the wheel over it scrolls a long palette. A click on a cell takes its color: the left button as the first color, the right one as the second. Ctrl+click writes the first color into the cell (undone with Z), a click on an empty cell adds the first color. The U key or the middle button on the palette open the palette screen: add, duplicate, delete and move cells, remove duplicates, sort by hue, saturation, brightness, lightness, channels and alpha, build a ramp of colors between two cells with a hue bend, shift the hue, saturation and brightness of cells, extract a palette from the image or the selection, set the transparent index. Palettes are read and written as PNG (a pixel per cell), GIMP .gpl, Lospec .hex and JASC .pal.
+
+INDEXED PALETTE
+The I key turns on indexed mode: every pixel stores a cell number, and the color comes from the palette. If the image has colors not in the palette, the editor asks whether to reduce them to the nearest ones or add them to the palette. The brush and fill with a free color lay the nearest palette color, there is no blending, and the eraser writes the transparent index.
+After that, writing into a cell (Ctrl+click) recolors all pixels bound to it: a tileset is recolored by changing the palette, not by redrawing. Indexed mode is shown by the palette frame in the selection color, and the cell the first color came from is outlined with it too.
+Editing a cell and recoloring the tile are undone together, with one Z.
+A pixel that matched no cell stays free: to bind the whole tile, reduce it to the palette colors in the color operations. A color set with the sliders is not bound to the palette until it matches some cell. The eyedropper takes a color together with its binding.
+
+SEAMLESS AND SYMMETRY
+The B key turns on the seamless preview: the tile is drawn repeated, and seams are visible right while working. The W key turns on wrapping over the edge: a stroke going past the right border continues from the left one.
+The F and D keys turn on the vertical and horizontal symmetry axes.
+The axes can be moved off the center, including between pixels, in the tool options.
+
+SELECTION AND TRANSFORMS
+A selection can be a rectangle, an ellipse, a lasso, a polygon, a magic wand (a connected area of one color) and by color (all pixels of that color). A polygon is placed by vertices: a click is a vertex, a click on the first one, a double click or Enter close it, Backspace removes the last one. The kind is chosen in the tool options: right-click the tool or press O. Shift adds to the selection, Alt subtracts from it, Shift with Alt leaves the intersection.
+A moved piece "floats" over the image: while it is moved and turned, what was there stays under it, not a hole.
+Ctrl+A selects all, Ctrl+D deselects, Ctrl+Shift+D reselects, Ctrl+I inverts, Ctrl+C copies, Ctrl+X cuts, Ctrl+V and V paste at the cursor position — the pasted piece is selected right away. Delete with a selection erases only the selection.
+The "Image, selection, color" screen (a menu item or the K key): flips and rotations by 90, 180 and 270 degrees, rotation by any angle with RotSprite or nearest neighbor (no new colors appear), scaling up 2, 3 and 4 times and halving with nearest neighbor — of the selection or the whole tile; cropping to the selection and to the content, canvas size with an anchor, scale to size, shift with wrap — used to check the tile's seam; fill, outline with the first color outside or inside of any thickness, growing and trimming the edge by a pixel, removing lone pixels, reducing colors by median cut.
+
+PIXEL-PERFECT
+The Q key or the "PP" cell on the panel: a stroke of the pencil, eraser and pattern loses the "L" corners that fast mouse movement leaves — the line goes as an even staircase. The "Repl." and "…" cells next to it are the brush mode and the tool options.
+
+GROUPS, VECTOR, TILEMAP
+On the layers and frames screen a layer can be grouped: a group hides, locks and makes semi-transparent all its children at once. The triangle on the timeline collapses a group, "Into the group above" and "Out of the group" move a layer along the tree, "Flatten group" turns it into one layer.
+A vector layer keeps shapes editable: a line, rectangle and ellipse are laid on it as shapes, dragging a vertex moves it, with Ctrl — the whole shape, Delete removes the last one touched. Right-clicking the line, rectangle or ellipse opens the shape options: the line kind (straight, polyline, polygon, curve through points, closed curve, star), thickness, fill with the second color, star rays. A polyline and a curve are placed point by point: a click is a point, a double click or Enter is the end. On a raster layer a shape is laid as pixels right away.
+A tilemap is a layer of cells, each holding the number of a tile from the layer's tileset: identical cells are stored once, and editing a tile changes all its copies. Ctrl+T opens the layer's tiles: pick the brush tile, add an empty one, one from the selection or from the game set, switch between tile and pixel editing. In tile mode the brush lays a tile into a cell, the fill fills cells, the eyedropper takes a tile; in pixel mode you draw as usual, and the drawing goes into the tile. "Layer → tilemap" cuts a ready layer into tiles, "Rasterize" turns a vector layer or a tilemap back into an ordinary layer.
+
+RULERS, GUIDES, GRID
+Ctrl+R shows the rulers at the top and on the left. Their numbers count from the origin, which can be moved, for example to the corner of a tile inside a sheet. A click on the top ruler places a vertical guide, on the left one — a horizontal guide; dragging moves it along pixel boundaries, with Shift — also to a pixel's center; the right button or dragging it off the document removes it. Ctrl+; hides and shows the guides, Ctrl+G or a click in the rulers' corner opens the grid and guides screen: a coarse grid (for example 16 by 16 for a tile sheet), guides through the document center and the centers of coarse grid cells, the origin, exact guides by number. Guides, the grid and the origin are saved in a .tjt project.
+
+BRUSH STRENGTH AND RAYS
+The tool options (O) have the brush strength in percent: a weak brush lays a color semi-transparently and once per stroke, a weak eraser erases less. There are also the rays of radial symmetry: 3, 4, 6 or 8 repeats of a stroke around the axes' crossing point; together with the axes they make a snowflake pattern.
+
+.TJT PROJECT
+Save as with the .tjt extension writes a project: the palette, indexed mode and the transparent index, layers, frames and animation tags, the selection, the view and the tool options. A project file is an ordinary PNG with the first frame, so any viewer shows it, and the project itself sits inside in a service chunk. Load file opens PNG and .tjt, as well as BMP, GIF, JPEG, TIFF (TIFF pages as frames). Save as writes the format by extension: .png, .tjt, .gif, .bmp, .tif. A tile opened from a tileset remembers its slot: from a project it can be exported back to the tileset on the layers, frames and export screen.
+A document with layers or frames does not fit into PNG: when saving to PNG the editor offers a project or a merged image of the current frame.
+
+LAYERS, FRAMES AND ANIMATION
+The J key opens the timeline under the canvas: layers on the left (the top one is on top), frames to the right, a dot in a cell means the layer has a drawing in that frame. A click on a cell selects the layer and the frame, on the eye — hides the layer, on the lock — locks it; a double click on a name renames it. The right button on a frame number sets its duration. The timeline buttons: play, new frame, copy frame, delete frame, new and delete layer, onion skin, tag, and "…" — the layers, frames and export screen (also in the menu). A frame copy shares images with the original until one of them is edited — such cells are joined by a bridge on the timeline.
+A tag is a named range of frames: run, jump. A click on a tag above the numbers selects it for playing and export, the right button edits it: frames, name, direction — forward, backward, ping-pong.
+The onion skin shows neighboring frames under the current one: past ones reddish, future ones bluish.
+Export: a sprite sheet as a row or a grid with borders, spacing, scaling and an Aseprite-style .json description (read by Godot, Phaser and other engines); GIF and APNG animation; frames as separate PNG files. Load file opens GIF and APNG as frames. Save writes an opened GIF back to GIF, and a single-layer animation in PNG — to APNG.
+
+GAME SET
+The "For the game…" button on the tilesets screen (T): an 8 by 8 sheet in the game's format — tiles on a service background, up to 63 pixels per side; an atlas of the whole tileset folder with a TexturePacker-style .json description; splitting a ready sheet back into tileset files.
+On the map Shift+B shows the cells with tileset images, with residents and transitions on top. For a terrain tile opened from a tileset, Shift+B shows it among its neighbors from the real map: cells of the same terrain are the live tile, so its joint with itself is visible; Ctrl+B goes to the next place of this terrain on the map.
+Joints: a terrain can have 16 variants by neighbors of the same terrain — files "slot_mask.png", where the mask adds up north 1, east 2, south 4 and west 8; beyond the map edge the same terrain is assumed. The "Template" button opens all variants as a 4 by 4 grid, "Split into variants" writes them to the tileset, and the map drawn with tiles picks them up right away. The Andors-Love game reads both the main tile and the variants: it draws a tileset without variants as before.
+
+BRUSH, SHADING, GRADIENT, REFERENCE
+Right-clicking the pencil chooses its kind: plain dots, airbrush, brush from selection, shading. Ctrl+E makes the selected piece of the active layer a brush: it is laid with its center under the cursor at every point of a stroke, transparent pixels lay nothing, symmetry mirrors reflect the brush itself. Shading shifts a pixel's color to the neighboring cell of its palette row (eight per row) — lighter or darker, with Shift the other way; the light end of the row is where the end cell is brighter. A pixel shifts once per stroke.
+Right-clicking the fill turns on the dithered gradient: dragging from the first color to the second over the connected area under the press point, linear or radial; blending uses a Bayer 8x8 pattern, there are no new colors.
+A reference layer (layers and frames screen) is an image for tracing under all layers: fitted into the document, shown semi-transparent, not editable, not recolored by the palette and not exported.
+
+BEYOND PIXEL ART
+What pixel art guards against is collected separately and marked: it makes new colors, semi-transparency and soft edges. In strict indexed mode the result is reduced to the palette: almost transparent becomes transparent, the rest — the nearest color.
+Shift+K or the button on the image screen — "Filters and effects": blur, sharpen, noise, edges, emboss, grayscale, sepia, negative, brightness with contrast and saturation, levels, curves by channel, skew and perspective (the corners are dragged right on the "After" image). A filter changes the active layer, with a selection — only the selection; "Wrap around" keeps the tile seamless. "Before" is on the left, "After" on the right, the "Apply" button writes it.
+Right-clicking the pencil gives the airbrush: a soft brush with a diameter, hardness and flow that builds up over a stroke. The shape options have edge smoothing for the line, rectangle, ellipse and vector layer shapes. Rotation by any angle can do "Smooth", the image screen has a smooth scale.
+
+INTERFACE MODES
+Full mode shows all features, basic mode only everyday ones: tools without the pattern, color and palette, zoom, undo, file, grid, layers as a simple list. Switch with Shift+Tab or "View → Basic mode"; the choice is remembered. Basic mode hides buttons, not features: keys of hidden things work in it too. The menu bar, tool options, status bar and side panel are in the light and dark themes; "Classic" keeps the 1.6 layout.
+
+KEYS
+F1 or ? — a cheat sheet over the canvas, with search. Keys are customized in "Help → Customize keys": any action, and the "Like Aseprite" preset.
+{KEYS}
+
+Shift with the wheel scrolls sideways, space with dragging is the hand.
+Alt held over the canvas temporarily turns on the eyedropper (except for selection).
+
+MAP EDITOR
+The map is drawn with tileset images right away, as in the game; Shift+B brings back colored cells. A double click on an object with the objects tool, Enter over an object or the middle button open its form: the fields are exactly those the game reads (resident, item and amount, transition location and point with conditions, enemy, chest with a key and contents), coordinates, a check by the game's rules, picking the transition location from the maps folder. An untouched line is saved as it was. Right-clicking the map brush, rectangle or fill gives a mixed brush: each cell is a random terrain by weight, a new stroke — a new arrangement. Ctrl+F — find and replace: terrain on the whole map or in the selection, objects by kind or part of the line with a jump to what was found.
+
+MAP FORMAT
+The grid stores only geometry: floor, wall, water, tree, grass, road, still water. Everything else is described by objects: npc, item, exit, spawn, chest, note, bed, sign. The editor parses only an object's kind and coordinates, keeps the rest of the line as is and writes it back unchanged, so transition conditions and chest contents are not lost. The location check in the map properties finds objects on impassable cells and areas that cannot be reached.
+
+SETTINGS
+All settings are stored in the Config.txt file next to the program in UTF-8, one per line as "key = value".
+The file can be edited by hand or with the "Settings" menu item. The language is chosen there too.
+At startup the last file opens (the "Open the last file" setting), and if there is none — the startup image. The size from the settings is needed only when there is nothing to open: then an empty tile is created.
+
+CREDITS
+The program's author is dpsmpx, vk.com/dpsmpx.
+To the PascalABC.NET team for the language and the GraphABC library: the first version of the editor was written with them, and its look is kept in this one.
+To the SDL authors for the library the current editor is built on.
+To the Andors-Love game for the map format the location mode was made for.
+To the vk.com/programmer_ne_lamer group for the community and support.
+To everyone who tried the editor, sent remarks and found bugs.
+
+The program is distributed under the GNU GPL version 3 license.

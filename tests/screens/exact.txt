@@ -182,3 +182,9 @@ uid        04_keys_own      0    0  780  560
 uid        05_keys_ask      0    0  780  560
 uid        06_cheat_aseprite 0   0  780  560
 uid        07_tool_by_letter 0   0  780  560
+# Интерфейс, этап D — по-английски.
+uie        01_start         0    0  780  560
+uie        02_menu_file     0    0  780  560
+uie        03_cheatsheet    0    0  780  560
+uie        04_help          0    0  780  560
+uie        05_palette       0    0  780  560
