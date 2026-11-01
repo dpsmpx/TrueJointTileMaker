@@ -57,7 +57,9 @@ int Editor::chipHit(int px, int py) {
 }
 
 void Editor::drawToolChips() {
-    if (m.docMode != DOC_TILE) return;
+    // «Зам.», «ПП» и «…» — полного режима: в базовом сокращений нет
+    // (dpsmpx/TrueJointTileMaker#14).
+    if (m.docMode != DOC_TILE || baseUi()) return;
     for (int c = 0; c < kChipCount; ++c) {
         const int x0 = Model::toolCellX(kChipFirst + c);
         const int y0 = Model::toolCellY(kChipFirst + c);

@@ -48,3 +48,19 @@ move 770 550
 sleep 0.2
 shot 08_axis_moved
 key f
+# C4: базовый режим (Shift+Tab) — только повседневное: без узора, «Зам.»,
+# «ПП», режимов и меню «Анимация»; клавиши скрытого работают.
+key shift+Tab
+sleep 4.5                   # уведомление о режиме догорает
+move 770 550
+sleep 0.2
+shot 09_base
+click 205 13                # меню «Выделение» — без кисти из выделения
+sleep 0.3
+move 250 120
+sleep 0.2
+shot 10_base_menu
+key Escape
+sleep 0.2
+key shift+Tab
+sleep 4.5

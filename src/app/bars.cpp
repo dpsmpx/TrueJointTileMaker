@@ -42,6 +42,7 @@ bool Editor::menuShown(int i) const {
     const char* title = menuTitles()[static_cast<std::size_t>(i)];
     for (const MenuItem& mi : menuItems()) {
         if (std::string_view(mi.menu) != title || mi.text == nullptr) continue;
+        if (mi.full && baseUi()) continue;
         if (mi.where == KeyWhere::Both || (mi.where == KeyWhere::Tile) == tile) return true;
     }
     return false;
@@ -98,6 +99,7 @@ bool Editor::cmdChecked(Cmd c) const {
         case Cmd::MapContext: return m.mapContext;
         case Cmd::MapTiles: return m.mapTiles;
         case Cmd::Dock: return cfg.dock;
+        case Cmd::UiMode: return baseUi();
         default: return false;
     }
 }
@@ -134,6 +136,7 @@ void Editor::openMenu(int menu) {
         for (const MenuItem& it : menuItems()) {
             if (std::string_view(it.menu) != title || it.text == nullptr) continue;
             if (it.where != KeyWhere::Both && (it.where == KeyWhere::Tile) != tile) continue;
+            if (it.full && baseUi()) continue;
             textW = std::max(textW, textWidth(it.text));
             keysW = std::max(keysW, textWidth(commandKeys(it.cmd, it.arg, tile)));
         }
@@ -155,6 +158,7 @@ void Editor::openMenu(int menu) {
                 continue;
             }
             if (it.where != KeyWhere::Both && (it.where == KeyWhere::Tile) != tile) continue;
+            if (it.full && baseUi()) continue;
             rows.push_back({&it, y, y + kItemH});
             y += kItemH;
             lastSep = false;
@@ -317,13 +321,18 @@ std::vector<Editor::BarItem> Editor::optionsItems() {
     if (const std::size_t dot = name.find(" · "); dot != std::string::npos) name.resize(dot);
     label(name);
     if (tile) {
-        static constexpr const char* kPen[PEN_MODES] = {"точки", "аэрограф", "кисть", "затенение"};
         switch (tool) {
-            case T_PEN:
-                button(std::string("Вид: ") + kPen[std::clamp(m.penMode, 0, PEN_MODES - 1)],
-                       "Вид карандаша и его параметры", false, [this] { showBrushOptions(); });
+            case T_PEN: {
+                // Аэрограф, кисть из выделения и затенение — полного режима.
+                if (!baseUi()) {
+                    static constexpr const char* kPen[PEN_MODES] = {"точки", "аэрограф", "кисть",
+                                                                    "затенение"};
+                    button(std::string("Вид: ") + kPen[std::clamp(m.penMode, 0, PEN_MODES - 1)],
+                           "Вид карандаша и его параметры", false, [this] { showBrushOptions(); });
+                }
                 if (m.penMode == PEN_PENCIL || m.penMode == PEN_SHADE) sizeGroup();
                 break;
+            }
             case T_ERASER: sizeGroup(); break;
             case T_DITHER: {
                 const int n = img::ditherPatternCount();
@@ -349,7 +358,8 @@ std::vector<Editor::BarItem> Editor::optionsItems() {
             case T_SELECT: {
                 static constexpr const char* kSel[SS_COUNT] = {"Рамка",   "Овал",     "Лассо",
                                                                "Палочка", "По цвету", "Вершины"};
-                for (int s = 0; s < SS_COUNT; ++s)
+                // Базовый режим выделяет рамкой; виды — в полном.
+                for (int s = 0; s < (baseUi() ? 0 : SS_COUNT); ++s)
                     button(kSel[s], "Вид выделения", m.selShape == s,
                            [this, s] { m.selShape = s; });
                 break;
@@ -374,7 +384,9 @@ std::vector<Editor::BarItem> Editor::optionsItems() {
     };
     std::vector<Mode> modes;
     modes.push_back({"Сетка", "G", "Сетка между точками · G", m.gridOn, Cmd::Grid});
-    if (tile) {
+    if (baseUi()) {
+        // В базовом режиме из переключателей — только сетка.
+    } else if (tile) {
         modes.push_back(
             {"Бесшовно", "B", "Бесшовный предпросмотр · B", m.seamlessOn, Cmd::Seamless});
         modes.push_back(

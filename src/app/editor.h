@@ -440,6 +440,20 @@ private:
     int edgeStartY_ = 0;
     bool edgeArmed_ = false;
 
+    // --- базовый и полный режимы (C4, dpsmpx/TrueJointTileMaker#14) ---
+    /// Базовый режим: на виду только повседневное. Прячет элементы, а не
+    /// возможности: клавиши скрытого работают (решение владельца).
+    [[nodiscard]] bool baseUi() const {
+        return !classicUi_ && theme::active.modern && cfg.uiMode == "базовый";
+    }
+    /// Инструмент спрятан в базовом режиме: узор у тайла, выделение у карты.
+    [[nodiscard]] bool toolHidden(int i) const {
+        return baseUi() && (m.docMode == DOC_TILE ? i == T_DITHER : i == M_SELECT);
+    }
+    /// Окно стало большим или маленьким: предложить другой режим, но не
+    /// переключать молча. 0 — ещё не предлагали.
+    int modeHint_ = 0;
+
     // --- строка меню и строка состояния (bars.cpp, C2) ---
     struct MenuSlot {
         int menu, x0, x1;

@@ -37,6 +37,20 @@ void Editor::syncFrameSize() {
     fb_.resize(w, h, cWindow);
     m.overDirty = true;
     m.needRepaint = true;
+    // Режим к размеру окна — предложением, а не молча (#14): большое окно
+    // и базовый режим, маленькое и полный.
+    if (!classicUi_ && active.modern && !pf_.scripted()) {
+        const bool big = w >= 1100 && h >= 700;
+        const bool small = w <= WIN_W + 40 && h <= WIN_H + 40;
+        const bool base = cfg.uiMode == "базовый";
+        if (big && base && modeHint_ != 1) {
+            modeHint_ = 1;
+            notify("Окно большое", "Полный режим покажет все возможности — Shift+Tab.");
+        } else if (small && !base && modeHint_ != 2) {
+            modeHint_ = 2;
+            notify("Окно маленькое", "Базовый режим оставит только повседневное — Shift+Tab.");
+        }
+    }
 }
 
 void Editor::setPage(bool screen) {

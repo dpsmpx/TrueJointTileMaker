@@ -72,6 +72,7 @@ std::string Editor::toolLabel(int i) const {
 void Editor::drawToolsSection() {
     fb_.fillRect(panelX(), 0, panelX() + PANEL_W, TOOLS_Y1 + 2, cPanel);
     for (int i = 0; i < m.toolCount(); ++i) {
+        if (toolHidden(i)) continue;
         const int x0 = Model::toolCellX(i);
         const int y0 = Model::toolCellY(i);
         const bool over = mouseX() >= x0 && mouseX() < x0 + TOOL_CW - 2 && mouseY() >= y0 &&

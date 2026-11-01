@@ -614,5 +614,29 @@ TEST(UiHistory, MapLabels) {
     EXPECT_EQ(done, 2);
 }
 
+// --- C4: базовый и полный режимы -------------------------------------------
+
+TEST(UiModes, ConfigAndMenu) {
+    Config c;
+    EXPECT_EQ(c.uiMode, "полный");
+    EXPECT_EQ(c.serialize().find("UiMode"), std::string::npos);
+    c.applyLines({"UiMode = базовый"});
+    EXPECT_EQ(c.uiMode, "базовый");
+    EXPECT_NE(c.serialize().find("UiMode = базовый"), std::string::npos);
+    // Анимация — только полного режима, файл и отмена — обоих.
+    for (const MenuItem& mi : menuItems()) {
+        if (mi.text == nullptr) continue;
+        if (std::string_view(mi.menu) == "Анимация") {
+            EXPECT_TRUE(mi.full) << mi.text;
+        }
+        if (mi.cmd == Cmd::Save || mi.cmd == Cmd::Undo || mi.cmd == Cmd::UiMode) {
+            EXPECT_FALSE(mi.full) << mi.text;
+        }
+    }
+    // Переключатель — Shift+Tab, а Tab остаётся тайлом и картой.
+    EXPECT_EQ(findShortcut(KEY_TAB, MOD_SHIFT, true)->cmd, Cmd::UiMode);
+    EXPECT_EQ(findShortcut(KEY_TAB, 0, true)->cmd, Cmd::SwitchMode);
+}
+
 }  // namespace
 }  // namespace tjtm

@@ -109,6 +109,7 @@ enum class Cmd {
     GameSet,
     MapProperties,
     Dock,
+    UiMode,
 };
 
 struct Shortcut {
@@ -155,6 +156,8 @@ struct MenuItem {
     Cmd cmd = Cmd::MainMenu;
     int arg = 0;
     KeyWhere where = KeyWhere::Both;
+    /// Только в полном режиме интерфейса (C4): базовый его не показывает.
+    bool full = false;
 };
 
 /// Названия меню в порядке строки.

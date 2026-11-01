@@ -63,6 +63,10 @@ struct Config {
     int gridAutoZoom = 12;
     /// Боковая панель со слоями и историей (C3), когда окно достаточно широко.
     bool dock = true;
+    /// Режим интерфейса (C4, dpsmpx/TrueJointTileMaker#14): «полный» — все
+    /// возможности на виду, «базовый» — только повседневное, для маленького
+    /// окна. Сочетания скрытого работают и в базовом.
+    std::string uiMode = "полный";
     /// Недавние файлы, последний — первым; не больше kRecentMax (UX-24).
     std::vector<std::string> recentFiles;
     static constexpr std::size_t kRecentMax = 10;

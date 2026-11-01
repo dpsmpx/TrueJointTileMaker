@@ -90,6 +90,9 @@ int Config::applyLines(const std::vector<std::string>& lines) {
                 windowW = parseInt(val.substr(0, x), 0, 0, 16384);
                 windowH = parseInt(val.substr(x + 1), 0, 0, 16384);
             }
+        } else if (key == "uimode") {
+            const std::string v = netToLower(netTrim(val));
+            uiMode = v == "базовый" || v == "basic" ? "базовый" : "полный";
         } else if (key == "dock") {
             dock = parseBool(val, dock);
         } else if (key == "gridautozoom") {
@@ -228,6 +231,11 @@ std::string Config::serialize() const {
     if (cellFrame != def.cellFrame) {
         add("# Рамка клетки под курсором на холсте.");
         add(std::string("CellFrame = ") + ruBool(cellFrame));
+        add("");
+    }
+    if (uiMode != def.uiMode) {
+        add("# Режим интерфейса: полный или базовый (только повседневное).");
+        add("UiMode = " + uiMode);
         add("");
     }
     if (dock != def.dock) {

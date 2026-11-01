@@ -349,6 +349,19 @@ void Editor::runCommand(Cmd c, int arg) {
             saveConfig();
             applyDock();
             break;
+        case Cmd::UiMode:
+            // Меняется только раскладка: документ, история, выделение и вид
+            // остаются.
+            cfg.uiMode = cfg.uiMode == "базовый" ? "полный" : "базовый";
+            saveConfig();
+            notify(cfg.uiMode == "базовый" ? "Базовый режим" : "Полный режим",
+                   cfg.uiMode == "базовый"
+                       ? "На виду только повседневное. Клавиши скрытого работают; всё — в "
+                         "полном режиме (Shift+Tab)."
+                       : "На виду все возможности. Базовый режим — Shift+Tab.");
+            modeHint_ = 0;
+            m.needRepaint = true;
+            break;
     }
 }
 

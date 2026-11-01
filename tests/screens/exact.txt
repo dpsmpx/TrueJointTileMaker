@@ -166,3 +166,5 @@ uic        05_back          0    0  780  560
 uic        06_menu_view     0    0  780  560
 uic        07_axis          0    0  780  560
 uic        08_axis_moved    0    0  780  560
+uic        09_base          0    0  780  560
+uic        10_base_menu     0    0  780  560

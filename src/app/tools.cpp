@@ -651,7 +651,7 @@ void Editor::handlePanelClick() {
     const int py = frameClickY_;
     int idx = 0;
     if (py >= TOOLS_Y0 && py < TOOLS_Y1) {
-        if (m.toolHit(frameClickX_, frameClickY_, idx)) {
+        if (m.toolHit(frameClickX_, frameClickY_, idx) && !toolHidden(idx)) {
             m.setTool(idx);
             // Правая кнопка по инструменту тайла — его параметры; у линии и
             // фигур — параметры фигур (этап 6).
@@ -672,7 +672,7 @@ void Editor::handlePanelClick() {
                 }
             }
         } else if (m.docMode == DOC_TILE) {
-            const int chip = chipHit(frameClickX_, frameClickY_);
+            const int chip = baseUi() ? -1 : chipHit(frameClickX_, frameClickY_);
             if (chip >= 0) handleChipClick(chip);
         }
     } else if (py >= OVER_Y0 && py < OVER_Y1) {

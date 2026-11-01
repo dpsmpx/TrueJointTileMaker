@@ -1,9 +1,13 @@
 key Escape
 sleep 0.2
-window 1100 700
+key shift+Tab
+sleep 4.5
+move 770 550
+sleep 0.2
+shot a_base
+click 205 13
 sleep 0.3
-key j
+move 250 120
 sleep 0.2
-move 1050 650
-sleep 0.2
-shot a_tl
+shot b_base_menu
+key Escape
