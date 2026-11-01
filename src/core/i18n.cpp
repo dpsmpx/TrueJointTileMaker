@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <unordered_map>
 
@@ -23,6 +24,8 @@ struct State {
     // text() мог вернуть ссылку.
     std::unordered_map<std::string, std::string> made;
     int raw = 0;
+    bool track = false;
+    std::set<std::string> missed;
 };
 
 State& st() {
@@ -38,6 +41,10 @@ std::string unescape(const std::string& s) {
             ++i;
         } else if (s[i] == '\\' && i + 1 < s.size() && s[i + 1] == 't') {
             out += '\t';
+            ++i;
+        } else if (s[i] == '\\' && i + 1 < s.size() && s[i + 1] == '\\') {
+            // «\\» — сама обратная черта, как её пишет tools/i18n.py.
+            out += '\\';
             ++i;
         } else {
             out += s[i];
@@ -90,7 +97,11 @@ bool matchPattern(const Pattern& p, const std::string& s, std::vector<std::strin
     return true;
 }
 
-const std::string* lookup(const std::string& s) {
+bool hasCyrillic(const std::string& s);
+
+// Рекурсия намеренная: подставленное в шаблон переводится тем же путём, и
+// глубина ограничена тремя уровнями.
+const std::string* lookup(const std::string& s, int depth = 0) {  // NOLINT(misc-no-recursion)
     State& t = st();
     if (const auto it = t.exact.find(s); it != t.exact.end()) return &it->second;
     if (const auto it = t.made.find(s); it != t.made.end()) return &it->second;
@@ -110,8 +121,13 @@ const std::string* lookup(const std::string& s) {
             }
             out += p.to.substr(from, h - from);
             if (g < got.size()) {
-                const auto it = t.exact.find(got[g]);
-                out += it != t.exact.end() ? it->second : got[g];
+                // Подставленное переводится тем же путём — целиком,
+                // шаблоном или кусками: «Слой «Вектор 2»» → «Layer
+                // "Vector 2"». Глубина ограничена: части всё короче, но
+                // кругов быть не должно.
+                const std::string* inner =
+                    depth < 3 && hasCyrillic(got[g]) ? lookup(got[g], depth + 1) : nullptr;
+                out += inner != nullptr ? *inner : got[g];
             }
             ++g;
             from = h + 2;
@@ -188,8 +204,15 @@ int loadCatalogText(const std::string& text) {
             len += part.size();
         return len;
     };
-    std::stable_sort(t.patterns.begin(), t.patterns.end(),
-                     [&](const Pattern& a, const Pattern& b) { return fixed(a) > fixed(b); });
+    // Шаблон, который начинается с текста, точнее начинающегося с
+    // подстановки: «Заготовка: {}» раньше «{} стоячая вода» (подпись
+    // кнопки местности), иначе второй перехватит «Заготовка: стоячая вода».
+    std::stable_sort(t.patterns.begin(), t.patterns.end(), [&](const Pattern& a, const Pattern& b) {
+        const bool fa = !a.parts.front().empty();
+        const bool fb = !b.parts.front().empty();
+        if (fa != fb) return fa;
+        return fixed(a) > fixed(b);
+    });
     // Длинные куски — первыми: «Палитра — » раньше «Палитра».
     std::stable_sort(t.pieces.begin(), t.pieces.end(),
                      [](const auto& a, const auto& b) { return a.first.size() > b.first.size(); });
@@ -228,10 +251,19 @@ std::vector<std::string> catalogProblems(const std::string& text) {
 }
 
 const std::string& text(const std::string& s) {
-    const State& t = st();
+    State& t = st();
     if (t.lang == "ru" || t.raw > 0 || s.empty() || !hasCyrillic(s)) return s;
     const std::string* r = lookup(s);
+    if (t.track && (r == nullptr || hasCyrillic(*r))) t.missed.insert(s);
     return r != nullptr ? *r : s;
+}
+
+void trackMisses(bool on) {
+    st().track = on;
+}
+
+std::vector<std::string> misses() {
+    return {st().missed.begin(), st().missed.end()};
 }
 
 std::string tr(const std::string& s) {

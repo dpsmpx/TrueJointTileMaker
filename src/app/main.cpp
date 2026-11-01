@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <fstream>
 #include <string>
 
 #include "app/editor.h"
@@ -474,11 +475,23 @@ int main(int argc, char** argv) {
         // Редактор закрывает свои шрифты раньше, чем библиотека шрифтов
         // выключится: отсюда отдельная область видимости.
         tjtm::Editor editor;
+        // Прогон сценариев по-английски собирает непереведённые строки.
+        const char* missLog = std::getenv("TJTM_I18N_MISSES");
+        if (missLog != nullptr && *missLog != 0) tjtm::i18n::trackMisses(true);
         if (editor.appInit(argc, argv)) {
             while (editor.running())
                 editor.appStep();
         } else {
             rc = 1;
+        }
+        if (missLog != nullptr && *missLog != 0) {
+            std::ofstream out(missLog, std::ios::app | std::ios::binary);
+            // Перевод строки внутри — «\n», как в таблице перевода.
+            for (std::string s : tjtm::i18n::misses()) {
+                for (std::size_t p = s.find('\n'); p != std::string::npos; p = s.find('\n', p + 2))
+                    s.replace(p, 1, "\\n");
+                out << s << '\n';
+            }
         }
     }
     TTF_Quit();
