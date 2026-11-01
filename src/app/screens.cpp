@@ -8,6 +8,8 @@
 
 #include "app/editor.h"
 #include "app/textfield.h"
+#include "core/i18n.h"
+#include "core/logo.h"
 #include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -71,6 +73,194 @@ void Editor::showTextScreen(const std::string& title, const std::vector<std::str
     m.needRepaint = true;
 }
 
+namespace {
+
+/// Заголовок раздела справки — строка заглавными буквами.
+bool helpHeader(const std::string& s) {
+    if (s.size() < 4) return false;
+    bool letter = false;
+    for (const char32_t c : utf8ToU32(s)) {
+        if ((c >= U'а' && c <= U'я') || c == U'ё' || (c >= U'a' && c <= U'z')) return false;
+        if ((c >= U'А' && c <= U'Я') || c == U'Ё' || (c >= U'A' && c <= U'Z')) letter = true;
+    }
+    return letter;
+}
+
+/// «ДВА РЕЖИМА» → «Два режима»: оглавлению заглавные ни к чему.
+std::string sentenceCase(const std::string& s) {
+    std::u32string u = utf8ToU32(netToLower(s));
+    if (!u.empty()) {
+        if (u[0] >= U'а' && u[0] <= U'я') u[0] = u[0] - U'а' + U'А';
+        if (u[0] == U'ё') u[0] = U'Ё';
+        if (u[0] >= U'a' && u[0] <= U'z') u[0] = u[0] - U'a' + U'A';
+    }
+    return u32ToUtf8(u);
+}
+
+}  // namespace
+
+void Editor::uiHelpButton(int x, int y, const std::string& section) {
+    if (!active.modern || classicUi_) return;
+    uiTip(x, y, 30, 30, "Справка об этом экране");
+    if (uiButtonEx(x, y, 30, 30, "?", true, false, Btn::Tonal)) showHelpScreen(section);
+}
+
+void Editor::showHelpBrowser(const std::vector<std::string>& paragraphs,
+                             const std::string& section) {
+    constexpr int TX = 24;
+    constexpr int TW = 196;
+    constexpr int CX = TX + TW + 16;
+    constexpr int CY = 56;
+    const int cw = WIN_W - CX - 24;
+    const int lineH = textHeight() + 3;
+    const int ch = WIN_H - CY - 56;
+    const int visible = std::max(1, ch / lineH);
+    std::string query;
+    std::string laidFor = "\x01";
+    struct Line {
+        std::string text;
+        bool header = false;
+    };
+    std::vector<Line> lines;
+    std::vector<std::pair<std::string, int>> toc;  // раздел и его первая строка
+    int top = 0;
+    bool done = false;
+    bool jump = !section.empty();
+    dropInput();
+    pf_.input().keys.clear();
+
+    // Раскладка: при поиске — только абзацы с найденным и их разделы.
+    auto layout = [&](const std::string& q) {
+        lines.clear();
+        toc.clear();
+        const std::string want = netToLower(netTrim(q));
+        std::string head;
+        bool headShown = false;
+        for (const std::string& par : paragraphs) {
+            if (helpHeader(par)) {
+                head = par;
+                headShown = false;
+                if (want.empty()) {
+                    toc.emplace_back(sentenceCase(par), static_cast<int>(lines.size()));
+                    lines.push_back({sentenceCase(par), true});
+                    headShown = true;
+                }
+                continue;
+            }
+            if (!want.empty()) {
+                if (netToLower(par).find(want) == std::string::npos) continue;
+                if (!headShown && !head.empty()) {
+                    if (!lines.empty()) lines.push_back({"", false});
+                    toc.emplace_back(sentenceCase(head), static_cast<int>(lines.size()));
+                    lines.push_back({sentenceCase(head), true});
+                    headShown = true;
+                }
+            }
+            for (const std::string& l : layoutText({par}, cw - 20))
+                lines.push_back({l, false});
+        }
+    };
+
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        fb_.clear(cWindow);
+        fb_.drawImage(appIcon(), TX, 12);
+        uiTitle(TX + 40, 12, WIN_W - 24, 44, "Справка");
+        // Поиск — над оглавлением; отбор при наборе.
+        uiTextLine(TX, CY, TW, 28, query);
+        const bool typing = textEditId_ == reinterpret_cast<std::uintptr_t>(&query);
+        const std::string live = typing ? u32ToUtf8(textEdit_.text) : query;
+        if (live.empty() && !typing) textOut(TX + 10, CY + 6, "Найти в справке…", cTextDim);
+        if (live != laidFor) {
+            laidFor = live;
+            layout(live);
+            top = 0;
+            // Открыта кнопкой «?» экрана — сразу на его разделе.
+            // Раздел назван по-русски; по-английски — его перевод.
+            const std::string want = sentenceCase(i18n::tr(section));
+            for (const auto& [name, line] : toc) {
+                if (jump && name == want) top = line;
+            }
+            jump = false;
+        }
+        const int maxTop = std::max(0, static_cast<int>(lines.size()) - visible);
+        top = clampI(top, 0, maxTop);
+
+        // Оглавление: раздел под началом видимой части подсвечен.
+        int cur = -1;
+        for (std::size_t k = 0; k < toc.size(); ++k) {
+            if (toc[k].second <= top + 1) cur = static_cast<int>(k);
+        }
+        // Разделов больше, чем строк под оглавлением: оно едет за текстом,
+        // держа текущий раздел на виду.
+        const int tocRows = (WIN_H - 56 - (CY + 36)) / 22;
+        const int tocTop =
+            clampI(cur - tocRows / 2, 0, std::max(0, static_cast<int>(toc.size()) - tocRows));
+        int ty = CY + 36;
+        for (auto k = static_cast<std::size_t>(tocTop); k < toc.size(); ++k) {
+            if (ty + 20 > WIN_H - 56) break;
+            const bool on = static_cast<int>(k) == cur;
+            if (on)
+                fb_.fillRoundRect(TX, ty, TX + TW, ty + 20, active.radius * 2, active.radius * 2,
+                                  active.accentContainer);
+            textOut(TX + 8, ty + 2, fitTextEnd(toc[k].first, TW - 12),
+                    on ? active.onAccentContainer : cText);
+            if (takeButtonClick(TX, ty, TW, 20, true)) top = toc[k].second;
+            ty += 22;
+        }
+
+        fb_.fillRoundRect(CX, CY, WIN_W - 24, CY + ch, active.radius * 2, active.radius * 2,
+                          cBorder);
+        fb_.fillRoundRect(CX + 1, CY + 1, WIN_W - 25, CY + ch - 1, active.radius * 2,
+                          active.radius * 2, cBack);
+        fb_.setClip(gfx::Rect{CX + 1, CY + 1, WIN_W - 25, CY + ch - 1});
+        for (int i = 0; i < visible; ++i) {
+            const int k = top + i;
+            if (k >= static_cast<int>(lines.size())) break;
+            const Line& l = lines[static_cast<std::size_t>(k)];
+            if (l.header) {
+                titleFont_.draw(fb_, CX + 12, CY + 6 + i * lineH, l.text, cAccent);
+            } else {
+                // Найденное — подсвечено. Строчные и заглавные в UTF-8 одной
+                // длины, так что место в строке — то же, что в строчной копии.
+                const std::string low = netToLower(l.text);
+                const std::string want = netToLower(netTrim(live));
+                for (std::size_t at = want.empty() ? std::string::npos : low.find(want);
+                     at != std::string::npos; at = low.find(want, at + want.size())) {
+                    const int hx = CX + 12 + textWidth(l.text.substr(0, at));
+                    const int hy = CY + 6 + i * lineH;
+                    fb_.fillRect(hx - 1, hy, hx + textWidth(l.text.substr(at, want.size())),
+                                 hy + lineH - 2, active.fieldSelection);
+                }
+                textOut(CX + 12, CY + 6 + i * lineH, l.text, cText);
+            }
+        }
+        fb_.resetClip();
+        if (lines.empty()) textOut(CX + 12, CY + 8, "Ничего не нашлось", cTextDim);
+        if (maxTop > 0)
+            uiLabelLeft(
+                CX + 4, WIN_H - 50, 28,
+                "строки " + std::to_string(top + 1) + "–" +
+                    std::to_string(std::min(static_cast<int>(lines.size()), top + visible)) +
+                    " из " + std::to_string(lines.size()),
+                cTextDim);
+        if (uiPrimary(WIN_W - 24 - 140, WIN_H - 48, 140, 32, "Закрыть", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC) done = true;
+        if (key == KEY_DOWN) ++top;
+        if (key == KEY_UP) --top;
+        if (key == KEY_PGDN) top += visible;
+        if (key == KEY_PGUP) top -= visible;
+        if (key == KEY_HOME) top = 0;
+        if (key == KEY_END) top = maxTop;
+        top -= takeWheel() * 3;
+        idle();
+    }
+    waitMouseRelease();
+    m.needRepaint = true;
+}
+
 /// Подпись под кнопками вопроса: какую нажимает Enter, какую — Escape.
 std::string Editor::keysHint(const std::string& enter, const std::string& escape) {
     std::string s = "Enter — «";
@@ -83,7 +273,7 @@ std::string Editor::keysHint(const std::string& enter, const std::string& escape
 
 std::optional<Editor::CardBack> Editor::cardBackdrop() {
     if (!active.modern) return std::nullopt;
-    CardBack b{fb_, fb_};
+    CardBack b{fb_, fb_, pf_.milliseconds()};
     // Притушить всё окно, а не одну страницу.
     b.dim.setOrigin(0, 0);
     b.dim.fillRect(0, 0, b.dim.width(), b.dim.height(), active.scrim);
@@ -99,9 +289,21 @@ void Editor::dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0,
         fb_.clear(cWindow);
         return;
     }
-    fb_ = backdrop->dim;
+    // Затемнение проявляется за 150 мс (D9): окно не гаснет рывком.
+    const float t = motion(backdrop->start, 150);
+    if (t < 1.0F) {
+        fb_ = backdrop->orig;
+        fb_.setOrigin(0, 0);
+        const Color s = active.scrim;
+        fb_.fillRect(0, 0, fb_.width(), fb_.height(),
+                     argb(static_cast<int>(static_cast<float>(s.a) * t), s.r, s.g, s.b));
+        m.needRepaint = true;
+    } else {
+        fb_ = backdrop->dim;
+    }
     fb_.setOrigin(pageX_, pageY_);
     const int r = active.radius * 4;
+    drawElevation(x0, y0, x1, y1, r, 3);
     fb_.fillRoundRect(x0, y0, x1, y1, r, r, cBorder);
     fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 2, r - 2, cFace);
 }
@@ -114,6 +316,7 @@ void Editor::notify(const std::string& title, const std::string& text) {
     toastTitle_ = title;
     toastText_ = text;
     toastUntil_ = pf_.milliseconds() + 4000;
+    toastStart_ = pf_.milliseconds();
     m.needRepaint = true;
 }
 
@@ -129,11 +332,15 @@ void Editor::drawToast() {
     // Внизу холста, над лентой кадров: там, куда смотрят после действия,
     // и не поверх панели с инструментами.
     const int x = std::max(8, (m.W - w) / 2);
-    const int y = m.H - h - 14;
+    // Въезжает снизу за 200 мс (D9).
+    const float t = motion(toastStart_, 200);
+    const int y = m.H - h - 14 + static_cast<int>((1.0F - t) * 24.0F);
+    if (t < 1.0F) m.needRepaint = true;
     // Место — на холсте окна, и поверх экрана-страницы тоже.
     const int ox = fb_.originX();
     const int oy = fb_.originY();
     fb_.setOrigin(0, 0);
+    drawElevation(x, y, x + w, y + h, 12, 2);
     fb_.fillRoundRect(x, y, x + w, y + h, 12, 12, active.inverseSurface);
     textOut(x + 14, y + 8, toastTitle_, active.inverseOnSurface);
     for (std::size_t i = 0; i < lines.size(); ++i)
@@ -897,6 +1104,7 @@ void Editor::showMapPropertiesScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 24, WIN_W, 60, "Свойства локации");
+        uiHelpButton(WIN_W - 44, 27, "РЕДАКТОР КАРТ");
         uiLabel(0, 62, WIN_W, 22, "Название и размер попадут в файл карты как есть", cTextDim);
 
         int y = 110;

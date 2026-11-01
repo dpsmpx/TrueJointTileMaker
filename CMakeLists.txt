@@ -11,7 +11,7 @@
 #   tjtm_gfx  — программный кадр и примитивы GraphABC, текст через SDL3_ttf.
 #   tjtm      — сам редактор: окно, ввод, экраны.
 cmake_minimum_required(VERSION 3.24)
-project(TrueJointTileMaker VERSION 1.9.0 LANGUAGES C CXX)
+project(TrueJointTileMaker VERSION 2.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -60,7 +60,9 @@ add_library(tjtm_core STATIC
     src/core/fsutil.cpp
     src/core/gameset.cpp
     src/core/gif.cpp
+    src/core/i18n.cpp
     src/core/imageops.cpp
+    src/core/logo.cpp
     src/core/mapdoc.cpp
     src/core/mapobj.cpp
     src/core/model.cpp
@@ -75,6 +77,7 @@ add_library(tjtm_core STATIC
     src/core/png.cpp
     src/core/project.cpp
     src/core/rasterfmt.cpp
+    src/core/scheme.cpp
     src/core/shortcuts.cpp
     src/core/text.cpp
     src/core/tilemap.cpp
@@ -99,6 +102,7 @@ if(TJTM_BUILD_APP)
     target_link_libraries(tjtm_gfx PUBLIC tjtm_core SDL3::SDL3 SDL3_ttf::SDL3_ttf)
 
     add_executable(tjtm
+        src/app/appearance_ui.cpp
         src/app/art_ui.cpp
         src/app/bars.cpp
         src/app/canvas.cpp
@@ -112,6 +116,7 @@ if(TJTM_BUILD_APP)
         src/app/color_ui.cpp
         src/app/dock.cpp
         src/app/keys.cpp
+        src/app/keys_ui.cpp
         src/app/menu.cpp
         src/app/palette_ui.cpp
         src/app/panel.cpp

@@ -174,3 +174,25 @@ uic        13_write_slot    0    0  780  560
 uic        14_export        0    0  780  560
 uic        15_rotate_preview 0    0  780  560
 uic        16_rotate_cancel 0    0  780  560
+# Интерфейс, этап D.
+uid        01_help_toc      0    0  780  560
+uid        02_help_search   0    0  780  560
+uid        03_help_context  0    0  780  560
+uid        04_keys_own      0    0  780  560
+uid        05_keys_ask      0    0  780  560
+uid        06_cheat_aseprite 0   0  780  560
+uid        07_tool_by_letter 0   0  780  560
+# Интерфейс, этап D — по-английски.
+uie        01_start         0    0  780  560
+uie        02_menu_file     0    0  780  560
+uie        03_cheatsheet    0    0  780  560
+uie        04_help          0    0  780  560
+uie        05_palette       0    0  780  560
+uid        08_pressure_switch 0 0  780  560
+uid        09_pressure_stroke 0 0  780  560
+uid        10_menu_f10      0    0  780  560
+uid        11_onion_colors  0    0  780  560
+uid        12_onion_timeline 0   0  780  560
+uid        13_appearance_contrast 0 0 780 560
+uid        14_appearance_file 0 0  780  560
+uid        15_appearance_cancel 0 0 780 560

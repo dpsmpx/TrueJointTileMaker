@@ -34,7 +34,7 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них, 1.7 и дальше — этапы плана
 // «Интерфейс» (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.9.0";
+inline constexpr const char* kAppVersion = "2.0.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
@@ -338,6 +338,14 @@ public:
     /// Непрозрачность кисти, 1..255. Точка мазка ложится один раз, поэтому
     /// повторный проход по ней в том же мазке не сгущает цвет.
     int brushOpacity = 255;
+    /// Нажим пера (план «Интерфейс», D6, UX-12): 0..1, у мыши — 1. Он
+    /// ослабляет силу кисти (pressureStrength) и напор аэрографа
+    /// (pressureFlow); у оригинала пера не было — оба выключены.
+    float penPressure = 1.0F;
+    bool pressureStrength = false;
+    bool pressureFlow = false;
+    /// Сила кисти с поправкой на нажим.
+    [[nodiscard]] int strokeOpacity() const;
 
     // --- этап 8: вне пиксель-арта ---
 
@@ -415,6 +423,12 @@ public:
     bool onionSkin = false;
     int onionPrev = 1;
     int onionNext = 1;
+    /// Цвета луковой кожи (D7, UX-51): 0 — красный и синий, как было;
+    /// 1 — оранжевый и голубой, 2 — пурпурный и зелёный. Различать их
+    /// должен и тот, кто путает красный с зелёным.
+    int onionPalette = 0;
+    static constexpr int kOnionPalettes = 3;
+    [[nodiscard]] static Color onionColor(int palette, bool past);
 
     Color firstColor = argb(255, 0, 0, 0);
     Color secondColor = argb(255, 255, 255, 255);

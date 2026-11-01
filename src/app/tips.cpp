@@ -12,6 +12,7 @@
 #include <algorithm>
 
 #include "app/editor.h"
+#include "core/i18n.h"
 #include "core/text.h"
 #include "core/theme.h"
 
@@ -55,7 +56,7 @@ void Editor::tipEvaluate() {
 
 void Editor::drawTip() {
     if (tipWant_.empty()) return;
-    const std::vector<std::string> lines = splitLines(tipWant_);
+    const std::vector<std::string> lines = splitLines(i18n::tr(tipWant_));
     int w = 0;
     for (const std::string& l : lines)
         w = std::max(w, textWidth(l));
@@ -70,39 +71,52 @@ void Editor::drawTip() {
     const int maxY = screenFrame_ ? WIN_H : gLayout.h;
     if (x + w > maxX - 4) x = std::max(4, maxX - 4 - w);
     if (y + h > maxY - 4) y = std::max(4, tipY_ - h - 8);
+    drawElevation(x, y, x + w, y + h, 8, 2);
     fb_.fillRoundRect(x, y, x + w, y + h, 8, 8, active.inverseSurface);
     for (std::size_t i = 0; i < lines.size(); ++i)
         textOut(x + 8, y + 5 + static_cast<int>(i) * lh, lines[i], active.inverseOnSurface);
 }
 
 std::string Editor::toolTip(int i) const {
+    // Клавиша — из действующей таблицы: её могли переназначить (D3).
+    const std::string keys = commandKeys(Cmd::Tool, i, m.docMode == DOC_TILE);
+    const std::string k = keys.empty() ? "" : " · " + keys;
+    // Название и описание переводятся порознь: клавиша между ними — своя
+    // у каждого набора.
+    auto tip = [&](const char* name, const std::string& rest) {
+        return i18n::tr(name) + k + "\n" + i18n::tr(rest);
+    };
     if (m.docMode == DOC_MAP) {
         switch (i) {
             case M_PAINT:
-                return "Местность · 1\nЛевая — рисовать, правая — взять местность\nПравая по "
-                       "кнопке — кисть смесью";
-            case M_FILL: return "Заливка местностью · 2\nПравая по кнопке — смесью";
-            case M_RECT: return "Прямоугольник местности · 3\nПравая по кнопке — смесью";
+                return tip("Местность",
+                           "Левая — рисовать, правая — взять местность\nПравая по кнопке — кисть "
+                           "смесью");
+            case M_FILL: return tip("Заливка местностью", "Правая по кнопке — смесью");
+            case M_RECT: return tip("Прямоугольник местности", "Правая по кнопке — смесью");
             case M_OBJ:
-                return "Объекты · 4\nЛевая — поставить или перенести, правая — убрать\nДвойной "
-                       "щелчок или Enter — форма объекта";
-            default: return "Выделение · 5\nПротяжка — выделить, щелчок — вставить";
+                return tip("Объекты",
+                           "Левая — поставить или перенести, правая — убрать\nДвойной щелчок или "
+                           "Enter — форма объекта");
+            default: return tip("Выделение", "Протяжка — выделить, щелчок — вставить");
         }
     }
     switch (i) {
         case T_PEN:
-            return "Карандаш · 1\nЛевая — рисовать, правая или Alt — взять цвет; [ и ] — "
-                   "размер\nПравая по кнопке — вид: точки, аэрограф, кисть, затенение";
-        case T_ERASER: return "Ластик · 2\nСтирает до прозрачного; [ и ] — размер";
-        case T_FILL: return "Заливка · 3\nПравая по кнопке — градиент узором";
-        case T_PICK: return "Пипетка · 4\nБерёт цвет из картинки";
-        case T_LINE: return "Линия · 5\nПравая по кнопке — параметры фигур";
-        case T_RECT: return "Прямоугольник · 6\nCtrl — залитый, Shift — квадрат";
-        case T_ELLIPSE: return "Овал · 7\nCtrl — залитый, Shift — круг";
-        case T_DITHER: return "Узор · 8\n[ и ] — размер, Shift+[ и ] — сменить узор";
+            return tip("Карандаш",
+                       "Левая — рисовать, правая или Alt — взять цвет; [ и ] — размер\nПравая по "
+                       "кнопке — вид: точки, аэрограф, кисть, затенение");
+        case T_ERASER: return tip("Ластик", "Стирает до прозрачного; [ и ] — размер");
+        case T_FILL: return tip("Заливка", "Правая по кнопке — градиент узором");
+        case T_PICK: return tip("Пипетка", "Берёт цвет из картинки");
+        case T_LINE: return tip("Линия", "Правая по кнопке — параметры фигур");
+        case T_RECT: return tip("Прямоугольник", "Ctrl — залитый, Shift — квадрат");
+        case T_ELLIPSE: return tip("Овал", "Ctrl — залитый, Shift — круг");
+        case T_DITHER: return tip("Узор", "[ и ] — размер, Shift+[ и ] — сменить узор");
         default:
-            return "Выделение · 9\nПротяжка — выделить, по выделенному — перенести\nВид "
-                   "выделения — в параметрах (O)";
+            return tip("Выделение",
+                       "Протяжка — выделить, по выделенному — перенести\nВид выделения — в "
+                       "параметрах (O)");
     }
 }
 

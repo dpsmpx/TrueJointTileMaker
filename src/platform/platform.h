@@ -70,6 +70,12 @@ struct Input {
     /// движение двумя пальцами удваивало масштаб несколько раз подряд.
     bool fineWheel = false;
     float wheelAccY = 0, wheelAccX = 0;
+    /// Нажим пера (план «Интерфейс», D6, UX-12): 0..1, пока рисуют пером;
+    /// у мыши — 1. pen — последний ввод был от пера.
+    float pressure = 1.0F;
+    bool pen = false;
+    /// Система сменила светлую тему на тёмную или обратно (D8).
+    bool themeChanged = false;
     bool quitRequested = false;
 };
 
@@ -91,6 +97,8 @@ public:
     void shutdown();
 
     void setTitle(const std::string& title);
+    /// Значок окна (и панели задач).
+    void setIcon(const Grid<Color>& icon);
     /// Вывести кадр в окно (Redraw оригинала). Кадр любого размера: окно
     /// растягивается, и кадр следует за ним.
     void present(const gfx::Surface& frame);
@@ -165,6 +173,9 @@ public:
     /// Сценарий был и весь пройден: программе пора закрываться.
     [[nodiscard]] bool scriptFinished() const { return scripted_ && scriptDone_; }
     [[nodiscard]] bool scripted() const { return scripted_; }
+    /// У системы тёмная тема — для «как в системе» (D8). Неизвестно —
+    /// светлая.
+    [[nodiscard]] static bool systemDark();
     /// Папка настроек пользователя (SDL_GetPrefPath); пусто — нет такой.
     [[nodiscard]] static std::string prefDir();
 
@@ -172,6 +183,8 @@ private:
     /// convert — пересчитать координаты окна в координаты кадра. События
     /// сценария уже в координатах кадра.
     void handle(const SDL_Event& e, bool convert = true);
+    /// Событие мыши не от пера сбрасывает нажим (which — SDL_MouseID).
+    void notePointer(std::uint32_t which);
     void scriptStep();
     std::string runDialog(int kind, const std::string& title,
                           const std::vector<FileFilter>& filters, const std::string& location);

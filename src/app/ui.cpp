@@ -5,6 +5,7 @@
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/i18n.h"
 #include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -62,6 +63,13 @@ void Editor::setPage(bool screen) {
 
 void Editor::beginFrameInput(bool screen) {
     pf_.pump();
+    // Система сменила тему, а выбрано «как в системе» — следом (D8).
+    if (pf_.input().themeChanged) {
+        pf_.input().themeChanged = false;
+        if (cfg.theme == "как в системе") applyTheme();
+    }
+    // Нажим пера — модели: мазок берёт его в каждой точке (D6).
+    m.penPressure = pf_.input().pen ? pf_.input().pressure : 1.0F;
     syncFrameSize();
     setPage(screen);
     Input& in = pf_.input();
@@ -87,7 +95,7 @@ void Editor::focusFrame(bool screen) {
     if (frameClick_) focusShown_ = false;
     // Набираемое поле разбирает Tab само: принимает набранное и передаёт
     // фокус дальше.
-    if (numEdit_ != 0 || textEditId_ != 0) return;
+    if (numEdit_ != 0 || textEditId_ != 0 || keyCapture_) return;
     Input& in = pf_.input();
     std::deque<KeyPress> rest;
     for (const KeyPress& k : in.keys) {
@@ -546,6 +554,8 @@ bool Editor::uiTextLine(int x, int y, int w, int h, std::string& value) {
         in.keys.clear();
     }
     const bool editing = textEditId_ == id;
+    // Набранное — данные человека: не переводится.
+    const i18n::Raw raw;
     const int r = active.radius * 2;
     fb_.fillRoundRect(x, y, x + w, y + h, r, r, active.field);
     fb_.strokeRoundRect(x, y, x + w, y + h, r, r,
@@ -665,7 +675,8 @@ void Editor::textOut(int x, int y, const std::string& s, Color c) {
 }
 
 /// Обрезает строку слева до ширины maxW, ставя многоточие.
-std::string Editor::fitText(const std::string& s, int maxW) const {
+std::string Editor::fitText(const std::string& src, int maxW) const {
+    std::string s = i18n::tr(src);
     if (textWidth(s) <= maxW) return s;
     std::u32string u = utf8ToU32(s);
     while (u.size() > 1 && textWidth("…" + u32ToUtf8(u)) > maxW)
@@ -675,7 +686,9 @@ std::string Editor::fitText(const std::string& s, int maxW) const {
 
 /// Обрезает строку справа до ширины maxW, ставя многоточие. Строка из
 /// нескольких строк (\n) не трогается: её переносит рисование.
-std::string Editor::fitTextEnd(const std::string& s, int maxW) const {
+std::string Editor::fitTextEnd(const std::string& src, int maxW) const {
+    // Режется переведённая строка: обрезанную перевод уже не узнал бы.
+    std::string s = i18n::tr(src);
     if (s.find('\n') != std::string::npos || textWidth(s) <= maxW) return s;
     std::u32string u = utf8ToU32(s);
     while (u.size() > 1 && textWidth(u32ToUtf8(u) + "…") > maxW)
@@ -688,7 +701,8 @@ std::vector<std::string> Editor::layoutText(const std::vector<std::string>& para
                                             int maxWidth) const {
     std::vector<std::string> out;
     for (const std::string& p : paragraphs) {
-        const std::vector<std::string> words = splitWords(p);
+        // Абзац переводится целиком, до переноса по словам.
+        const std::vector<std::string> words = splitWords(i18n::tr(p));
         if (words.empty()) {
             out.emplace_back();
             continue;
@@ -708,6 +722,34 @@ std::vector<std::string> Editor::layoutText(const std::vector<std::string>& para
         out.push_back(cur);
     }
     return out;
+}
+
+void Editor::drawElevation(int x0, int y0, int x1, int y1, int r, int level) {
+    if (!active.modern || classicUi_) return;
+    // Размытая тень — стопкой расширяющихся полупрозрачных прямоугольников:
+    // середина набирает полную плотность, край тает (ДС-6: уровень 2 —
+    // смещение 2, размытие 6, 15 %; уровень 3 — 8, 24, 20 %).
+    // У уровня 2 размытие чуть шире ДС-6 (10 вместо 6): в программном
+    // кадре без настоящего размытия узкая тень пряталась под самим меню.
+    const int off = level >= 3 ? 8 : 3;
+    const int blur = level >= 3 ? 24 : 10;
+    const int peak = level >= 3 ? 51 : 44;
+    const int layers = level >= 3 ? 8 : 4;
+    for (int k = layers; k >= 1; --k) {
+        const int e = blur * k / layers / 2;
+        fb_.fillRoundRect(x0 - e, y0 - e + off, x1 + e, y1 + e + off, r + e * 2, r + e * 2,
+                          argb(std::max(1, peak / layers), 0, 0, 0));
+    }
+}
+
+float Editor::motion(int startMs, int durationMs) {
+    if (cfg.reduceMotion || classicUi_ || durationMs <= 0) return 1.0F;
+    const float t = std::clamp(
+        static_cast<float>(pf_.milliseconds() - startMs) / static_cast<float>(durationMs), 0.0F,
+        1.0F);
+    // Замедление к концу, как cubic-bezier(0.2, 0, 0, 1) у Material 3.
+    const float u = 1.0F - t;
+    return 1.0F - u * u * u;
 }
 
 }  // namespace tjtm

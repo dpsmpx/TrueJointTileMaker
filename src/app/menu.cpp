@@ -2,9 +2,12 @@
 // настройки, главное меню», «Наборы тайлов Andors-Love»).
 
 #include <algorithm>
+#include <sstream>
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/i18n.h"
+#include "core/logo.h"
 #include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -38,8 +41,56 @@ Grid<Color> gridFromBgra(const std::vector<std::uint8_t>& raw, int size) {
 // Справка
 // ---------------------------------------------------------------------------
 
-void Editor::showHelpScreen() {
+/// Клавиши из действующей таблицы — строками справки (UX-09, UX-18): список
+/// от руки отставал от кода.
+static void helpKeyLines(std::vector<std::string>& p, bool en) {
+    const std::span<const Shortcut> all = shortcuts();
+    const char* group = nullptr;
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        const Shortcut& s = all[i];
+        if (s.text == nullptr) continue;
+        if (group == nullptr || std::string_view(group) != s.group) {
+            group = s.group;
+            p.emplace_back();
+            p.push_back((en ? i18n::tr(s.group) : std::string(s.group)) + ":");
+        }
+        const char* where = s.where == KeyWhere::Tile  ? (en ? " (tile)" : " (тайл)")
+                            : s.where == KeyWhere::Map ? (en ? " (map)" : " (карта)")
+                                                       : "";
+        const std::string keys = shortcutKeys(all, i);
+        if (!keys.empty())
+            p.push_back(keys + " — " + netToLower(en ? i18n::tr(s.text) : s.text) + where);
+    }
+}
+
+void Editor::showHelpScreen(const std::string& section) {
     std::vector<std::string> p;
+    // По-английски справка — своим файлом: её абзацы здесь склеиваются из
+    // строк исходника, и переводить их строками таблицы не выходит (D4).
+    if (i18n::language() == "en") {
+        if (const auto text = readFile(resolvePath("Resources/Lang/help.en.txt"))) {
+            // Пустые строки — пустые абзацы: splitLines их бы выбросил.
+            std::istringstream in(*text);
+            std::string line;
+            while (std::getline(in, line)) {
+                if (!line.empty() && line.back() == '\r') line.pop_back();
+                if (line.starts_with("#")) continue;
+                if (line == "{KEYS}") {
+                    helpKeyLines(p, true);
+                    continue;
+                }
+                if (const std::size_t v = line.find("{VERSION}"); v != std::string::npos)
+                    line.replace(v, 9, kAppVersion);
+                p.push_back(line);
+            }
+            if (active.modern && !classicUi_) {
+                showHelpBrowser(p, section);
+            } else {
+                showTextScreen("Справка", p);
+            }
+            return;
+        }
+    }
     // Набираемый абзац: строки прозы склеиваются и переносятся потом по
     // ширине окна, а не по ширине набора в исходнике.
     std::string cur;
@@ -330,27 +381,11 @@ void Editor::showHelpScreen() {
     par("строка состояния и боковая панель — в светлой и тёмной темах;");
     par("«Классика» сохраняет раскладку 1.6.");
     add("");
-    // Клавиши — из той же таблицы, что их разбирает (UX-09, UX-18): список
-    // от руки отставал от кода.
     add("КЛАВИШИ");
-    add("F1 или ? — шпаргалка поверх холста, с поиском.");
-    {
-        const std::span<const Shortcut> all = shortcuts();
-        const char* group = nullptr;
-        for (std::size_t i = 0; i < all.size(); ++i) {
-            const Shortcut& s = all[i];
-            if (s.text == nullptr) continue;
-            if (group == nullptr || std::string_view(group) != s.group) {
-                group = s.group;
-                add("");
-                add(std::string(s.group) + ":");
-            }
-            const char* where = s.where == KeyWhere::Tile  ? " (тайл)"
-                                : s.where == KeyWhere::Map ? " (карта)"
-                                                           : "";
-            add(shortcutKeys(all, i) + " — " + netToLower(s.text) + where);
-        }
-    }
+    par("F1 или ? — шпаргалка поверх холста, с поиском. Клавиши настраиваются");
+    par("в «Справка → Настроить клавиши»: любое действие и набор «как в Aseprite».");
+    flush();
+    helpKeyLines(p, false);
     add("");
     add("Shift с роликом — прокрутка вбок, пробел с протяжкой — рука.");
     add("Alt, зажатый над холстом, временно включает пипетку (кроме выделения).");
@@ -380,7 +415,7 @@ void Editor::showHelpScreen() {
     add("НАСТРОЙКИ");
     par("Все параметры хранятся в файле Config.txt рядом с программой в");
     par("кодировке UTF-8, по строке на параметр в виде «ключ = значение».");
-    add("Файл можно править вручную или через пункт «Настройки» в меню.");
+    add("Файл можно править вручную или через пункт «Настройки» в меню. Там же — язык.");
     par("При запуске открывается последний файл (настройка «Открывать последний");
     par("файл»), а если его нет — стартовое изображение. Размер из настроек нужен");
     par("только тогда, когда открыть нечего: тогда создаётся пустой тайл.");
@@ -396,7 +431,11 @@ void Editor::showHelpScreen() {
     add("");
     add("Программа распространяется по лицензии GNU GPL версии 3.");
     flush();
-    showTextScreen("Справка", p);
+    if (active.modern && !classicUi_) {
+        showHelpBrowser(p, section);
+    } else {
+        showTextScreen("Справка", p);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -455,6 +494,7 @@ void Editor::showSettingsScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 14, WIN_W, 46, "Настройки");
+        uiHelpButton(WIN_W - 44, 15, "НАСТРОЙКИ");
         uiLabel(0, 46, WIN_W, 20, "Сохраняются в Config.txt рядом с программой", cTextDim);
 
         int y = 76;
@@ -476,12 +516,21 @@ void Editor::showSettingsScreen() {
             toggleRow(410, y, "Рамка клетки под курсором", v.cellFrame);
         }
         uiLabelLeft(ox, y, 30, "Оформление", cText);
-        const bool dark = v.theme == "тёмная";
-        const bool classic = v.theme == "классика";
-        const int tx = active.modern ? 130 : 410 + 104;
-        if (uiToggle(tx, y, 80, 30, "Светлое", !dark && !classic)) v.theme = "светлая";
-        if (uiToggle(tx + 84, y, 80, 30, "Тёмное", dark)) v.theme = "тёмная";
-        if (uiToggle(tx + 168, y, 80, 30, "Классика", classic)) v.theme = "классика";
+        if (active.modern && !classicUi_) {
+            // Тем и акцентов стало много (D8): свой экран с предпросмотром.
+            if (uiButton(130, y, 248, 30, "Тема и акцент…", true)) {
+                showAppearance();
+                v.theme = cfg.theme;
+                v.themeAccent = cfg.themeAccent;
+            }
+        } else {
+            const bool dark = v.theme == "тёмная";
+            const bool classic = v.theme == "классика";
+            const int tx = active.modern ? 130 : 410 + 104;
+            if (uiToggle(tx, y, 80, 30, "Светлое", !dark && !classic)) v.theme = "светлая";
+            if (uiToggle(tx + 84, y, 80, 30, "Тёмное", dark)) v.theme = "тёмная";
+            if (uiToggle(tx + 168, y, 80, 30, "Классика", classic)) v.theme = "классика";
+        }
 
         y += 40;
         if (active.modern) {
@@ -505,6 +554,15 @@ void Editor::showSettingsScreen() {
             bool autoGrid = v.gridAutoZoom > 0;
             uiSwitch(30, y, 450, "Сетка точек сама с масштаба 1200 %", autoGrid);
             v.gridAutoZoom = autoGrid ? (v.gridAutoZoom > 0 ? v.gridAutoZoom : 12) : 0;
+            // Язык (D4): названия языков — каждое на своём языке.
+            uiLabelLeft(500, y, 30, "Язык", cText);
+            {
+                const i18n::Raw raw;
+                if (uiToggle(580, y, 86, 30, "Русский", v.language != "english"))
+                    v.language = "русский";
+                if (uiToggle(670, y, 86, 30, "English", v.language == "english"))
+                    v.language = "english";
+            }
         } else {
             stepRow(y, "Ширина нового тайла", v.defaultWidth, MIN_TILE, MAX_TILE);
             y += 36;
@@ -545,8 +603,12 @@ void Editor::showSettingsScreen() {
             v.windowW = cfg.windowW;
             v.windowH = cfg.windowH;
             v.windowMaximized = cfg.windowMaximized;
+            // Клавиши правит свой экран и сам их записывает.
+            v.keyPreset = cfg.keyPreset;
+            v.keys = cfg.keys;
             cfg = v;
             applyTheme();
+            applyLanguage();
             if (!classicUi_) {
                 pf_.setUiScale(cfg.uiScale);
                 m.gridAutoZoom = cfg.gridAutoZoom;
@@ -562,6 +624,7 @@ void Editor::showSettingsScreen() {
             done = true;
         }
         if (uiButton(WIN_W / 2 + 10, WIN_H - 52, 180, 36, "Отмена", true)) done = true;
+        if (!classicUi_ && uiButton(30, WIN_H - 52, 130, 36, "Клавиши…", true)) showKeysScreen();
         redraw();
         if (takeKey() == KEY_ESC) done = true;
         idle();
@@ -574,7 +637,180 @@ void Editor::showSettingsScreen() {
 // Главное меню
 // ---------------------------------------------------------------------------
 
+void Editor::showStartScreen() {
+    bool done = false;
+    dropInput();
+    pf_.input().keys.clear();
+    // Миниатюры недавних — один раз при входе: файлы читаются с диска.
+    std::vector<Grid<Color>> thumbs;
+    for (const std::string& f : cfg.recentFiles) {
+        Grid<Color> g;
+        if (pathExtLower(f) != ".map" && fileExists(f) && readImageGrid(f, g, true)) {
+            thumbs.push_back(std::move(g));
+        } else {
+            thumbs.emplace_back();
+        }
+    }
+    const Grid<Color> logo = appIcon();
+    constexpr int LX = 30;
+    constexpr int LW = 300;
+    constexpr int RX = 360;
+    constexpr int RW = WIN_W - RX - 30;
+    constexpr int kRowH = 46;
+    // Открыть недавний — после цикла: файл открывается на место документа.
+    std::string openPath;
+
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        focusArrows_ = true;
+        const bool isMap = m.docMode == DOC_MAP;
+        fb_.clear(cWindow);
+        fb_.drawImage(logo, LX, 20, 64, 64);
+        uiHeadline(LX + 76, 22, LX + 76 + 380, 52, kAppTitle);
+        std::string info = (isMap ? fileNameOnly(m.currentMapFile) : fileNameOnly(m.currentFile));
+        if (info.empty()) info = isMap ? "новая карта" : "новый тайл";
+        info += "   " + std::to_string(m.docW()) + "×" + std::to_string(m.docH());
+        if (m.isModified()) info += "   · есть несохранённые изменения";
+        uiLabelLeft(LX + 78, 54, 24, info, cTextDim);
+
+        int y = 104;
+        if (uiPrimary(LX, y, LW, 36, "Продолжить редактирование", true)) done = true;
+        y += 46;
+        auto item = [&](const std::string& caption, bool enabled) {
+            const bool hit = uiButton(LX, y, LW, 32, caption, enabled);
+            y += 36;
+            return hit;
+        };
+        if (item("Новый тайл…", true)) {
+            if (isMap) m.switchMode(DOC_TILE);
+            commandNew();
+            done = true;
+        }
+        if (item("Новая карта…", true)) {
+            if (!isMap) m.switchMode(DOC_MAP);
+            commandNew();
+            done = true;
+        }
+        if (item(isMap ? "Открыть карту…" : "Открыть файл…", true)) {
+            commandOpen();
+            done = true;
+        }
+        if (item("Сохранить", true) && commandSave()) done = true;
+        if (item("Сохранить как…", true) && commandSaveAs()) done = true;
+        if (item("Экспорт…", !isMap)) {
+            showExportCard();
+            done = true;
+        }
+        if (item(isMap ? "К редактору тайлов" : "К редактору карт", true)) {
+            m.switchMode(isMap ? DOC_TILE : DOC_MAP);
+            done = true;
+        }
+        if (item("Настройки…", true)) showSettingsScreen();
+        {
+            const int hw = (LW - 6) / 2;
+            if (uiButton(LX, y, hw, 32, "Справка", true)) showHelpScreen();
+            if (uiButton(LX + hw + 6, y, LW - hw - 6, 32, "Клавиши  F1", true)) showCheatsheet();
+            y += 36;
+            if (uiButton(LX, y, hw, 32, pf_.fullscreen() ? "Обычное окно" : "Во весь экран", true))
+                pf_.setFullscreen(!pf_.fullscreen());
+            if (uiButton(LX + hw + 6, y, LW - hw - 6, 32, "Выход", true)) commandExit();
+        }
+
+        // Недавние файлы — с миниатюрами (UX-24, UX-47).
+        uiTitle(RX, 100, RX + RW, 124, "Недавние файлы");
+        int ry = 132;
+        if (cfg.recentFiles.empty())
+            uiLabelLeft(RX, ry, 30, "Пока пусто: открытые и сохранённые файлы появятся здесь",
+                        cTextDim);
+        for (std::size_t i = 0; i < cfg.recentFiles.size() && i < 6; ++i) {
+            const std::string& f = cfg.recentFiles[i];
+            const bool over =
+                mouseX() >= RX && mouseX() < RX + RW && mouseY() >= ry && mouseY() < ry + kRowH - 4;
+            if (over)
+                fb_.fillRoundRect(RX, ry, RX + RW, ry + kRowH - 4, active.radius * 2,
+                                  active.radius * 2, cHover);
+            const int tx = RX + 4;
+            const int ty = ry + 2;
+            fb_.fillRect(tx, ty, tx + 38, ty + 38, cFace);
+            if (i < thumbs.size() && !thumbs[i].empty()) {
+                const Grid<Color>& g = thumbs[i];
+                const int s = std::max(g.w, g.h);
+                const int w = std::max(1, g.w * 38 / s);
+                const int h = std::max(1, g.h * 38 / s);
+                drawChecker(tx + (38 - w) / 2, ty + (38 - h) / 2, tx + (38 + w) / 2,
+                            ty + (38 + h) / 2);
+                fb_.drawImage(g, tx + (38 - w) / 2, ty + (38 - h) / 2, w, h);
+            } else {
+                uiLabel(tx, ty, 38, 38, pathExtLower(f) == ".map" ? "карта" : "—", cTextDim);
+            }
+            fb_.frameRect(tx - 1, ty - 1, tx + 39, ty + 39, cBorder);
+            textOut(tx + 48, ry + 4, fitTextEnd(fileNameOnly(f), RW - 60), cText);
+            // Папка внутри каталога программы — от него: переносной
+            // редактор переезжает вместе с картинками.
+            // Разделители — косой чертой: на Windows путь и каталог
+            // программы приходят с обратной, а то и вперемешку.
+            auto slash = [](std::string p) {
+                std::replace(p.begin(), p.end(), '\\', '/');
+                return p;
+            };
+            std::string dir = slash(pathDirName(f));
+            const std::string home = slash(baseDir_);
+            if (!home.empty() && dir.starts_with(home)) dir = "…" + dir.substr(home.size());
+            textOut(tx + 48, ry + 22, fitTextEnd(dir, RW - 60), cTextDim);
+            // Строка списка берёт фокус с клавиатуры, как кнопка (D7).
+            const bool focused = focusSlot(RX, ry, RW, kRowH - 4);
+            if (takeButtonClick(RX, ry, RW, kRowH - 4, true) || focusPressed(focused)) {
+                openPath = f;
+                done = true;
+            }
+            ry += kRowH;
+        }
+
+        // Что нового — коротко, чтобы обновлённый редактор не удивлял.
+        const int ny = 132 + 6 * kRowH + 4;
+        uiTitle(RX, ny, RX + RW, ny + 24, std::string("Что нового в ") + kAppVersion);
+        static constexpr const char* kNews[] = {
+            "English — в настройках, темы — «Вид → Оформление»",
+            "Свои клавиши и набор «как в Aseprite»",
+            "Справка с оглавлением и поиском, «?» на экранах",
+            "Нажим пера, F10 — меню, цвета луковой кожи",
+        };
+        int ly = ny + 30;
+        for (const char* n : kNews) {
+            uiLabelLeft(RX + 8, ly, 20, fitTextEnd("·  " + i18n::tr(n), RW - 12), cTextDim);
+            ly += 20;
+        }
+        // Флажок «показывать при запуске» (UX-47).
+        bool show = cfg.showMenuOnStart;
+        uiSwitch(LX, WIN_H - 40, LW, "Показывать при запуске", show);
+        if (show != cfg.showMenuOnStart) {
+            cfg.showMenuOnStart = show;
+            saveConfig();
+        }
+        uiLabel(RX, WIN_H - 40, RW, 30,
+                std::string("версия ") + kAppVersion + "   ·   Escape — к редактору", cTextDim);
+        redraw();
+        if (takeKey() == KEY_ESC) done = true;
+        idle();
+    }
+    waitMouseRelease();
+    m.needRepaint = true;
+    if (!openPath.empty()) {
+        if (fileExists(openPath)) {
+            openAnyFile(openPath);
+        } else {
+            errorOpen("Файл не найден", openPath);
+        }
+    }
+}
+
 void Editor::showMainMenu() {
+    // В новых темах — стартовый экран (D1): меню-хаб из двенадцати кнопок
+    // заменили строка меню и поиск команд.
+    if (active.modern && !classicUi_) {
+        showStartScreen();
+        return;
+    }
     bool done = false;
     dropInput();
     pf_.input().keys.clear();
@@ -609,7 +845,7 @@ void Editor::showMainMenu() {
         }
         const bool lastOk = fileExists(lastPath);
         std::string info =
-            curName + "   " + std::to_string(m.docW()) + " на " + std::to_string(m.docH());
+            curName + "   " + std::to_string(m.docW()) + "×" + std::to_string(m.docH());
         if (isMap) info += "   объектов " + std::to_string(m.map.objects.size());
         if (m.isModified()) info += "   есть несохранённые изменения";
 
@@ -931,6 +1167,7 @@ bool Editor::showTilesetScreen() {
         const std::string dir = tsetDirOf(tsetKind_);
         fb_.clear(cWindow);
         uiTitle(0, 6, WIN_W, 40, "Наборы тайлов");
+        uiHelpButton(WIN_W - 44, 8, "НАБОРЫ ТАЙЛОВ");
 
         // Переключатель наборов — вкладки: открытая видна сразу.
         for (int i = 0; i < TS_KINDS; ++i) {
@@ -994,6 +1231,14 @@ bool Editor::showTilesetScreen() {
             const bool object = tsetKind_ == TS_BASE && !tsetBaseIsTerrain(k);
             uiLabel(cx, cy + 52, TSET_CELL_W, 16, fitText(tsetLabels_[kk], TSET_CELL_W - 4),
                     object ? cAccent : cText);
+            // Объект от местности — и формой, не только цветом подписи
+            // (D7, UX-51): кружок в углу миниатюры.
+            if (object && active.modern) {
+                const int ox = tx + TSET_THUMB - 9;
+                const int oy = cy + 4;
+                fb_.fillRoundRect(ox - 1, oy - 1, ox + 8, oy + 8, 9, 9, cWindow);
+                fb_.fillRoundRect(ox, oy, ox + 7, oy + 7, 7, 7, cAccent);
+            }
             uiLabel(cx, cy + 68, TSET_CELL_W, 16, fitText(tsetFiles_[kk] + ".png", TSET_CELL_W - 4),
                     cTextDim);
         }
@@ -1116,8 +1361,8 @@ bool Editor::showTilesetScreen() {
                            !askYesNo("Заменить тайл",
                                      "Файл " + tsetFiles_[ks] +
                                          ".png уже есть. Заменить его текущим тайлом " +
-                                         std::to_string(m.tile.w) + " на " +
-                                         std::to_string(m.tile.h) + "?",
+                                         std::to_string(m.tile.w) + "×" + std::to_string(m.tile.h) +
+                                         "?",
                                      "Заменить", "Отмена")) {
                     note.clear();
                 } else if (saveTileTo(path)) {

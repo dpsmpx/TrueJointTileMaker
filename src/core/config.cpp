@@ -95,6 +95,28 @@ int Config::applyLines(const std::vector<std::string>& lines) {
             uiMode = v == "базовый" || v == "basic" ? "базовый" : "полный";
         } else if (key == "dock") {
             dock = parseBool(val, dock);
+        } else if (key == "penpressurebrush") {
+            penPressureBrush = parseBool(val, penPressureBrush);
+        } else if (key == "penpressureair") {
+            penPressureAir = parseBool(val, penPressureAir);
+        } else if (key == "onioncolors") {
+            onionColors = parseInt(val, onionColors, 0, 2);
+        } else if (key == "reducemotion") {
+            reduceMotion = parseBool(val, reduceMotion);
+        } else if (key == "themeaccent") {
+            themeAccent = netTrim(val);
+        } else if (key == "language") {
+            const std::string v = netToLower(netTrim(val));
+            language = v.starts_with("en") || v.starts_with("англ") ? "english" : "русский";
+        } else if (key == "keypreset") {
+            keyPreset = netToLower(val).find("aseprite") != std::string::npos ? "как в Aseprite"
+                                                                              : "стандартный";
+        } else if (key.starts_with("key.") && key.size() > 4) {
+            // Имя действия — как в файле: регистр сверяет таблица клавиш.
+            const std::string id = netTrim(s.substr(4, p - 4));
+            std::erase_if(keys,
+                          [&](const auto& kv) { return netToLower(kv.first) == key.substr(4); });
+            keys.emplace_back(id, val);
         } else if (key == "gridautozoom") {
             gridAutoZoom = parseInt(val, gridAutoZoom, 0, 64);
         } else if (key == "windowmaximized") {
@@ -125,6 +147,13 @@ int Config::applyLines(const std::vector<std::string>& lines) {
                 theme = "светлая";
             } else if (t == "dark" || t == "темная") {
                 theme = "тёмная";
+            } else if (t == "system" || t == "как в системе") {
+                theme = "как в системе";
+            } else if (t == "light contrast" || t == "светлая контрастная") {
+                theme = "светлая контрастная";
+            } else if (t == "dark contrast" || t == "темная контрастная" ||
+                       t == "тёмная контрастная") {
+                theme = "тёмная контрастная";
             } else {
                 theme = t;
             }
@@ -208,6 +237,16 @@ std::string Config::serialize() const {
     add("PaletteFile = " + paletteFile);
     add("");
     const Config def;
+    if (reduceMotion != def.reduceMotion) {
+        add("# Уменьшить движение: окна и уведомления появляются сразу.");
+        add(std::string("ReduceMotion = ") + ruBool(reduceMotion));
+        add("");
+    }
+    if (!themeAccent.empty()) {
+        add("# Акцент оформления: из него считаются все цвета темы.");
+        add("ThemeAccent = " + themeAccent);
+        add("");
+    }
     if (theme != def.theme) {
         add("# Тема окна: светлая, тёмная или классика (облик 1.6).");
         add("Theme = " + theme);
@@ -241,6 +280,37 @@ std::string Config::serialize() const {
     if (dock != def.dock) {
         add("# Боковая панель со слоями и историей.");
         add(std::string("Dock = ") + ruBool(dock));
+        add("");
+    }
+    if (penPressureBrush != def.penPressureBrush || penPressureAir != def.penPressureAir) {
+        add("# Нажим пера: ослабляет силу кисти и напор аэрографа.");
+        add(std::string("PenPressureBrush = ") + ruBool(penPressureBrush));
+        add(std::string("PenPressureAir = ") + ruBool(penPressureAir));
+        add("");
+    }
+    if (onionColors != def.onionColors) {
+        add("# Цвета луковой кожи: 0 — красный и синий, 1 — оранжевый и голубой,");
+        add("# 2 — пурпурный и зелёный.");
+        add("OnionColors = " + std::to_string(onionColors));
+        add("");
+    }
+    if (language != def.language) {
+        add("# Язык интерфейса: русский или english.");
+        add("Language = " + language);
+        add("");
+    }
+    if (keyPreset != def.keyPreset || !keys.empty()) {
+        add("# Клавиши: набор (стандартный или как в Aseprite) и свои сочетания");
+        add("# поверх него, через | ; «нет» — без клавиши. Правятся экраном");
+        add("# «Настроить клавиши» в меню «Справка».");
+        add("KeyPreset = " + keyPreset);
+        for (const auto& [id, val] : keys) {
+            std::string line = "Key.";
+            line += id;
+            line += " = ";
+            line += val;
+            add(line);
+        }
         add("");
     }
     if (gridAutoZoom != def.gridAutoZoom) {

@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <cmath>
 #include <sstream>
 
@@ -254,6 +255,12 @@ bool Script::parse(const std::string& text, std::string& error) {
             e.y = mouseY_;
             push(e);
             pause(0.05);
+        } else if (cmd == "pressure") {
+            if (a.empty()) return fail("pressure P");
+            ScriptEvent e;
+            e.kind = ScriptEvent::PRESSURE;
+            e.pressure = std::clamp(std::stof(a[0]), 0.0F, 1.0F);
+            push(e);
         } else if (cmd == "window") {
             if (a.size() < 2) return fail("window W H");
             ScriptEvent e;

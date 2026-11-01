@@ -1,0 +1,1448 @@
+# Перевод интерфейса на английский (план «Интерфейс», D4).
+# Строка — «русский<TAB>английский»; {} — любое непустое, «~» в начале —
+# кусок, который заменяется внутри строки; \n — перевод строки.
+# Пополняется так: tools/i18n.py missing — строки без перевода.
+
+Аэрограф	Airbrush
+Кисть из выделения	Brush from selection
+Затенение	Shading
+Чистые точки	Plain dots
+Карандаш	Pencil
+Каждая точка мазка — ровно один пиксель: замена или смешивание,	Each dab point is exactly one pixel: replace or blend,
+пиксель-перфект, сила кисти — в параметрах инструментов.	pixel-perfect and brush strength are in tool options.
+Аэрограф — не пиксель-арт: мягкий край и смесь цветов.	Airbrush is not pixel art: soft edge and mixed colors.
+В строгом индексном режиме точка становится цветом кисти, когда напор перевалит за половину.	In strict indexed mode a pixel takes the brush color once the flow passes half.
+Диаметр	Diameter
+Жёсткость	Hardness
+Напор	Flow
+Жёсткость — доля радиуса со сплошной серединой; напор	Hardness is the share of the radius with a solid core; flow
+копится за мазок: проведите по месту ещё раз — гуще.	builds up over a stroke: go over the spot again for more.
+Взять из выделения   Ctrl+E	Take from selection   Ctrl+E
+Пустое выделение	Empty selection
+В выделении нет ни одной видимой точки.	There is not a single visible pixel in the selection.
+Кисть — выделенный кусок активного слоя, серединой	The brush is the selected piece of the active layer, centered
+под курсором; ложится в каждую точку мазка. Прозрачные	under the cursor; it is stamped at every point of a stroke. Transparent
+точки ничего не кладут, симметрия отражает и саму кисть,	pixels lay nothing, symmetry mirrors the brush itself,
+заворот и выделение действуют, как у карандаша.	wrap and selection work as with the pencil.
+кисти пока нет	no brush yet
+Светлее	Lighter
+Темнее	Darker
+Мазок сдвигает цвет точки на соседнюю ячейку её ряда	A stroke shifts a pixel's color to the neighboring cell of its palette
+палитры — по восемь в ряд. Светлый конец ряда — где	row — eight per row. The light end of the row is where
+ярче крайняя ячейка. За мазок точка сдвигается раз;	the end cell is brighter. A pixel shifts once per stroke;
+цвет не из палитры не меняется. Shift — в другую сторону.	colors not in the palette stay. Shift goes the other way.
+ряд первого цвета	first color's row
+Все параметры инструментов…   O	All tool options…   O
+Сглаживание линии и фигур — в параметрах фигур:	Line and shape smoothing is in the shape options:
+правая кнопка по линии, прямоугольнику или овалу.	right-click the line, rectangle or ellipse.
+Закрыть	Close
+Заливка	Fill
+Цветом	With color
+Градиентом узором	With dithered gradient
+Линейный	Linear
+Круговой	Radial
+Протяжка от первого цвета ко второму по связной области	Drag from the first color to the second over the connected area
+под точкой нажатия (в границах выделения). Смесь — узором	under the press point (within the selection). Blending uses a
+Байера 8x8: новых цветов нет, 65 ступеней. Щелчок без	Bayer 8x8 pattern: no new colors, 65 steps. A click without
+протяжки заливает первым цветом.	dragging fills with the first color.
+Связная область одного цвета — первым цветом, как в	A connected area of one color — with the first color, as in
+оригинале; в строгом индексном режиме — цветом ячейки.	the original; in strict indexed mode — with the cell color.
+Размер	Size
+Кисть меньше · [	Smaller brush · [
+Кисть больше · ]	Bigger brush · ]
+Круг	Round
+Пятно кистью-кругом	Dab with a round brush
+Квадрат	Square
+Пятно кистью-квадратом	Dab with a square brush
+точки	dots
+аэрограф	airbrush
+кисть	brush
+затенение	shading
+~Вид: 	Kind: 
+Вид карандаша и его параметры	Pencil kind and its options
+Узор назад · Shift+[	Previous pattern · Shift+[
+Узор вперёд · Shift+]	Next pattern · Shift+]
+Параметры заливки…	Fill options…
+Допуск, градиент узором	Tolerance, dithered gradient
+Параметры фигур…	Shape options…
+Вид линии, толщина, сглаживание	Line style, thickness, smoothing
+Ctrl — залитая · Shift — ровная	Ctrl — filled · Shift — even
+Рамка	Rectangle
+Овал	Ellipse
+Лассо	Lasso
+Палочка	Magic wand
+По цвету	By color
+Вершины	Polygon
+Вид выделения	Selection kind
+Кисть карты…	Map brush…
+Одна местность или смесь по весам	Single terrain or weighted mix
+Сетка	Grid
+Сет.	Grid
+Сетка между точками	Grid between pixels
+Бесшовно	Seamless
+Бш.	Sml.
+Бесшовный предпросмотр	Seamless preview
+Заворот	Wrap
+Зав.	Wrap
+Мазок через край — с другой стороны	A stroke over the edge continues on the other side
+Ось ↕	Axis ↕
+Вертикальная ось симметрии	Vertical symmetry axis
+Ось ↔	Axis ↔
+Горизонтальная ось симметрии	Horizontal symmetry axis
+ПП	PP
+Пиксель-перфект: без углов «Г» в мазке	Pixel-perfect: no "L" corners in a stroke
+Смесь	Blend
+См.	Bl.
+Смешивание вместо замены цвета	Blend instead of replacing the color
+Индекс	Index
+Инд.	Ind.
+Индексная палитра	Indexed palette
+Картинками	Tiles
+Карт.	Tiles
+Карта картинками набора	Map drawn with tileset images
+~   ·   слой 	   ·   layer 
+~, кадр 	, frame 
+Цвет	Color
+было	before
+стало	after
+В палитру	To palette
+Палитра	Palette
+~Цвет 	Color 
+~ добавлен в конец	 added to the end
+Недавние	Recent
+Здесь появятся цвета, выбранные кнопкой «Готово»	Colors chosen with "Done" will appear here
+Готово	Done
+Отмена	Cancel
+Слои	Layers
+История	History
+Начало	Start
+Видимость слоя	Layer visibility
+Порядок слоёв	Layer order
+Картинки, анимации и проекты	Images, animations and projects
+PNG и APNG	PNG and APNG
+Проекты редактора	Editor projects
+Все файлы	All files
+Карты локаций	Location maps
+Файл не найден	File not found
+Не удалось открыть файл	Could not open the file
+Слишком большое изображение	Image too large
+~Максимальный размер тайла — 	The maximum tile size is 
+~ пикселей. В файле 	 pixels. The file has 
+Проект не открыт	Project not opened
+Не удалось сохранить проект	Could not save the project
+~ хранит картинки, а не слои: слои сведутся	 stores images, not layers: layers will be merged
+~ хранит одну картинку	 stores a single image
+, кадры сохранятся по одному	, frames will be saved one by one
+, сохранится только текущий кадр	, only the current frame will be saved
+Слои и кадры	Layers and frames
+. Слои, кадры и метки целиком сохраняет проект .tjt.	. Layers, frames and tags are fully kept by a .tjt project.
+Сохранить проект	Save project
+Сохранить картинку	Save image
+Не удалось сохранить файл	Could not save the file
+: не удалось записать файл. Проверьте права на запись.	: could not write the file. Check write permissions.
+Не удалось открыть GIF	Could not open GIF
+Не удалось открыть TIFF	Could not open TIFF
+Не удалось открыть APNG	Could not open APNG
+Лист спрайтов	Sprite sheet
+Рядом ляжет описание .json в виде Aseprite — его читают движки	An Aseprite-style .json description goes alongside — game engines read it
+С кадра	From frame
+По кадр	To frame
+Раскладка	Layout
+Строкой	Row
+Столбцом	Column
+Столбцов	Columns
+Сеткой…	Grid…
+Поле вокруг	Border
+Промежуток	Spacing
+Отступ в клетке	Cell padding
+Увеличение	Scale
+Фон	Background
+Прозрачный	Transparent
+Второй цвет	Second color
+Первый цвет	First color
+~Лист 	Sheet 
+~ точек	 pixels
+Дальше…	Next…
+Сохранить лист спрайтов	Save sprite sheet
+Не удалось сохранить картинку	Could not save the image
+Не удалось сохранить кадр	Could not save the frame
+Не удалось сохранить лист	Could not save the sheet
+Не удалось сохранить описание	Could not save the description
+: не удалось записать файл.	: could not write the file.
+Картинка PNG	PNG image
+Кадр целиком, слои сведены; увеличение — без сглаживания	Whole frame, layers merged; scaling without smoothing
+Кадр	Frame
+Экспортировать снова	Export again
+Этот документ ещё не выгружали — сначала «Файл → Экспорт…» (Ctrl+Shift+E).	This document has not been exported yet — use "File → Export…" first (Ctrl+Shift+E).
+Экспортировано снова	Exported again
+кадр целиком, слои сведены	whole frame, layers merged
+Лист спрайтов и JSON	Sprite sheet and JSON
+кадры одной картинкой с описанием для движков	frames in one image with a description for engines
+Анимация GIF	GIF animation
+до 256 цветов, прозрачность только полная	up to 256 colors, only full transparency
+Анимация APNG	APNG animation
+все цвета и полупрозрачность	all colors and semi-transparency
+Каждый кадр в PNG	Each frame as PNG
+имя_001.png, имя_002.png…	name_001.png, name_002.png…
+Лист 8×8 для игры	8×8 sheet for the game
+основные тайлы набора одной картинкой	the tileset's main tiles in one image
+Экспорт	Export
+~Экспортировать снова: 	Export again: 
+До 256 цветов, прозрачность только полная; повторов 0 — бесконечно	Up to 256 colors, only full transparency; 0 repeats — forever
+Все цвета и полупрозрачность; повторов 0 — бесконечно	All colors and semi-transparency; 0 repeats — forever
+Проигрываний	Loops
+Сохранить GIF	Save GIF
+Сохранить APNG	Save APNG
+Кадры в PNG	Frames as PNG
+Каждый кадр — свой файл: имя_001.png, имя_002.png…	Each frame is its own file: name_001.png, name_002.png…
+Основа имён кадров	Frame name base
+Папка набора не задана	Tileset folder is not set
+Укажите её на экране «Наборы тайлов».	Set it on the "Tilesets" screen.
+Не удалось записать тайл	Could not write the tile
+Тайл в наборе	Tile in tileset
+~Первый кадр записан в 	First frame written to 
+Карта не прочитана	Map not read
+Карта открыта с замечанием	Map opened with a warning
+Карта не сохранена	Map not saved
+~Не удалось записать файл 	Could not write the file 
+. Проверьте права на запись.	. Check write permissions.
+~Объект 	Object 
+~Строка целиком: 	Whole line: 
+Сохранить карту	Save map
+Сохранить тайл	Save tile
+новая карта	new map
+новый тайл	new tile
+карта	map
+тайл	tile
+В документе есть изменения, которых нет в файле.	The document has changes that are not in the file.
+новой карте	new map
+новом тайле	new tile
+~ есть изменения, которых нет в файле.	 has changes that are not in the file.
+Несохранённые изменения	Unsaved changes
+Сохранить	Save
+Не сохранять	Don't save
+Создать новую карту?	Create a new map?
+Создать новую карту	Create a new map
+Создать новый тайл?	Create a new tile?
+Создать новый тайл	Create a new tile
+Открыть другую карту?	Open another map?
+Открыть карту локации	Open a location map
+Открыть другой файл?	Open another file?
+Открыть тайл	Open tile
+Файл недоступен	File unavailable
+~Последний файл не найден: 	Last file not found: 
+Открыть последний файл?	Open the last file?
+Только для тайла	Tile only
+Отдельным файлом сохраняется выделение тайла. Выделение карты копирует клетки внутри редактора: вставьте их щелчком инструмента выделения или клавишей V.	Only a tile selection is saved to a separate file. A map selection copies cells inside the editor: paste them with a click of the selection tool or with V.
+Нечего сохранять	Nothing to save
+Сначала выделите область инструментом выделения или возьмите тайл из тайлсета.	First select an area with the selection tool or take a tile from the tileset.
+Сохранить выделение	Save selection
+новую карту	the new map
+Восстановить работу?	Restore your work?
+~Прошлый раз программа закрылась, не сохранив изменения. Вернуть 	Last time the program closed without saving changes. Bring back 
+~ в том виде, в каком они были при последнем автосохранении?	 as they were at the last autosave?
+Восстановить	Restore
+Отбросить	Discard
+Слой-образец	Reference layer
+Добавлен из «	Added from "
+Недавние файлы	Recent files
+Щелчок — открыть; последний — сверху	Click to open; the latest is on top
+~Открыть 	Open 
+~ Выйти из программы?	 Quit the program?
+~Изменения, которых нет в файлах, есть в двух документах: 	Changes that are not in files exist in two documents: 
+. Выйти из программы?	. Quit the program?
+Сохранить всё	Save all
+Выйти из программы?	Quit the program?
+Размытие	Blur
+Резкость	Sharpen
+Шум	Noise
+Края	Edges
+Тиснение	Emboss
+Оттенки серого	Grayscale
+Сепия	Sepia
+Негатив	Negative
+Яркость и контраст	Brightness and contrast
+Уровни	Levels
+Кривые	Curves
+Наклон	Skew
+Перспектива	Perspective
+Красный	Red
+Зелёный	Green
+Синий	Blue
+Все	All
+Слой не растровый	Layer is not raster
+Фильтры меняют точки растрового слоя. Вектор и тайлкарта тайлами перерисовываются из своих данных — растрируйте слой на экране слоёв и кадров или переключите тайлкарту на правку точками (Ctrl+T).	Filters change the pixels of a raster layer. Vector and tilemap layers are redrawn from their data — rasterize the layer on the layers and frames screen or switch the tilemap to pixel editing (Ctrl+T).
+Фильтры и эффекты	Filters and effects
+ВНЕ ПИКСЕЛЬ-АРТА	BEYOND PIXEL ART
+Не пиксель-арт: новые цвета, полупрозрачность и мягкие края. В строгом индексном режиме итог сводится к палитре.	Not pixel art: new colors, semi-transparency and soft edges. In strict indexed mode the result is reduced to the palette.
+~Активный слой, 	Active layer, 
+выделенное	selection
+вся ячейка	whole cell
+~   ·   применяется кнопкой, Z отменяет	   ·   applied with the button, Z undoes
+По кругу: край тайла продолжается с другой стороны	Wrap around: the tile edge continues on the other side
+Радиус	Radius
+Сила	Strength
+Одноцветный	Monochrome
+Другой узор	Another pattern
+Яркость	Brightness
+Контраст	Contrast
+Насыщенность	Saturation
+Вход: чёрное	Input: black
+Вход: белое	Input: white
+Гамма	Gamma
+Выход: чёрное	Output: black
+Выход: белое	Output: white
+Сбросить кривую	Reset curve
+По горизонтали	Horizontal
+По вертикали	Vertical
+Тяните углы на картинке «После».	Drag the corners on the "After" image.
+Сбросить углы	Reset corners
+Без параметров.	No options.
+Фильтр видит только рамку выделения.	The filter only sees the selection's bounding box.
+До	Before
+После	After
+Применить	Apply
+~   Ctrl+B — дальше	   Ctrl+B — next
+Тайл не из набора	Tile not from the tileset
+Окружение карты показывается у тайла местности: открытого на экране наборов (T, правая кнопка) или названного по слоту — wall.png, floor.png и так далее.	The map surroundings are shown for a terrain tile: one opened on the tilesets screen (T, right button) or named after its slot — wall.png, floor.png and so on.
+Набор пуст	Tileset is empty
+В папке набора нет ни одного основного тайла.	The tileset folder has no main tiles.
+Лист не собран	Sheet not built
+В папке набора нет картинок.	The tileset folder has no images.
+Атлас набора	Tileset atlas
+Не удалось сохранить атлас	Could not save the atlas
+Лист 8×8 игры	Game 8×8 sheet
+Лист не разрезан	Sheet not split
+Разрезать лист	Split sheet
+~В листе 	The sheet has 
+~ основных тайлов. Записать их в папку набора 	 main tiles. Write them to the tileset folder 
+? Файлы с теми же именами заменятся.	? Files with the same names will be replaced.
+Записать	Write
+Нет основного тайла	No main tile
+~Сначала нарисуйте 	First draw 
+.png: варианты стыков начинаются с него.	.png: the joint variants start from it.
+Открыть заготовку вариантов?	Open the variants template?
+Тайл великоват	Tile is a bit large
+~Сетка 4x4 из тайлов 	A 4x4 grid of tiles 
+~ больше 	 is larger than 
+~ точек.	 pixels.
+Заготовка стыков «	Joints template "
+Клетка k сетки 4x4 — вариант с соседями по маске k: север 1, восток 2, юг 4, запад 8 (клетка 5 — соседи сверху и снизу). Нарисуйте варианты и разрежьте их кнопкой «Разрезать на варианты» на экране «Набор для игры».	Cell k of the 4x4 grid is the variant with neighbors by mask k: north 1, east 2, south 4, west 8 (cell 5 — neighbors above and below). Draw the variants and split them with the "Split into variants" button on the "Game set" screen.
+Не удалось записать вариант	Could not write a variant
+~Шестнадцать файлов 	Sixteen files 
+_15.png — в папке набора. Карта картинками уже подбирает их по соседям.	_15.png are in the tileset folder. The map drawn with tiles already picks them by neighbors.
+Варианты стыков записаны	Joint variants written
+Набор для игры	Game set
+НАБОР ДЛЯ ИГРЫ	GAME SET
+Выгрузка набора	Tileset export
+Лист 8×8 для игры…	8×8 sheet for the game…
+Формат игры: маркер-разделитель, тайлы до 63 точек	Game format: separator marker, tiles up to 63 pixels
+Атлас всего набора и JSON…	Atlas of the whole tileset and JSON…
+Все картинки папки, описание в виде TexturePacker	All images of the folder, TexturePacker-style description
+Разрезать лист 8×8 в набор…	Split an 8×8 sheet into the tileset…
+Карта	Map
+Карта картинками тайлов   Shift+B	Map drawn with tile images   Shift+B
+Стыки по соседям на карте	Joints by neighbors on the map
+Тайл в окружении карты   Shift+B	Tile in map surroundings   Shift+B
+Стыки местности: 16 вариантов по соседям	Terrain joints: 16 variants by neighbors
+~Заготовка: 	Template: 
+Разрезать на варианты — нет заготовки	Split into variants — no template
+Разрезать на варианты «	Split into variants "
+Вариант — файл «слот_маска.png»: север 1,	A variant is the file "slot_mask.png": north 1,
+восток 2, юг 4, запад 8; за краем карты —	east 2, south 4, west 8; beyond the map edge —
+та же местность. wall_5 — стена с соседями	the same terrain. wall_5 is a wall with neighbors
+сверху и снизу. Игра подбирает варианты	above and below. The game reads the variants
+так же — по соседям на карте.	the same way — by neighbors on the map.
+нет	none
+Сетка и направляющие	Grid and guides
+ЛИНЕЙКИ, НАПРАВЛЯЮЩИЕ, СЕТКА	RULERS, GUIDES, GRID
+Показ	Show
+Линейки   Ctrl+R	Rulers   Ctrl+R
+Направляющие видны   Ctrl+;	Guides visible   Ctrl+;
+Через середину документа	Through the document center
+Через середины клеток крупной сетки	Through the centers of coarse grid cells
+Мелкая сетка по точкам   G	Fine pixel grid   G
+Крупная сетка: клетка в точках, 0 — нет	Coarse grid: cell in pixels, 0 — none
+Ширина клетки	Cell width
+Высота клетки	Cell height
+Начало координат линеек	Ruler origin
+угол	corner
+середина	center
+у выделения	at selection
+Направляющие (в точках)	Guides (in pixels)
+~Вертикальные: 	Vertical: 
+~Горизонтальные: 	Horizontal: 
++ Вертикальная…	+ Vertical…
+Вертикальная направляющая	Vertical guide
+Граница перед этой точкой по X	Boundary before this pixel along X
+Добавить	Add
++ Горизонтальная…	+ Horizontal…
+Горизонтальная направляющая	Horizontal guide
+Граница перед этой точкой по Y	Boundary before this pixel along Y
+Убрать все направляющие	Remove all guides
+На линейке: щелчок ставит направляющую,	On a ruler: a click places a guide,
+протяжка двигает, Shift — на середину точки,	dragging moves it, Shift — to the pixel center,
+правая кнопка или вынос за край — убирает.	right button or dragging off the edge removes it.
+Выделите кусок активного слоя — он станет кистью карандаша.	Select a piece of the active layer — it will become the pencil brush.
+базовый	basic
+полный	full
+Базовый режим	Basic mode
+Полный режим	Full mode
+На виду только повседневное. Клавиши скрытого работают; всё — в полном режиме (Shift+Tab).	Only everyday tools are shown. Keys of hidden ones work; everything is in full mode (Shift+Tab).
+На виду все возможности. Базовый режим — Shift+Tab.	All features are shown. Basic mode — Shift+Tab.
+Найти команду…	Find a command…
+Ничего не нашлось	Nothing found
+Клавиши	Keys
+режим тайла	tile mode
+режим карты	map mode
+Найти клавишу…	Find a key…
+карандаш	pencil
+ластик	eraser
+заливка	fill
+пипетка	eyedropper
+линия	line
+прямоугольник	rectangle
+овал	ellipse
+узор	pattern
+выделение	selection
+местность	terrain
+заливка местностью	terrain fill
+прямоугольник местности	terrain rectangle
+объекты	objects
+~Инструмент 	Tool 
+КЛАВИШИ	KEYS
+Набор	Preset
+Стандартный	Standard
+Как в Aseprite	Like Aseprite
+Найти действие или клавишу	Find an action or key
+Ещё одно сочетание…	One more combination…
+Нажмите сочетание…	Press a combination…
+не меняется	fixed
+Без клавиши	No key
+Добавить ещё одно сочетание	Add one more combination
+Задать	Set
+Сброс	Reset
+Сбросить всё	Reset all
+~строки 	lines 
+Сменить набор клавиш?	Change the key preset?
+Свои сочетания (	Your combinations (
+) сбросятся: набор ставит клавиши заново.	) will be reset: the preset assigns keys anew.
+Сменить	Change
+Оставить	Keep
+~ — теперь «	 is now "
+~ это сочетание снято.	 this combination is removed.
+~Не удалось открыть окно: 	Could not open the window: 
+Не найден шрифт интерфейса: положите LiberationSans-Regular.ttf в Resources/Fonts.	UI font not found: put LiberationSans-Regular.ttf into Resources/Fonts.
+Список пуст	The list is empty
+Назад	Back
+~страница 	page 
+Дальше	Next
+X и Y — целые числа	X and Y are whole numbers
+Клетка (	Cell (
+~) за краем карты 	) beyond the map edge 
+Объект «	Object "
+Поля — как их читает игра. Tab и стрелки — между полями, Enter — готово	Fields as the game reads them. Tab and arrows move between fields, Enter — done
+Карта…	Map…
+Локация перехода	Transition location
+Папка карт не задана — в настройках	Maps folder is not set — see settings
+~Строка: 	Line: 
+Строка целиком…	Whole line…
+Удалить	Delete
+Кисть карты	Map brush
+ИНСТРУМЕНТЫ РЕЖИМА КАРТЫ	MAP MODE TOOLS
+Одной местностью	Single terrain
+Смесью местностей	Terrain mix
+Вес каждой местности: сколько её в смеси относительно других.	Weight of each terrain: how much of it is in the mix relative to the others.
+Смесь кладут кисть, прямоугольник и заливка карты: каждая	The mix is laid by the map brush, rectangle and fill: each
+клетка — случайная местность по весам, новый мазок — новая	cell is a random terrain by weight, a new stroke — a new
+раскладка. Местность кисти на панели остаётся для пипетки.	arrangement. The panel's brush terrain stays for the eyedropper.
+Кисть, прямоугольник и заливка кладут местность, выбранную	The brush, rectangle and fill lay the terrain chosen
+на панели.	on the panel.
+Найти и заменить	Find and replace
+РЕДАКТОР КАРТ	MAP EDITOR
+Заменить местность	Replace terrain
+Что	What
+На что	With
+Только в выделении	Only in selection
+~клеток: 	cells: 
+Заменить	Replace
+~Заменено клеток: 	Cells replaced: 
+. Отменить — Z.	. Undo — Z.
+Найти объекты	Find objects
+Искать…	Search…
+Вид или часть строки, например chest или rat	Kind or part of the line, for example chest or rat
+все объекты	all objects
+Выбрать	Choose
+Очистить	Clear
+Настройки	Settings
+НАСТРОЙКИ	SETTINGS
+Сохраняются в Config.txt рядом с программой	Saved to Config.txt next to the program
+Справка при запуске	Help at startup
+Меню при запуске	Menu at startup
+Сетка между пикселями	Grid between pixels
+Шахматка прозрачности	Transparency checkerboard
+Открывать последний файл	Open the last file
+Запускаться в режиме карты	Start in map mode
+Подсказки при наведении	Tooltips on hover
+Рамка клетки под курсором	Cell frame under the cursor
+Оформление	Appearance
+тёмная	dark
+классика	classic
+Светлое	Light
+светлая	light
+Тёмное	Dark
+Классика	Classic
+Масштаб интерфейса	Interface scale
+Авто	Auto
+Новый тайл	New tile
+Новая карта	New map
+Сетка точек сама с масштаба 1200 %	Pixel grid by itself from 1200 % zoom
+Язык	Language
+Ширина нового тайла	New tile width
+Высота нового тайла	New tile height
+Ширина новой карты	New map width
+Высота новой карты	New map height
+Стартовое изображение	Startup image
+Файл палитры	Palette file
+Папка карт локаций	Location maps folder
+Выберите любую карту в нужной папке	Choose any map in the folder you need
+Папка набора тайлов	Tileset folder
+Выберите любой тайл в нужной папке	Choose any tile in the folder you need
+Настройки не сохранены	Settings not saved
+. Проверьте права на запись в папку программы.	. Check write permissions for the program folder.
+Клавиши…	Keys…
+~   · есть несохранённые изменения	   ·   there are unsaved changes
+Продолжить редактирование	Continue editing
+Новый тайл…	New tile…
+Новая карта…	New map…
+Открыть карту…	Open map…
+Открыть файл…	Open file…
+Сохранить как…	Save as…
+Экспорт…	Export…
+К редактору тайлов	To the tile editor
+К редактору карт	To the map editor
+Настройки…	Settings…
+Справка	Help
+Клавиши  F1	Keys  F1
+Обычное окно	Windowed
+Во весь экран	Full screen
+Выход	Quit
+Пока пусто: открытые и сохранённые файлы появятся здесь	Empty for now: opened and saved files will appear here
+~Что нового в 	What's new in 
+Показывать при запуске	Show at startup
+~версия 	version 
+~   ·   Escape — к редактору	   ·   Escape — to the editor
+Открыть последнюю карту — нет	Open the last map — none
+~Открыть последнюю карту — 	Open the last map — 
+Открыть последний файл — нет	Open the last file — none
+~Открыть последний файл — 	Open the last file — 
+~   объектов 	   objects 
+~   есть несохранённые изменения	   there are unsaved changes
+режим карты локации	location map mode
+Недавние файлы…	Recent files…
+Создать карту	Create a map
+Создать файл	Create a file
+Загрузить карту	Load a map
+Загрузить файл	Load a file
+Сохранить как	Save as
+Свойства и проверка локации	Location properties and check
+Наборы тайлов	Tilesets
+Изображение, выделение, цвет	Image, selection, color
+Перейти к редактору тайлов	Go to the tile editor
+Перейти к редактору карт	Go to the map editor
+Справка и благодарности	Help and credits
+Обычное окно  F11	Windowed  F11
+Во весь экран  F11	Full screen  F11
+~   ·   Escape закрывает меню	   ·   Escape closes the menu
+нет файла	no file
+Записать в слот «	Write to slot "
+станет	becomes
+НАБОРЫ ТАЙЛОВ	TILESETS
+Папка значков не найдена — создайте её кнопкой внизу	Icons folder not found — create it with the button below
+Папка набора не задана — укажите data/tiles игры	Tileset folder is not set — point to the game's data/tiles
+Щелчок — выбрать, двойной щелчок или Enter — открыть	Click to select, double-click or Enter to open
+Найти по имени…	Find by name…
+Правая кнопка открывает тайл, левая пишет на его место текущий	The right button opens a tile, the left one writes the current tile in its place
+~,  тайлов 	,  tiles 
+Записать в слот	Write to slot
+Для игры…	For the game…
+Папка набора…	Tileset folder…
+Папка значков	Icons folder
+Пустой слот игра рисует знаком шрифта — набор можно делать по одному тайлу	The game draws an empty slot with a font glyph — a tileset can be made one tile at a time
+Состав жителей и врагов читается из самой папки: что в ней лежит, то и здесь	The set of residents and enemies is read from the folder itself: what lies in it is shown here
+Сначала укажите папку	Set the folder first
+~Файла 	File 
+.png ещё нет	.png does not exist yet
+~Открыть тайл 	Open tile 
+Записать можно только тайл, а сейчас открыта карта	Only a tile can be written, and a map is open now
+Заменить тайл	Replace tile
+~Файл 	File 
+~.png уже есть. Заменить его текущим тайлом 	.png already exists. Replace it with the current tile 
+~Записано: 	Written: 
+Палитры (PNG, GIMP, HEX, JASC)	Palettes (PNG, GIMP, HEX, JASC)
+Индексный режим	Indexed mode
+~Точек, чей цвет не совпадает ни с одной ячейкой палитры: 	Pixels whose color matches no palette cell: 
+. Свести их к ближайшим цветам палитры или добавить их цвета в палитру?	. Reduce them to the nearest palette colors or add their colors to the palette?
+Свести	Reduce
+Добавить цвета	Add colors
+Палитра не прочитана	Palette not read
+~Не открыть файл 	Cannot open file 
+Палитра не сохранена	Palette not saved
+~Не записать файл 	Cannot write file 
+~Палитра — 	Palette — 
+· индексный режим	· indexed mode
+· свободные цвета	· free colors
+ПАЛИТРА	PALETTE
+~Ячейка 	Cell 
+~   ·   выбрано 	   ·   selected 
+~   ·   прозрачный 	   ·   transparent 
+Левая — выбрать, с Shift — до неё; правая — взять цветом.	Left — select, with Shift — up to it; right — take as color.
+Индексный режим  (I)	Indexed mode  (I)
+Прозрачный: снять	Transparent: unset
+Сделать прозрачным	Make transparent
+Ячейки	Cells
+Первый цвет в ячейку	First color into cell
+Добавить первый цвет	Add first color
+Дублировать	Duplicate
+← Влево	← Left
+Вправо →	Right →
+Убрать повторы	Remove duplicates
+Повторы	Duplicates
+~Убрано ячеек: 	Cells removed: 
+Стандартная	Default
+Сортировать выбранное по	Sort selected by
+Сортировать всю палитру по	Sort the whole palette by
+Тону	Hue
+Насыщ.	Sat.
+Яркости	Brightness
+Светлоте	Lightness
+Красн.	Red
+Зелён.	Green
+Синему	Blue
+Альфе	Alpha
+Ряды и тон	Ramps and hue
+Ряд от первой выбранной до последней…	Ramp from the first selected to the last…
+Ряд цветов	Color ramp
+Промежуточные встанут после первой ячейки; изгиб тона — в градусах	The in-between colors go after the first cell; hue bend is in degrees
+Ступеней	Steps
+Изгиб тона	Hue bend
+Построить	Build
+Тон, насыщенность, яркость…	Hue, saturation, brightness…
+Тон, насыщенность, яркость	Hue, saturation, brightness
+Для выбранных ячеек; точки картинки перекрасятся следом	For the selected cells; image pixels get recolored too
+~Для ячейки 	For cell 
+; её точки перекрасятся следом	; its pixels get recolored too
+Тон, градусы	Hue, degrees
+Насыщенность, %	Saturation, %
+Яркость, %	Brightness, %
+Извлечь из выделения…	Extract from selection…
+Извлечь из картинки…	Extract from image…
+Палитра из картинки	Palette from image
+Цвета без повторов; лишние сводятся медианным разрезом	Unique colors; extra ones are reduced by median cut
+Не больше цветов	At most colors
+Извлечь	Extract
+~Цветов в палитре: 	Colors in palette: 
+Файл: PNG, GIMP .gpl, Lospec .hex, JASC .pal	File: PNG, GIMP .gpl, Lospec .hex, JASC .pal
+Загрузить…	Load…
+Загрузить палитру	Load palette
+Добавить из файла…	Add from file…
+Добавить цвета из палитры	Add colors from a palette
+Сохранить…	Save…
+Сохранить палитру	Save palette
+Мест	Ter
+Зал	Fill
+Прям	Rect
+Объ	Obj
+Выд	Sel
+Кар	Pen
+Аэр	Air
+Кисть	Brush
+Тень	Shade
+Ласт	Eras
+Град	Grad
+Пип	Pick
+Лин	Line
+Диз	Dith
+~  объектов 	  objects 
+Меню — карта	Menu — map
+Меню — тайл	Menu — tile
+Угол, по часовой	Angle, clockwise
+Без поворота	No rotation
+Способ	Method
+Ближайший	Nearest
+Плавно	Smooth
+Держит линии и контур целыми	Keeps lines and outlines whole
+Быстро, но рвёт тонкие линии	Fast, but breaks thin lines
+Не пиксель-арт: новые цвета	Not pixel art: new colors
+Вырастить холст	Grow canvas
+Тот же размер	Same size
+~Поворот на 	Rotate by 
+Поворот на любой угол	Rotate by any angle
+Повернуть	Rotate
+Где	Where
+Снаружи	Outside
+Внутри	Inside
+Соседи	Neighbors
+Четыре	Four
+Восемь	Eight
+Толщина	Thickness
+первый рабочий	first color
+Контур	Outline
+Контур первым цветом	Outline with the first color
+Обвести	Outline
+Многоугольник	Polygon
+Зам.	Repl.
+Параметры инструментов	Tool options
+ИНСТРУМЕНТЫ РЕЖИМА ТАЙЛА	TILE MODE TOOLS
+Карандаш, ластик, узор	Pencil, eraser, pattern
+Замена цвета	Replace color
+Смешивание	Blend
+«Пиксель-перфект»: без углов в мазке  (Q)	"Pixel-perfect": no corners in a stroke  (Q)
+Сила кисти	Brush strength
+Размер  [ ]	Size  [ ]
+Узор инструмента «Узор»  ([ и ] — листать)	Pattern of the "Pattern" tool  ([ and ] — browse)
+Узор инструмента «Узор»  (Shift+[ и ] — листать)	Pattern of the "Pattern" tool  (Shift+[ and ] — browse)
+Выделение	Selection
+Действие без клавиш	Action without keys
+Вычесть	Subtract
+Пересечь	Intersect
+Shift — добавить, Alt — вычесть, оба — пересечь.	Shift — add, Alt — subtract, both — intersect.
+Протяжка за выделенное двигает, с Ctrl — копирует.	Dragging the selection moves it, with Ctrl — copies it.
+Симметрия: положение осей	Symmetry: axes position
+центр	center
+Ось X  (F)	X axis  (F)
+Ось Y  (D)	Y axis  (D)
+Лучей	Rays
+Сетка и направляющие…   Ctrl+G	Grid and guides…   Ctrl+G
+Картинка к	Image to
+~По часовой стрелке, 	Clockwise, 
+все слои и кадры	all layers and frames
+; новых цветов не появляется	; no new colors appear
+Угол, градусы	Angle, degrees
+Ближайший сосед	Nearest neighbor
+Ближайший сосед быстрее и честнее к точкам, но рвёт тонкие линии	Nearest neighbor is faster and true to pixels, but breaks thin lines
+RotSprite держит линии и контур целыми — для спрайтов	RotSprite keeps lines and outlines whole — for sprites
+Плавно — не пиксель-арт: билинейно, с новыми цветами и мягким краем	Smooth is not pixel art: bilinear, with new colors and a soft edge
+Холст	Canvas
+Вырастить	Grow
+Оставить размер	Keep size
+Не помещается	Does not fit
+~Повёрнутый тайл больше 	The rotated tile is larger than 
+~ точек по стороне. Поверните с прежним размером холста или уменьшите картинку.	 pixels per side. Rotate with the same canvas size or shrink the image.
+~По точкам, без сглаживания; 	By pixels, without smoothing; 
+в пределах выделения	within the selection
+по всему тайлу	over the whole tile
+Четыре — углы открыты	Four — corners open
+Восемь — сплошной	Eight — solid
+Изображение и выделение	Image and selection
+ВЫДЕЛЕНИЕ И ПРЕОБРАЗОВАНИЯ	SELECTION AND TRANSFORMS
+выделенного	of the selection
+всего тайла	of the whole tile
+~   ·   выделено 	   ·   selected 
+~   ·   выделения нет	   ·   no selection
+Выделить всё   Ctrl+A	Select all   Ctrl+A
+Снять   Ctrl+D	Deselect   Ctrl+D
+Обратить   Ctrl+I	Invert   Ctrl+I
+Вернуть прежнее   Ctrl+Shift+D	Reselect   Ctrl+Shift+D
+Всё непрозрачное	All opaque
+По первому цвету	By first color
+Расширить на точку	Grow by a pixel
+Сузить на точку	Shrink by a pixel
+Копировать   Ctrl+C	Copy   Ctrl+C
+Вырезать   Ctrl+X	Cut   Ctrl+X
+Стереть выделенное   Delete	Erase selection   Delete
+~Отражение и поворот 	Flip and rotate 
+Отразить слева направо	Flip left to right
+Отразить сверху вниз	Flip top to bottom
+Повернуть на 90° по часовой	Rotate 90° clockwise
+Повернуть на 180°	Rotate 180°
+Повернуть на 90° против	Rotate 90° counterclockwise
+Повернуть на любой угол…	Rotate by any angle…
+~Увеличить в 	Scale up 
+~ раза	 times
+Уменьшить вдвое	Halve
+Контур первым цветом…	Outline with the first color…
+Обрезать по выделению	Crop to selection
+Обрезать по содержимому	Crop to content
+Размер холста…	Canvas size…
+Размер холста	Canvas size
+Картинка не масштабируется: холст растёт или обрезается	The image is not scaled: the canvas grows or is cropped
+Ширина	Width
+Высота	Height
+Масштаб до размера…	Scale to size…
+Масштаб до размера	Scale to size
+Ближайшим соседом: точки не размываются	Nearest neighbor: pixels are not blurred
+Сдвиг на полтайла	Shift by half a tile
+Сдвиг с переносом…	Shift with wrap…
+Сдвиг с переносом	Shift with wrap
+Ушедшее за край выходит с другой стороны — так видно шов	What goes past an edge comes out on the other side — so the seam shows
+Сдвинуть	Shift
+Залить выделенное	Fill selection
+Залить весь тайл	Fill the whole tile
+Первым цветом	With first color
+Вторым цветом	With second color
+Прозрачным	With transparency
+Убрать одиночные точки	Remove lone pixels
+~Для точек 	For pixels 
+выделения	of the selection
+; итог сведётся к палитре	; the result is reduced to the palette
+Нарастить край	Grow edge
+Срезать край	Trim edge
+Фильтры и эффекты…   Shift+K	Filters and effects…   Shift+K
+Плавный масштаб…	Smooth scale…
+Плавный масштаб	Smooth scale
+Не пиксель-арт: усреднение и билинейная выборка дают новые цвета	Not pixel art: averaging and bilinear sampling make new colors
+Случайные цвета на весь тайл	Random colors over the whole tile
+Сократить цвета…	Reduce colors…
+Сократить цвета	Reduce colors
+~Медианный разрез цветов 	Median cut of colors 
+; прозрачность точек остаётся	; pixel transparency stays
+Цветов	Colors
+Цвет…	Color…
+Палитра…	Palette…
+Параметры инструментов…	Tool options…
+Справка об этом экране	Help on this screen
+Найти в справке…	Search the help…
+Скрыть	Hide
+Подробнее	Details
+Файл не открылся: его нет на прежнем месте, это не картинка, которую редактор читает (PNG, GIF, APNG, BMP, TIFF, JPEG, проект .tjt, карта .map), или он повреждён. Проверьте путь или откройте другой файл (Ctrl+O).	The file did not open: it is no longer where it was, it is not an image the editor reads (PNG, GIF, APNG, BMP, TIFF, JPEG, a .tjt project, a .map map), or it is damaged. Check the path or open another file (Ctrl+O).
+Записать не удалось: папка защищена от записи, диск заполнен или файл занят другой программой. Сохраните в другую папку через «Сохранить как» (Ctrl+Shift+S).	Could not write: the folder is write-protected, the disk is full or the file is used by another program. Save to another folder with "Save as" (Ctrl+Shift+S).
+Белый	White
+~Размер от 	Size from 
+Сохранять пропорции	Keep proportions
+Готовые размеры	Preset sizes
+Создать	Create
+~ пикселей	 pixels
+Быстрый выбор	Quick pick
+Прозрачность	Opacity
+Точный выбор цвета	Precise color pick
+Enter — готово, Escape — отмена. Работают выделение и буфер обмена	Enter — done, Escape — cancel. Selection and clipboard work
+Операции с цветом	Color operations
+Первый и второй цвет берутся из панели справа	The first and second colors are taken from the panel on the right
+первый	first
+второй	second
+Заменить второй цвет первым по всему тайлу	Replace the second color with the first over the whole tile
+~Заменено пикселей: 	Pixels replaced: 
+Свести тайл к цветам палитры	Reduce the tile to the palette colors
+Отразить тайл по горизонтали	Flip the tile horizontally
+Отразить тайл по вертикали	Flip the tile vertically
+Индексный режим: включён	Indexed mode: on
+Индексный режим: выключен	Indexed mode: off
+Привязать тайл к палитре	Bind the tile to the palette
+Привязка к палитре	Binding to the palette
+~Связано пикселей: 	Pixels bound: 
+. Остальные не совпали ни с одной ячейкой палитры и правкой ячеек не изменятся. Свести тайл к цветам палитры можно кнопкой выше — тогда свяжутся все.	. The rest matched no palette cell and will not change when cells are edited. To bind them all, reduce the tile to the palette colors with the button above.
+Буфер обмена	Clipboard
+Отразить буфер по горизонтали	Flip the clipboard horizontally
+Отразить буфер по вертикали	Flip the clipboard vertically
+Повернуть буфер на четверть оборота	Rotate the clipboard a quarter turn
+~Локация: 	Location: 
+~Размер: 	Size: 
+~, объектов: 	, objects: 
+Замечаний нет: все объекты стоят на проходимых клетках, проходимая часть локации связна.	No warnings: all objects stand on walkable cells, the walkable part of the location is connected.
+Замечания:	Warnings:
+Проверка локации	Location check
+Свойства локации	Location properties
+Название и размер попадут в файл карты как есть	The name and size go into the map file as is
+Название	Name
+Изменить	Change
+Название локации	Location name
+Строка name в файле карты	The name line in the map file
+Обрезка уберёт объекты, оказавшиеся за новой границей	Cropping removes objects left beyond the new border
+~Применить размер 	Apply size 
+Найти и заменить…   Ctrl+F	Find and replace…   Ctrl+F
+Проверить локацию	Check location
++ Кадр	+ Frame
+Копия	Copy
+− Кадр	− Frame
++ Слой	+ Layer
+− Слой	− Layer
+Лук	Onion
+Метка	Tag
+~ мс	 ms
+► все кадры	► all frames
+Порядок кадров	Frame order
+Имя слоя	Layer name
+~Слой 	Layer 
+~Длительность кадра 	Frame duration 
+Миллисекунды; 100 мс — десять кадров в секунду	Milliseconds; 100 ms — ten frames per second
+Длительность, мс	Duration, ms
+~Метка 	Tag 
+Новая метка анимации	New animation tag
+Метка анимации	Animation tag
+Именованный отрезок кадров: бег, прыжок, удар	A named range of frames: run, jump, hit
+Имя	Name
+Изменить…	Change…
+Имя метки	Tag name
+Его увидят движок и описание листа спрайтов	The engine and the sprite sheet description will see it
+Проигрывать	Play
+Вперёд	Forward
+Туда и обратно	Ping-pong
+Удалить метку	Delete tag
+Размер тайла в точках; клетки идут от левого верхнего угла	Tile size in pixels; cells go from the top left corner
+Ширина тайла	Tile width
+Высота тайла	Tile height
+Слои, кадры и экспорт	Layers, frames and export
+СЛОИ, КАДРЫ И АНИМАЦИЯ	LAYERS, FRAMES AND ANIMATION
+~ сл. · 	 lay. · 
+~ кадр. · 	 fr. · 
+~ меток   ·   	 tags   ·   
+Слой «	Layer "
+Переименовать…	Rename…
+Непрозрачность…	Opacity…
+Непрозрачность слоя	Layer opacity
+Сто — слой как есть, ноль — не виден	One hundred — the layer as is, zero — invisible
+Непрозрачность, %	Opacity, %
+Виден	Visible
+Заперт	Locked
+Новый слой	New layer
+Копия группы	Copy group
+Копия слоя	Copy layer
+Удалить группу	Delete group
+Удалить слой	Delete layer
+Слить с нижним	Merge down
+Выше   PgUp — выбрать	Up   PgUp — select
+Ниже   PgDn — выбрать	Down   PgDn — select
+Группы и вид слоя	Groups and layer kind
+Сгруппировать	Group
+Распустить группу	Ungroup
+В группу над ним	Into the group above
+Из группы	Out of the group
+Свести группу	Flatten group
+Новый векторный слой	New vector layer
+Новая тайлкарта…	New tilemap…
+Новая тайлкарта	New tilemap
+Слой → тайлкарта…	Layer → tilemap…
+Слой в тайлкарту	Layer to tilemap
+Тайлы слоя…   Ctrl+T	Layer tiles…   Ctrl+T
+Растрировать слой	Rasterize layer
+Слой-образец…	Reference layer…
+~Кадр 	Frame 
+Длительность…	Duration…
+Длительность всех…	Duration of all…
+Длительность всех кадров	Duration of all frames
+Миллисекунды на каждый кадр	Milliseconds per frame
+Новый кадр	New frame
+Копия кадра	Copy frame
+Удалить кадр	Delete frame
+Левее	Left
+Правее	Right
+Метки анимации	Animation tags
+Новая метка…	New tag…
+Изменить метку кадра…	Edit frame tag…
+Просмотр	View
+Лента кадров   J	Timeline   J
+Луковая кожа   F3	Onion skin   F3
+Кадров до и после…	Frames before and after…
+Луковая кожа	Onion skin
+Кадров до	Frames before
+Кадров после	Frames after
+Экспорт: «	Export: "
+Экспорт: все кадры	Export: all frames
+Лист спрайтов и JSON…	Sprite sheet and JSON…
+Анимация GIF…	GIF animation…
+Анимация APNG…	APNG animation…
+Каждый кадр в PNG…	Each frame as PNG…
+Проект .tjt…	.tjt project…
+В набор игры — слота нет	To the game set — no slot
+~В набор: 	To the set: 
+Местность	Terrain
+Левая — рисовать, правая — взять местность\nПравая по кнопке — кисть смесью	Left — paint, right — take terrain\nRight click on the button — mixed brush
+Заливка местностью	Terrain fill
+Правая по кнопке — смесью	Right click on the button — mixed
+Прямоугольник местности	Terrain rectangle
+Объекты	Objects
+Левая — поставить или перенести, правая — убрать\nДвойной щелчок или Enter — форма объекта	Left — place or move, right — remove\nDouble click or Enter — object form
+Протяжка — выделить, щелчок — вставить	Drag — select, click — paste
+Левая — рисовать, правая или Alt — взять цвет; [ и ] — размер\nПравая по кнопке — вид: точки, аэрограф, кисть, затенение	Left — paint, right or Alt — take color; [ and ] — size\nRight click on the button — kind: dots, airbrush, brush, shading
+Ластик	Eraser
+Стирает до прозрачного; [ и ] — размер	Erases to transparent; [ and ] — size
+Правая по кнопке — градиент узором	Right click on the button — dithered gradient
+Пипетка	Eyedropper
+Берёт цвет из картинки	Takes a color from the image
+Линия	Line
+Правая по кнопке — параметры фигур	Right click on the button — shape options
+Прямоугольник	Rectangle
+Ctrl — залитый, Shift — квадрат	Ctrl — filled, Shift — square
+Ctrl — залитый, Shift — круг	Ctrl — filled, Shift — circle
+Узор	Pattern
+[ и ] — размер, Shift+[ и ] — сменить узор	[ and ] — size, Shift+[ and ] — change pattern
+Протяжка — выделить, по выделенному — перенести\nВид выделения — в параметрах (O)	Drag — select, on the selection — move\nSelection kind — in the options (O)
+\nСтоит на непроходимой клетке: игра его не примет	\nStands on an impassable cell: the game will not accept it
+Замена цвета или смешивание · E	Replace color or blend · E
+Пиксель-перфект · Q\nУбирает углы «Г» в мазке; только при размере кисти 1	Pixel-perfect · Q\nRemoves "L" corners in a stroke; only at brush size 1
+Параметры инструментов · O	Tool options · O
+Обзор документа\nЩелчок — показать это место, протяжка средней — двигать	Document overview\nClick — show this place, middle-button drag — move
+Главное меню · Escape	Main menu · Escape
+Местность «	Terrain "
+»\nКисть, заливка и прямоугольник	"\nBrush, fill and rectangle
+\nИнструмент объектов (4) ставит его; правая кнопка по объекту на карте берёт его вид	\nThe objects tool (4) places it; right click on an object on the map takes its kind
+Палитра\nЛевая — первый цвет, правая — второй, Ctrl+щелчок — записать\nU или средняя — экран палитры, I — индексный режим	Palette\nLeft — first color, right — second, Ctrl+click — write\nU or middle — palette screen, I — indexed mode
+Первый и второй цвет · X — поменять	First and second color · X — swap
+Насыщенность и яркость\nP или средняя — точный выбор цвета	Saturation and brightness\nP or middle — precise color pick
+Тон первого цвета	Hue of the first color
+Непрозрачность первого цвета	Opacity of the first color
+Проиграть анимацию · Enter	Play animation · Enter
+Луковая кожа · F3\nСоседние кадры — полупрозрачно	Onion skin · F3\nNeighboring frames — semi-transparent
+Метка анимации\nКадры, которые проигрываются вместе	Animation tag\nFrames that play together
+Чтобы открывать тайлы прямо с карты, укажите папку набора — например data/tiles игры. Это делается в настройках или на экране наборов.	To open tiles right from the map, set the tileset folder — for example the game's data/tiles. This is done in the settings or on the tilesets screen.
+Несохранённый тайл	Unsaved tile
+~В открытом тайле есть изменения, которых нет в файле. Открыть 	The open tile has changes that are not in the file. Open 
+.png и потерять их?	.png and lose them?
+Открыть	Open
+Тайла ещё нет	No tile yet
+.png в папке набора нет. Создать пустой и начать рисовать? Он попадёт в игру, как только вы его сохраните.	.png is not in the tileset folder. Create an empty one and start drawing? It will get into the game as soon as you save it.
+Это группа	This is a group
+Группа сама не рисуется: выберите слой внутри неё на ленте кадров (J).	A group does not draw by itself: pick a layer inside it on the timeline (J).
+Образец — подложка для срисовки: на нём не рисуют, и в выгрузку он не попадает. Выберите слой рисунка на ленте кадров (J) или клавишами PgUp и PgDn.	A reference layer is an underlay for tracing: you do not draw on it, and it is not exported. Pick a drawing layer on the timeline (J) or with PgUp and PgDn.
+Векторный слой	Vector layer
+На векторном слое рисуют линией, прямоугольником и овалом — фигуры остаются правимыми. Чтобы рисовать точками, растрируйте слой на экране слоёв и кадров.	On a vector layer you draw with the line, rectangle and ellipse — shapes stay editable. To draw with pixels, rasterize the layer on the layers and frames screen.
+Слой заперт	Layer locked
+Слой скрыт	Layer hidden
+заперт	locked
+скрыт	hidden
+~ вместе со своей группой	 together with its group
+: рисунок на нём не меняется. Щёлкните по замку или глазу на ленте кадров (клавиша J).	: the drawing on it does not change. Click the lock or the eye on the timeline (key J).
+Окно большое	Large window
+Полный режим покажет все возможности — Shift+Tab.	Full mode shows all features — Shift+Tab.
+Окно маленькое	Small window
+Базовый режим оставит только повседневное — Shift+Tab.	Basic mode keeps only everyday tools — Shift+Tab.
+~Щелчок — набрать число, ролик или протяжка — изменить\nShift — шаг 	Click — type a number, wheel or drag — change\nShift — step 
+Ломаная	Polyline
+Кривая	Curve
+Замкнутая кривая	Closed curve
+Звезда	Star
+Прямая	Straight
+Параметры фигур	Shape options
+Вид линии (инструмент «Линия»)	Line kind (the "Line" tool)
+Ломаную, многоугольник и кривую ставят по точкам: щелчок — точка, двойной щелчок или Enter — конец	Polylines, polygons and curves are placed point by point: click — a point, double click or Enter — finish
+Заливка вторым цветом	Fill with the second color
+Лучей звезды	Star rays
+Впадины, %	Hollows, %
+На векторном слое фигуры остаются правимыми:	On a vector layer shapes stay editable:
+протяжка за вершину двигает её, с Ctrl — всю фигуру,	dragging a vertex moves it, with Ctrl — the whole shape,
+Delete удаляет последнюю тронутую. На растровом слое	Delete removes the last one touched. On a raster layer
+фигура сразу ложится точками.	the shape is laid as pixels right away.
+Сглаживание края — не пиксель-арт	Edge smoothing — not pixel art
+Край — долями покрытия: новые цвета и полупрозрачность. В строгом индексном режиме итог сводится к палитре.	The edge uses coverage fractions: new colors and semi-transparency. In strict indexed mode the result is reduced to the palette.
+Не тайлкарта	Not a tilemap
+Тайлы выбирают для слоя-тайлкарты. Создайте его на экране слоёв и кадров: «Новая тайлкарта» или «Слой → тайлкарта».	Tiles are chosen for a tilemap layer. Create one on the layers and frames screen: "New tilemap" or "Layer → tilemap".
+Тайлы слоя «	Tiles of layer "
+~ тайлов 	 tiles 
+~   ·   щелчок выбирает, правая кнопка удаляет	   ·   click selects, right button deletes
+пусто	empty
+Удалить тайл	Delete tile
+~Клетки с этим тайлом станут пустыми во всех кадрах. Удалить тайл 	Cells with this tile become empty in all frames. Delete tile 
+Правка точками — тайл во всех копиях	Pixel editing — the tile in all copies
+Правка тайлами — кисть кладёт тайл	Tile editing — the brush lays a tile
+Новый пустой тайл	New empty tile
+Тайл из выделения	Tile from selection
+Тайлы из набора игры	Tiles from the game set
+Укажите её на экране «Наборы тайлов» (T).	Set it on the "Tilesets" screen (T).
+~Добавлено тайлов: 	Tiles added: 
+Файл	File
+Правка	Edit
+Вид	View
+Инструменты и кисть	Tools and brush
+Цвет и картинка	Color and image
+Анимация	Animation
+Новый документ	New document
+Выделение в файл	Selection to file
+Отменить	Undo
+Повторить	Redo
+Вставить под курсор	Paste under the cursor
+Стереть выделенное	Erase selection
+Выделить всё	Select all
+Снять выделение	Deselect
+Вернуть выделение	Reselect
+Обратить выделение	Invert selection
+Копировать	Copy
+Вырезать	Cut
+Вставить из буфера	Paste from clipboard
+Сдвинуть; без выделения — холст	Nudge; without a selection — the canvas
+Стрелки	Arrows
+Сдвинуть на 8 точек	Nudge by 8 pixels
+Shift+стрелки	Shift+arrows
+Крупнее и мельче	Zoom in and out
+Вписать картинку	Fit image
+Масштаб 100 %	Zoom 100 %
+Рука; коротко — вписать	Hand; short press — fit
+Двигать холст	Move canvas
+Ctrl+стрелки	Ctrl+arrows
+Шахматка	Checkerboard
+Заворот через край	Wrap over the edge
+Линейки	Rulers
+Направляющие	Guides
+Сетка и направляющие…	Grid and guides…
+Тайл в окружении карты	Tile in map surroundings
+Следующее место на карте	Next place on the map
+Инструменты панели	Panel tools
+Размер кисти	Brush size
+Узор назад, вперёд	Previous, next pattern
+Пиксель-перфект	Pixel-perfect
+Смешивание или замена	Blend or replace
+Оси симметрии ↕ и ↔	Symmetry axes ↕ and ↔
+Поменять цвета местами	Swap colors
+Чёрный и белый	Black and white
+Выбор цвета	Color picker
+Изображение	Image
+Тайлы слоя-тайлкарты	Tilemap layer tiles
+Лента кадров	Timeline
+Проиграть, остановить	Play, stop
+Кадр назад, вперёд	Previous, next frame
+Первый, последний кадр	First, last frame
+Слой выше, ниже	Layer up, down
+Форма объекта	Object form
+Удалить объект под курсором	Delete the object under the cursor
+Картинками или клетками	Images or cells
+Главное меню	Main menu
+Тайл или карта	Tile or map
+Базовый или полный режим	Basic or full mode
+Эта шпаргалка	This cheat sheet
+Найти команду	Find a command
+Новый…	New…
+Открыть…	Open…
+Выделение в файл…	Selection to file…
+Вставить	Paste
+Найти и заменить…	Find and replace…
+Изображение и выделение…	Image and selection…
+Фильтры и эффекты…	Filters and effects…
+Операции с цветом…	Color operations…
+Выбор цвета…	Color picker…
+Наборы тайлов…	Tilesets…
+Тайлы слоя-тайлкарты…	Tilemap layer tiles…
+Набор для игры…	Game set…
+Слои, кадры и экспорт…	Layers, frames and export…
+Проиграть	Play
+Кадр назад	Previous frame
+Кадр вперёд	Next frame
+Слой выше	Layer up
+Слой ниже	Layer down
+Крупнее	Zoom in
+Мельче	Zoom out
+Боковая панель	Side panel
+Свойства и проверка локации…	Location properties and check…
+Форма объекта под курсором	Object form under the cursor
+Настроить клавиши…	Customize keys…
+~Пробел	Space
+Сдвинуть влево	Nudge left
+Сдвинуть вправо	Nudge right
+Сдвинуть вверх	Nudge up
+Сдвинуть вниз	Nudge down
+Сдвинуть влево на 8	Nudge left by 8
+Сдвинуть вправо на 8	Nudge right by 8
+Сдвинуть вверх на 8	Nudge up by 8
+Сдвинуть вниз на 8	Nudge down by 8
+Холст влево	Canvas left
+Холст вправо	Canvas right
+Холст вверх	Canvas up
+Холст вниз	Canvas down
+Кисть меньше	Smaller brush
+Кисть больше	Bigger brush
+Узор назад	Previous pattern
+Узор вперёд	Next pattern
+Симметрия по X	Symmetry along X
+Симметрия по Y	Symmetry along Y
+Первый кадр	First frame
+Последний кадр	Last frame
+Шпаргалка клавиш	Key cheat sheet
+Рука (пока зажат пробел)	Hand (while space is held)
+Ctrl+Пробел	Ctrl+Space
+пол	floor
+стена	wall
+вода	water
+дерево	tree
+трава	grass
+дорога	road
+стоячая вода	still water
+Текст таблички	Sign text
+Новая локация	New location
+~строка 	line 
+: size ожидает два положительных числа	: size expects two positive numbers
+~локация больше 	location larger than 
+~ клеток по стороне	 cells per side
+: grid до объявления size	: grid before size is declared
+сетка обрывается: не хватает строк	the grid breaks off: lines are missing
+~строка сетки 	grid line 
+~ была длиной 	 was 
+~ вместо 	 long instead of 
+; недостающее заполнено стеной	; the missing part is filled with wall
+~: неизвестная директива 	: unknown directive 
+в файле нет сетки	the file has no grid
+size после grid не совпадает с размером сетки	size after grid does not match the grid size
+не удалось прочитать файл	could not read the file
+Житель	Resident
+Предмет	Item
+Переход	Transition
+Враг	Enemy
+Сундук	Chest
+Записка	Note
+Кровать	Bed
+Табличка	Sign
+Локация пуста.	The location is empty.
+~ — координаты вне локации	 — coordinates outside the location
+~ — стоит на непроходимой клетке (	 — stands on an impassable cell (
+В локации нет ни одной проходимой клетки.	The location has no walkable cell.
+~Проходимая часть разбита на 	The walkable part is split into 
+~ несвязанных областей: до части локации не дойти.	 unconnected areas: part of the location cannot be reached.
+имя жителя, как в игре: elder, smith	resident name as in the game: elder, smith
+id предмета	item id
+Количество	Amount
+пусто — один	empty — one
+Локация	Location
+имя файла карты без .map	map file name without .map
+X цели	Target X
+Y цели	Target Y
+Условия	Conditions
+key=ключ quest=код:этап counter=код:число deny=текст	key=key quest=code:stage counter=code:number deny=text
+имя врага, как в игре: wolf, rat	enemy name as in the game: wolf, rat
+Сколько	How many
+сколько врагов держит зона	how many enemies the zone holds
+в клетках	in cells
+Золото	Gold
+Ключ	Key
+id ключа или - без ключа	key id or - for no key
+Содержимое	Contents
+предмет:количество через пробел	item:amount separated by spaces
+код записки	note code
+Текст	Text
+Строка	Line
+вид не из игры: хвост строки как есть	kind not from the game: the rest of the line as is
+~Условия: 	Conditions: 
+quest=код:этап	quest=code:stage
+counter=код:число	counter=code:number
+Условия: игра не знает «	Conditions: the game does not know "
+» — бывают key=, quest=, counter=, deny=	" — possible are key=, quest=, counter=, deny=
+Прочее	Other
+слова сверх того, что читает игра	words beyond what the game reads
+~Не заполнено: 	Not filled in: 
+: одно слово, без пробелов	: one word, no spaces
+: нужно целое число	: a whole number is needed
+: не меньше нуля	: not less than zero
+Количество: хотя бы один	Amount: at least one
+Сколько: хотя бы один	How many: at least one
+Содержимое: «	Contents: "
+» — нужно предмет:количество больше нуля	" — item:amount greater than zero is needed
+в лист не влезает больше 64 тайлов	no more than 64 tiles fit into a sheet
+тайл больше 63 точек по стороне в лист игры не влезает	a tile larger than 63 pixels per side does not fit into the game sheet
+не похоже на лист тайлов: картинка должна делиться на 8 клеток по каждой стороне	does not look like a tile sheet: the image must split into 8 cells along each side
+Шахматка 50%	Checker 50%
+Точки 25%	Dots 25%
+Точки 75%	Dots 75%
+Редкие 12%	Sparse 12%
+Частые 88%	Dense 88%
+Строки	Rows
+Столбцы	Columns
+Диагональ \\	Diagonal \\
+Диагональ /	Diagonal /
+Клетка 2×2	Cell 2×2
+Клетка 3×3	Cell 3×3
+Клетка 4×4	Cell 4×4
+Кластер 50%	Cluster 50%
+добавить	add
+вычесть	subtract
+пересечь	intersect
+заменить	replace
+~Группа 	Group 
+~Вектор 	Vector 
+~Тайлы 	Tiles 
+~Тайлкарта 	Tilemap 
+Максимальный размер тайла — {} на {} пикселей. В файле {} на {}.	The maximum tile size is {} by {} pixels. The file has {} by {}.
+Прошлый раз программа закрылась, не сохранив изменения. Вернуть {} и {} в том виде, в каком они были при последнем автосохранении?	Last time the program closed without saving changes. Bring back {} and {} as they were at the last autosave?
+Прошлый раз программа закрылась, не сохранив изменения. Вернуть {} в том виде, в каком они были при последнем автосохранении?	Last time the program closed without saving changes. Bring back {} as they were at the last autosave?
+Изменения, которых нет в файлах, есть в двух документах: {} и {}. Выйти из программы?	Changes that are not in files exist in two documents: {} and {}. Quit the program?
+В {} есть изменения, которых нет в файле. Выйти из программы?	The {} has changes that are not in the file. Quit the program?
+В {} есть изменения, которых нет в файле.	The {} has changes that are not in the file.
+{}   {} из {}   Ctrl+B — дальше	{}   {} of {}   Ctrl+B — next
+строки {}–{} из {}	lines {}–{} of {}
+страница {} из {}	page {} of {}
+страница {} из {}   ·   {}	page {} of {}   ·   {}
+Размер от {} до {} точек	Size from {} to {} pixels
+У {} это сочетание снято.	{} no longer has this combination.
+Вид: {}	Kind: {}
+Палитра — {} · свободные цвета	Palette — {} · free colors
+Палитра — {} · индексный режим	Palette — {} · indexed mode
+Отражение и поворот всего тайла	Flip and rotate the whole tile
+Отражение и поворот выделенного	Flip and rotate the selection
+{} пол	{} floor
+{} стена	{} wall
+{} вода	{} water
+{} дерево	{} tree
+{} трава	{} grass
+{} дорога	{} road
+{} стоячая вода	{} still water
+Файл {}.png уже есть. Заменить его текущим тайлом {}?	File {}.png already exists. Replace it with the current tile {}?
+страница {} из {},  тайлов {}	page {} of {},  {} tiles
+~ (тайл)	 (tile)
+~ (карта)	 (map)
+герой	hero
+житель	resident
+враг	enemy
+переход	transition
+табличка	sign
+предмет	item
+лежанка	bed
+сундук	chest
+портал	portal
+записка	note
+Основные	Main
+Жители	Residents
+Враги	Enemies
+Значки	Icons
+дизеринг	dithering
+заливка карты	map fill
+прямоугольник карты	map rectangle
+объект	object
+выделение карты	map selection
+Образец	Reference
+Слой 1	Layer 1
+~ копия	 copy
+тону	hue
+насыщенности	saturation
+яркости	brightness
+светлоте	lightness
+красному	red
+зелёному	green
+синему	blue
+прозрачности	alpha
+это не палитра GIMP: нет строки «GIMP Palette»	this is not a GIMP palette: no "GIMP Palette" line
+в палитре нет ни одного цвета	the palette has no colors
+строка «{}» — не цвет RRGGBB	line "{}" is not an RRGGBB color
+в файле нет ни одного цвета	the file has no colors
+это не палитра JASC-PAL	this is not a JASC-PAL palette
+Фигура	Shape
+кусок проекта испорчен	the project chunk is damaged
+проект записан более новой версией редактора	the project was written by a newer version of the editor
+палитра слишком длинная	the palette is too long
+неверное число слоёв	wrong number of layers
+неверное число кадров	wrong number of frames
+ячейки раньше заголовка	cells before the header
+ячейки обрезаны	cells are cut off
+набор тайлов испорчен	the tileset is damaged
+набор тайлов обрезан	the tileset is cut off
+сетка тайлов испорчена	the tile grid is damaged
+в проекте нет заголовка, слоёв или кадров	the project has no header, layers or frames
+недопустимый размер проекта	invalid project size
+в проекте нет палитры	the project has no palette
+это не проект редактора: в PNG нет куска проекта	this is not an editor project: the PNG has no project chunk
+кусок проекта испорчен: {}	the project chunk is damaged: {}
+не удалось записать файл	could not write the file
+не открыть файл	cannot open the file
+оглавление TIFF обрезано	the TIFF directory is cut off
+данные TIFF за концом файла	TIFF data beyond the end of the file
+поток LZW испорчен	the LZW stream is damaged
+сжатие TIFF {} не поддержано: сохраните без сжатия, LZW или Deflate	TIFF compression {} is not supported: save uncompressed, LZW or Deflate
+это не TIFF	this is not a TIFF
+недопустимый размер страницы TIFF	invalid TIFF page size
+TIFF с {} битами на канал не поддержан	TIFF with {} bits per channel is not supported
+TIFF с дробными или знаковыми каналами не поддержан	TIFF with floating-point or signed channels is not supported
+TIFF в CMYK, YCbCr и Lab не поддержан: сохраните в RGB	TIFF in CMYK, YCbCr and Lab is not supported: save as RGB
+число каналов TIFF не сходится с его цветом	the number of TIFF channels does not match its color
+у TIFF не хватает полос или плиток	the TIFF is missing strips or tiles
+у TIFF с палитрой нет таблицы цветов	the palette TIFF has no color table
+в TIFF нет страниц	the TIFF has no pages
+это не GIF	this is not a GIF
+недопустимый размер холста	invalid canvas size
+таблица цветов обрезана	the color table is cut off
+картинка обрезана	the image is cut off
+в файле нет картинок	the file has no images
+данных изображения меньше, чем обещает заголовок	there is less image data than the header promises
+неизвестный фильтр строки	unknown row filter
+это не PNG	this is not a PNG
+кусок {} обрезан	chunk {} is cut off
+контрольная сумма куска {} не сходится	checksum of chunk {} does not match
+неверный заголовок	wrong header
+недопустимый размер изображения	invalid image size
+неподдерживаемый вид PNG	unsupported PNG kind
+нет заголовка IHDR	no IHDR header
+кадр анимации выходит за холст	an animation frame goes beyond the canvas
+нет данных изображения	no image data
+у картинки с палитрой нет палитры	the palette image has no palette
+данные изображения испорчены: {}	the image data is damaged: {}
+испорченный код Хаффмана	damaged Huffman code
+распакованные данные больше допустимого	unpacked data is larger than allowed
+недопустимый код длины	invalid length code
+недопустимый код расстояния	invalid distance code
+поток обрывается	the stream breaks off
+расстояние за началом данных	distance before the start of data
+испорчен блок без сжатия	an uncompressed block is damaged
+неверные размеры кодов	wrong code sizes
+испорчен код длин	the code lengths are damaged
+повтор без предыдущей длины	a repeat without a previous length
+длины выходят за набор	lengths go beyond the set
+нет кода конца блока	no end-of-block code
+испорчен код Хаффмана	the Huffman code is damaged
+недопустимый тип блока	invalid block type
+поток zlib слишком короткий	the zlib stream is too short
+неверный заголовок zlib	wrong zlib header
+«{}» (карта)	"{}" (map)
+«{}» (тайл)	"{}" (tile)
+Активный слой, {}   ·   применяется кнопкой, Z отменяет	Active layer, {}   ·   applied with the button, Z undoes
+По часовой стрелке, {}; новых цветов не появляется	Clockwise, {}; no new colors appear
+По часовой стрелке, {}	Clockwise, {}
+Для точек {}; итог сведётся к палитре	For pixels {}; the result is reduced to the palette
+Для точек {}	For pixels {}
+Слой «{}» {} вместе со своей группой: рисунок на нём не меняется. Щёлкните по замку или глазу на ленте кадров (клавиша J).	Layer "{}" is {} together with its group: the drawing on it does not change. Click the lock or the eye on the timeline (key J).
+Слой «{}» {}: рисунок на нём не меняется. Щёлкните по замку или глазу на ленте кадров (клавиша J).	Layer "{}" is {}: the drawing on it does not change. Click the lock or the eye on the timeline (key J).
+Вертикальные: {}	Vertical: {}
+Горизонтальные: {}	Horizontal: {}
+Объект «{}»	Object "{}"
+Слой «{}»	Layer "{}"
+Кадр {} из {}	Frame {} of {}
+Местность «{}»\nКисть, заливка и прямоугольник	Terrain "{}"\nBrush, fill and rectangle
+Тайлы слоя «{}»	Tiles of layer "{}"
+~«	"
+~»	"
+Сила кисти — по нажиму пера	Brush strength — by pen pressure
+Напор — по нажиму пера	Flow — by pen pressure
+~   ·   нажим 	   ·   pressure 
+Строка меню	Menu bar
+~   ·   индексная палитра	   ·   indexed palette
+Соседние кадры — полупрозрачно под текущим	Neighboring frames — semi-transparent under the current one
+Цвета: прошлые и будущие	Colors: past and future
+Красный и синий	Red and blue
+Оранжевый и голубой	Orange and light blue
+Пурпурный и зелёный	Magenta and green
+Тема	Theme
+Перечитать темы из файлов	Reload themes from files
+Акцент — у новых тем	Accent — for the new themes
+Акцент	Accent
+Свой	Custom
+Подпись и текст	Caption and text
+Подсказка — тише текста	A hint is quieter than text
+Главная	Primary
+Обычная	Regular
+Выбрано	Selected
+Недоступна	Unavailable
+Предупреждение	Warning
+контраст {}	contrast {}
+Тема и акцент…	Theme and accent…
+как в системе	as in the system
+Как в системе	As in the system
+Оформление…	Appearance…
+Светлая	Light
+Тёмная	Dark
+Светлая контрастная	Light high contrast
+Тёмная контрастная	Dark high contrast
+светлая контрастная	light high contrast
+тёмная контрастная	dark high contrast
+Бирюзовый	Teal
+Янтарный	Amber
+Оранжевый	Orange
+Розовый	Pink
+Фиолетовый	Violet
+Графит	Graphite
+Сумерки	Dusk
+Хвоя	Pine
+строка {}: нет «=»	line {}: no "="
+строка {}: seed — не цвет	line {}: seed is not a color
+строка {}: нет роли {}	line {}: no role {}
+строка {}: неизвестный ключ {}	line {}: unknown key {}
+строка {}: {} — не цвет	line {}: {} is not a color
+Тема «{}»	Theme "{}"
+{} (и ещё {})	{} (and {} more)
+Уменьшить движение	Reduce motion
+English — в настройках, темы — «Вид → Оформление»	English in Settings, themes in "View → Appearance"
+Свои клавиши и набор «как в Aseprite»	Your own keys and the "Like Aseprite" preset
+Справка с оглавлением и поиском, «?» на экранах	Help with contents and search, "?" on screens
+Нажим пера, F10 — меню, цвета луковой кожи	Pen pressure, F10 — menu, onion skin colors

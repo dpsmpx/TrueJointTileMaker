@@ -1,0 +1,38 @@
+# План «Интерфейс», D4: английский интерфейс (uie.config: Language =
+# english). Строки переводит шрифт по Resources/Lang/en.txt, справка —
+# своим файлом Resources/Lang/help.en.txt.
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 01_start
+key Escape
+sleep 0.3
+click 32 13                  # меню «File»
+sleep 0.3
+move 120 200
+sleep 0.2
+shot 02_menu_file
+key Escape
+sleep 0.2
+key F1
+sleep 0.4
+shot 03_cheatsheet
+key Escape
+sleep 0.2
+# Справка: оглавление и поиск — по английскому тексту.
+key h
+sleep 0.3
+click 120 257                # «Palette»
+move 770 550
+sleep 0.2
+shot 04_help
+key Escape
+sleep 0.2
+# Подписи из нескольких частей — шаблонами таблицы.
+key u
+sleep 0.4
+move 770 550
+sleep 0.2
+shot 05_palette
+key Escape
+sleep 0.2

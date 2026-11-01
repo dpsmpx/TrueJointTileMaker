@@ -1,0 +1,10 @@
+# Тема True Joint Tile Maker (docs/ui-design-system.md, «Файл темы»).
+# Формат — как у Config.txt. Самая короткая тема — base и seed: все цвета
+# считаются из акцента. Свои темы кладите в Themes в папке пользователя.
+name = Сумерки
+base = тёмная            # от какой встроенной темы
+seed = #7445B4           # акцент: фиолетовый
+shape.corners = rounded  # rounded | square | pixel
+color.canvas.backdrop = #2B2B2B
+color.canvas.checker.a = #4A4A4A
+color.canvas.checker.b = #3C3C3C

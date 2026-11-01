@@ -1,0 +1,173 @@
+# Этап D плана «Интерфейс» (docs/roadmap.md): рост аудитории. Светлая
+# тема (uid.config); стартовый экран закрывается.
+key Escape
+sleep 0.3
+# D2: справка — оглавление слева, щелчок по разделу ведёт к нему; поиск
+# оставляет абзацы с найденным и подсвечивает его.
+key h
+sleep 0.3
+click 120 257                # «Палитра»
+move 770 550
+sleep 0.2
+shot 01_help_toc
+click 120 70                 # поле поиска
+sleep 0.2
+type сетк
+sleep 0.3
+shot 02_help_search
+key Escape
+key Escape
+sleep 0.3
+# Кнопка «?» экрана открывает справку на его разделе: у палитры — «Палитра».
+key u
+sleep 0.3
+click 751 21
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 03_help_context
+key Escape
+key Escape
+sleep 0.3
+# D3: правка клавиш. Ctrl+N, отданное «Открыть», у «Новый документ»
+# снимается — свои сочетания отмечены точкой и акцентом.
+key ctrl+k
+sleep 0.2
+type Настроить клавиши
+sleep 0.2
+key Return
+sleep 0.4
+click 633 160                # «Задать» у «Открыть»
+sleep 0.2
+key ctrl+n
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 04_keys_own
+# Набор «как в Aseprite»: свои сочетания сбросятся — спрашивает.
+click 307 63
+sleep 0.3
+shot 05_keys_ask
+key Return
+sleep 0.3
+click 685 529                # «Готово»
+sleep 0.4
+# Шпаргалка — по новой таблице; E — ластик, как в Aseprite.
+sleep 3                      # уведомление о снятом сочетании догорает
+key F1
+sleep 0.4
+shot 06_cheat_aseprite
+key Escape
+sleep 0.2
+key e
+sleep 0.2
+move 770 550
+sleep 0.2
+shot 07_tool_by_letter
+# Дальше — снова стандартный набор (поиск команды у Aseprite — Ctrl+Space).
+key ctrl+space
+sleep 0.2
+type Настроить клавиши
+sleep 0.2
+key Return
+sleep 0.4
+click 158 63                 # «Стандартный»
+sleep 0.3
+click 685 529                # «Готово»
+sleep 0.4
+# D6: нажим пера. Сила кисти — по нажиму (переключатель на экране
+# карандаша, правая кнопка по нему); мазок пером с нажимом 30 % ложится
+# полупрозрачно, нажим виден в строке состояния.
+key ctrl+0                   # вписать картинку
+sleep 0.2
+click 622 20                 # карандаш
+sleep 0.2
+click 622 20 3               # правая кнопка по карандашу
+sleep 0.4
+click 300 199                # «Сила кисти — по нажиму пера»
+sleep 0.2
+shot 08_pressure_switch
+key Escape
+sleep 0.3
+pressure 0.3
+drag 100 200 400 200
+sleep 0.2
+move 250 260
+sleep 0.2
+shot 09_pressure_stroke
+pressure 1
+move 250 270
+sleep 0.2
+# D7: доступность. F10 открывает строку меню, стрелки ходят по пунктам.
+move 770 550
+sleep 0.2
+key F10
+sleep 0.3
+key Down
+key Down
+sleep 0.2
+shot 10_menu_f10
+key Escape
+sleep 0.3
+# Луковая кожа: цвета на выбор, кадры под ней на ленте — уголками ◂ ▸.
+# Кнопка экрана слоёв и кадров делает дело и закрывает экран.
+key ctrl+k
+sleep 0.2
+type Слои, кадры
+sleep 0.2
+key Return
+sleep 0.4
+click 488 155                # «Новый кадр»
+sleep 0.3
+key ctrl+k
+sleep 0.2
+type Слои, кадры
+sleep 0.2
+key Return
+sleep 0.4
+click 488 155
+sleep 0.3
+key ctrl+k
+sleep 0.2
+type Слои, кадры
+sleep 0.2
+key Return
+sleep 0.4
+click 678 154                # «Кадров до и после…»
+sleep 0.4
+click 270 302                # «Оранжевый и голубой»
+sleep 0.2
+shot 11_onion_colors
+click 295 419                # «Применить»
+sleep 0.3
+key F3
+key j
+key comma
+sleep 0.3
+move 770 300
+sleep 0.2
+shot 12_onion_timeline
+# D8: оформление — тема и акцент на выбор, экран сам себе предпросмотр.
+key ctrl+k
+sleep 0.2
+type Оформление
+sleep 0.2
+key Return
+sleep 0.4
+click 540 176                # акцент «Фиолетовый»
+sleep 0.2
+click 170 162                # «Светлая контрастная»
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 13_appearance_contrast
+click 170 298                # тема из файла «Сумерки»
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 14_appearance_file
+click 542 527                # «Отмена» — всё как было
+sleep 0.4
+move 770 550
+sleep 0.2
+shot 15_appearance_cancel

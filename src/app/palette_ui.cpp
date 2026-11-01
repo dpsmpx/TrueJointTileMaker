@@ -154,6 +154,7 @@ void Editor::showPaletteScreen() {
                      "Палитра — " + std::to_string(n) + " " +
                          (m.indexedOn ? "· индексный режим" : "· свободные цвета"),
                      cText);
+        uiHelpButton(WIN_W - 44, 6, "ПАЛИТРА");
 
         // --- сетка ячеек ---
         for (int k = 0; k < pal::MAX_PALETTE; ++k) {

@@ -13,8 +13,9 @@
 // точках кадра (только перенос: окно оригинала не растягивается).
 //
 // Сверх команд tools/gui.sh здесь есть «wheel DY [DX]» — прокрутка долями
-// щелчка, как у трекпада, и «drop ПУТЬ» — файл, брошенный в окно (у xdotool
-// их нет: сценарии с ними — только для переноса).
+// щелчка, как у трекпада, «drop ПУТЬ» — файл, брошенный в окно, и
+// «pressure P» — дальше мышь ведёт перо с нажимом P от 0 до 1 («pressure 1»
+// — снова мышь). У xdotool их нет: сценарии с ними — только для переноса.
 #pragma once
 
 #include <deque>
@@ -25,7 +26,18 @@ namespace tjtm {
 
 /// Событие сценария в координатах окна оригинала.
 struct ScriptEvent {
-    enum Kind { MOTION, BUTTON_DOWN, BUTTON_UP, WHEEL, KEY_DOWN, KEY_UP, TEXT, DROP, WINDOW };
+    enum Kind {
+        MOTION,
+        BUTTON_DOWN,
+        BUTTON_UP,
+        WHEEL,
+        KEY_DOWN,
+        KEY_UP,
+        TEXT,
+        DROP,
+        WINDOW,
+        PRESSURE
+    };
     Kind kind = MOTION;
     int x = 0, y = 0;
     int button = 0;  // 1 левая, 2 средняя, 3 правая — как у xdotool и SDL
@@ -33,6 +45,7 @@ struct ScriptEvent {
     /// трекпада.
     float wheelY = 0, wheelX = 0;
     int winW = 0, winH = 0;  // размер окна для WINDOW
+    float pressure = 1;      // нажим пера для PRESSURE
     int scancode = 0;        // SDL_Scancode
     int mod = 0;             // SDL_Keymod
     std::string text;

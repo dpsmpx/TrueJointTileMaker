@@ -322,6 +322,7 @@ bool Editor::showGameSetScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 12, WIN_W, 40, "Набор для игры");
+        uiHelpButton(WIN_W - 44, 11, "НАБОР ДЛЯ ИГРЫ");
         const std::string dir = tilesDir();
         uiLabel(0, 40, WIN_W, 20, dir.empty() ? "Папка набора не задана" : fitText(dir, WIN_W - 40),
                 dir.empty() ? cWarn : cTextDim);
@@ -363,8 +364,8 @@ bool Editor::showGameSetScreen() {
         uiLabelLeft(RX, 286, 20, "Вариант — файл «слот_маска.png»: север 1,", cTextDim);
         uiLabelLeft(RX, 306, 20, "восток 2, юг 4, запад 8; за краем карты —", cTextDim);
         uiLabelLeft(RX, 326, 20, "та же местность. wall_5 — стена с соседями", cTextDim);
-        uiLabelLeft(RX, 346, 20, "сверху и снизу. Игра пока читает только", cTextDim);
-        uiLabelLeft(RX, 366, 20, "основной тайл; правило — для её перехода.", cTextDim);
+        uiLabelLeft(RX, 346, 20, "сверху и снизу. Игра подбирает варианты", cTextDim);
+        uiLabelLeft(RX, 366, 20, "так же — по соседям на карте.", cTextDim);
 
         if (uiButton(WIN_W / 2 - 90, WIN_H - 52, 180, 36, "Закрыть", true)) done = true;
         redraw();

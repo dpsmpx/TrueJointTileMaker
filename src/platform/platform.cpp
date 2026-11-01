@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
@@ -141,6 +142,20 @@ void Platform::setCursor(Cursor c) {
     if (slot == nullptr) slot = SDL_CreateSystemCursor(kSystem[c]);
     // Без своего курсора (бывает без экрана) остаётся прежний.
     if (slot != nullptr) SDL_SetCursor(slot);
+}
+
+void Platform::setIcon(const Grid<Color>& icon) {
+    if (window_ == nullptr || icon.empty()) return;
+    SDL_Surface* s = SDL_CreateSurface(icon.w, icon.h, SDL_PIXELFORMAT_ARGB8888);
+    if (s == nullptr) return;
+    for (int y = 0; y < icon.h; ++y) {
+        auto* row = reinterpret_cast<std::uint32_t*>(static_cast<std::uint8_t*>(s->pixels) +
+                                                     static_cast<std::ptrdiff_t>(y) * s->pitch);
+        for (int x = 0; x < icon.w; ++x)
+            row[x] = icon.at(x, y).argb();
+    }
+    SDL_SetWindowIcon(window_, s);
+    SDL_DestroySurface(s);
 }
 
 void Platform::setTitle(const std::string& title) {
@@ -284,6 +299,18 @@ void Platform::present(const gfx::Surface& frame) {
     SDL_RenderPresent(renderer_);
 }
 
+bool Platform::systemDark() {
+    return SDL_GetSystemTheme() == SDL_SYSTEM_THEME_DARK;
+}
+
+void Platform::notePointer(std::uint32_t which) {
+    // Мышь после пера: нажим снова полный.
+    if (which != SDL_PEN_MOUSEID) {
+        in_.pen = false;
+        in_.pressure = 1.0F;
+    }
+}
+
 void Platform::handle(const SDL_Event& e0, bool convert) {
     SDL_Event e = e0;
     if (convert && renderer_ != nullptr) SDL_ConvertEventToRenderCoordinates(renderer_, &e);
@@ -291,8 +318,22 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
         case SDL_EVENT_MOUSE_MOTION:
             in_.mouseX = static_cast<int>(e.motion.x);
             in_.mouseY = static_cast<int>(e.motion.y);
+            notePointer(e.motion.which);
+            break;
+        // Перо SDL3 ведёт и мышь (её события с which = SDL_PEN_MOUSEID):
+        // рисование идёт по ним, а отсюда берётся только нажим.
+        case SDL_EVENT_PEN_AXIS:
+            if (e.paxis.axis == SDL_PEN_AXIS_PRESSURE) {
+                in_.pressure = std::clamp(e.paxis.value, 0.0F, 1.0F);
+                in_.pen = true;
+            }
+            break;
+        case SDL_EVENT_PEN_PROXIMITY_OUT:
+            in_.pen = false;
+            in_.pressure = 1.0F;
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            notePointer(e.button.which);
             in_.mouseX = static_cast<int>(e.button.x);
             in_.mouseY = static_cast<int>(e.button.y);
             buttons_ |= 1U << e.button.button;
@@ -360,6 +401,7 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
         case SDL_EVENT_DROP_FILE:
             if (e.drop.data != nullptr) in_.drops.emplace_back(e.drop.data);
             break;
+        case SDL_EVENT_SYSTEM_THEME_CHANGED: in_.themeChanged = true; break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             // Отпускание после ухода фокуса придёт уже не нам: клавиши
             // осталась бы «нажатыми» навсегда.
@@ -414,6 +456,7 @@ void Platform::scriptStep() {
         switch (se.kind) {
             case ScriptEvent::MOTION:
                 e.type = SDL_EVENT_MOUSE_MOTION;
+                e.motion.which = in_.pen ? SDL_PEN_MOUSEID : 0;
                 e.motion.x = static_cast<float>(se.x);
                 e.motion.y = static_cast<float>(se.y);
                 break;
@@ -421,6 +464,7 @@ void Platform::scriptStep() {
             case ScriptEvent::BUTTON_UP:
                 e.type = se.kind == ScriptEvent::BUTTON_DOWN ? SDL_EVENT_MOUSE_BUTTON_DOWN
                                                              : SDL_EVENT_MOUSE_BUTTON_UP;
+                e.button.which = in_.pen ? SDL_PEN_MOUSEID : 0;
                 e.button.button = static_cast<Uint8>(se.button);
                 e.button.down = se.kind == ScriptEvent::BUTTON_DOWN;
                 e.button.clicks = 1;
@@ -451,6 +495,10 @@ void Platform::scriptStep() {
                 e.drop.data = se.text.c_str();
                 break;
             case ScriptEvent::WINDOW: setWindowSize(se.winW, se.winH); continue;
+            case ScriptEvent::PRESSURE:
+                in_.pressure = se.pressure;
+                in_.pen = se.pressure < 1.0F;
+                continue;
         }
         handle(e, false);
     }

@@ -6,6 +6,7 @@
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/i18n.h"
 #include "core/pmath.h"
 #include "core/text.h"
 #include "core/theme.h"
@@ -428,7 +429,7 @@ void Editor::handleCanvasClick() {
     // Название шага истории (C3) — по инструменту.
     {
         const int tool = m.docMode == DOC_TILE ? m.toolTile : m.toolMap;
-        std::string name = splitLines(toolTip(tool)).front();
+        std::string name = splitLines(i18n::tr(toolTip(tool))).front();
         if (const std::size_t dot = name.find(" · "); dot != std::string::npos) name.resize(dot);
         m.actionName = name;
     }

@@ -214,6 +214,19 @@ void Editor::drawTimeline() {
         if (f == af) fb_.fillRect(x, tlHeadY(), x + TL_CELL_W, tlRowsY(), cHover);
         textCentered(x, tlHeadY(), x + TL_CELL_W, tlRowsY(), std::to_string(f + 1),
                      f == af ? cAccent : cTextDim);
+        // Кадры под луковой кожей — уголком, а не только оттенком на холсте
+        // (D7, UX-51): прошлые ◂ слева, будущие ▸ справа.
+        if (m.onionSkin && !classicUi_ && f != af && f >= af - m.onionPrev &&
+            f <= af + m.onionNext) {
+            const bool past = f < af;
+            const Color c = Model::onionColor(m.onionPalette, past);
+            const int cy = (tlHeadY() + tlRowsY()) / 2;
+            for (int t = 0; t < 4; ++t) {
+                // Остриё — наружу: ◂ к прошлым, ▸ к будущим.
+                const int lx = past ? x + 5 - t : x + TL_CELL_W - 6 + t;
+                fb_.line(lx, cy - 3 + t, lx, cy + 3 - t, c);
+            }
+        }
     }
 
     // --- слои и ячейки ---
@@ -705,6 +718,7 @@ void Editor::showAnimationScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 8, WIN_W, 34, "Слои, кадры и экспорт");
+        uiHelpButton(WIN_W - 44, 6, "СЛОИ, КАДРЫ И АНИМАЦИЯ");
         const bool tile = m.docMode == DOC_TILE;
         const int nl = m.doc.layerCount();
         const int nf = m.doc.frameCount();
@@ -837,16 +851,7 @@ void Editor::showAnimationScreen() {
             m.tileBmpDirty = true;
         }
         y += ST;
-        if (act(c4, y, "Кадров до и после…", tile)) {
-            int prev = m.onionPrev;
-            int next = m.onionNext;
-            askTwoNumbers("Луковая кожа", "Прошлые кадры — красноватые, будущие — синеватые",
-                          "Кадров до", prev, 0, 8, "Кадров после", next, 0, 8, "Применить",
-                          nullptr);
-            m.onionPrev = prev;
-            m.onionNext = next;
-            m.tileBmpDirty = true;
-        }
+        if (act(c4, y, "Кадров до и после…", tile)) showOnionOptions();
         y += ST + 8;
         uiLabelLeft(
             c4, y - 6, 20,
@@ -881,6 +886,63 @@ void Editor::showAnimationScreen() {
         idle();
     }
     waitMouseRelease();
+    m.needRepaint = true;
+}
+
+void Editor::showOnionOptions() {
+    int prev = m.onionPrev;
+    int next = m.onionNext;
+    int pal = m.onionPalette;
+    bool done = false;
+    bool ok = false;
+    dropInput();
+    pf_.input().keys.clear();
+    static constexpr const char* kNames[Model::kOnionPalettes] = {
+        "Красный и синий", "Оранжевый и голубой", "Пурпурный и зелёный"};
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        fb_.clear(cWindow);
+        uiTitle(0, 30, WIN_W, 66, "Луковая кожа");
+        uiLabel(0, 70, WIN_W, 26, "Соседние кадры — полупрозрачно под текущим", cTextDim);
+        uiLabelLeft(140, 120, 34, "Кадров до", cText);
+        uiNumber(330, 120, 120, 34, prev, 0, 8);
+        uiLabelLeft(140, 170, 34, "Кадров после", cText);
+        uiNumber(330, 170, 120, 34, next, 0, 8);
+        // Цвета — на выбор (D7, UX-51): у красного и зелёного одна яркость.
+        uiLabelLeft(140, 226, 30, "Цвета: прошлые и будущие", cText);
+        for (int k = 0; k < Model::kOnionPalettes; ++k) {
+            const int y = 262 + k * 40;
+            if (uiToggle(140, y, 260, 34, kNames[k], pal == k)) pal = k;
+            fb_.fillRect(412, y + 5, 436, y + 29, Model::onionColor(k, true));
+            fb_.fillRect(442, y + 5, 466, y + 29, Model::onionColor(k, false));
+            fb_.frameRect(411, y + 4, 467, y + 30, cBorder);
+        }
+        if (uiPrimary(WIN_W / 2 - 180, 400, 170, 38, "Применить", true)) {
+            ok = true;
+            done = true;
+        }
+        if (uiButton(WIN_W / 2 + 10, 400, 170, 38, "Отмена", true)) done = true;
+        redraw();
+        const int key = takeKey();
+        if (key == KEY_ESC) done = true;
+        if (key == KEY_ENTER) {
+            ok = true;
+            done = true;
+        }
+        idle();
+    }
+    waitMouseRelease();
+    if (ok) {
+        m.onionPrev = prev;
+        m.onionNext = next;
+        m.onionPalette = pal;
+        m.tileBmpDirty = true;
+        // Цвета — привычка глаза, а не свойство документа: в Config.txt.
+        if (!classicUi_ && cfg.onionColors != pal) {
+            cfg.onionColors = pal;
+            saveConfig();
+        }
+    }
     m.needRepaint = true;
 }
 

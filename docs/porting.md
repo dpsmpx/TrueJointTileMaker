@@ -117,7 +117,8 @@ SDL_VIDEODRIVER=offscreen build/debug/tjtm --base КАТАЛОГ \
 
 Проверка кода: `tools/lint.sh` — C++ и скрипты (с `--fix` правит оформление).
 
-CI (`.github/workflows/ci.yml`) на каждый push и PR повторяет то же самое:
+CI (`.github/workflows/ci.yml`) запускается вручную — у закрытого
+репозитория нет минут Actions на каждый push — и повторяет то же самое:
 отладочная сборка, все тесты с корпусом карт игры и `tools/lint.sh`;
 отдельно `asan`; Windows — пресет `mingw` с тестами под Wine, и готовая
 программа для Windows лежит артефактом прогона. Пакеты ставит

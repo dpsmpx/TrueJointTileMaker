@@ -56,7 +56,7 @@ bool Editor::previewPanel(const std::string& title, int height,
             under = fb_;
         }
         fb_ = under;
-        fb_.fillRoundRect(x0 + 2, y0 + 3, x1 + 2, y1 + 4, 16, 16, active.shadow);
+        drawElevation(x0, y0, x1, y1, 16, 2);
         fb_.fillRoundRect(x0, y0, x1, y1, 16, 16, cBorder);
         fb_.fillRoundRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 14, 14, cFace);
         uiTitle(x0, y0 + 8, x1, y0 + 36, title);

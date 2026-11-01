@@ -19,6 +19,7 @@
 #include "core/config.h"
 #include "core/grid.h"
 #include "core/model.h"
+#include "core/scheme.h"
 #include "core/shortcuts.h"
 #include "gfx/font.h"
 #include "gfx/surface.h"
@@ -294,7 +295,15 @@ private:
     struct CardBack {
         gfx::Surface dim;  // снимок с затемнением — фон карточки
         gfx::Surface orig;  // снимок как был — вернуть в кадр после диалога
+        int start = 0;  // когда появилась: затемнение проявляется (D9)
     };
+    /// Тень под всплывающим (D9, ДС-6): уровень 2 — меню, подсказки,
+    /// уведомления; 3 — диалоги. В «Классике» теней нет.
+    void drawElevation(int x0, int y0, int x1, int y1, int r, int level);
+    /// Доля пройденного движения 0..1 с замедлением к концу; «Уменьшить
+    /// движение» и «Классика» — сразу 1.
+    float motion(int startMs, int durationMs);
+    int toastStart_ = 0;
     std::optional<CardBack> cardBackdrop();
     /// Начало кадра диалога: притушенный снимок и карточка, или страница.
     void dialogBack(const std::optional<CardBack>& backdrop, int x0, int y0, int x1, int y1);
@@ -338,8 +347,25 @@ private:
     void showColorOpsScreen();
     void showMapReport();
     void showMapPropertiesScreen();
-    void showHelpScreen();
+    /// section — заголовок раздела, на котором открыть (заглавными, как в
+    /// тексте); пусто — с начала.
+    void showHelpScreen(const std::string& section = "");
     void showSettingsScreen();
+    /// Правка клавиш и набор «как в Aseprite» (D3).
+    void showKeysScreen();
+    /// Луковая кожа: сколько кадров и какими цветами (D7).
+    void showOnionOptions();
+    /// Язык интерфейса из настроек (D4); «Классика» (--classic) — русский.
+    void applyLanguage();
+    /// Темы из файлов (D8): Resources/Themes и Themes в папке пользователя.
+    std::vector<theme::ThemeFile> themeFiles_;
+    void loadThemeFiles();
+    /// Экран «Оформление» (D8): тема, акцент, предпросмотр.
+    void showAppearance();
+    /// Название действия на экране клавиш; у цифр — инструменты тайла и карты.
+    std::string keyActionTitle(const KeyAction& a) const;
+    /// Экран клавиш ждёт сочетание: Tab и стрелки — ему, а не фокусу.
+    bool keyCapture_ = false;
     void showMainMenu();
     bool showTilesetScreen();
 
@@ -530,6 +556,16 @@ private:
     /// Поиск команды по названию (C6, UX-05): пункты строки меню — и
     /// спрятанные базовым режимом — с клавишами; Enter выполняет.
     void showCommandSearch();
+    /// Стартовый экран (D1, UX-47) — в новых темах вместо меню из
+    /// двенадцати кнопок: продолжить, новый, открыть, недавние с
+    /// миниатюрами, что нового.
+    void showStartScreen();
+    /// Справка с оглавлением и поиском (D2, UX-09): у 1.6 — 250 строк
+    /// сплошного текста с кнопками ▲▼.
+    void showHelpBrowser(const std::vector<std::string>& paragraphs, const std::string& section);
+    /// Кнопка «?» экрана: открывает справку на его разделе (UX-09). Только
+    /// в новых темах: у «Классики» заголовки экранов — как у 1.6.
+    void uiHelpButton(int x, int y, const std::string& section);
     /// Команда, выбранная в поиске: её выполнит следующий шаг главного цикла.
     std::optional<std::pair<Cmd, int>> pendingCmd_;
     /// Стрелки двигают выделенное: инструмент выделения и есть что двигать

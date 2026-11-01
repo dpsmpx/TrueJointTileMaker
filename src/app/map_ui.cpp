@@ -305,6 +305,7 @@ void Editor::showMapBrushOptions() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 12, WIN_W, 40, "Кисть карты");
+        uiHelpButton(WIN_W - 44, 11, "ИНСТРУМЕНТЫ РЕЖИМА КАРТЫ");
         if (uiToggle(LX, 60, 300, 34, "Одной местностью", !m.mapMix)) m.mapMix = false;
         if (uiToggle(LX + 310, 60, 300, 34, "Смесью местностей", m.mapMix)) {
             m.mapMix = true;
@@ -375,6 +376,7 @@ void Editor::showMapFindScreen() {
         beginFrameInput();
         fb_.clear(cWindow);
         uiTitle(0, 8, WIN_W, 36, "Найти и заменить");
+        uiHelpButton(WIN_W - 44, 7, "РЕДАКТОР КАРТ");
 
         // --- местность ---
         uiLabelLeft(LX, 44, 22, "Заменить местность", cTextDim);

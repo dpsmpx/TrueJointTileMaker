@@ -25,7 +25,10 @@
 
 #include "app/editor.h"
 #include "core/fsutil.h"
+#include "core/i18n.h"
+#include "core/logo.h"
 #include "core/png.h"
+#include "core/text.h"
 
 namespace tjtm {
 
@@ -41,9 +44,52 @@ Editor::Editor() {
     m.drawPreviewPixel = [this](int x, int y) { drawPreviewPixel(x, y); };
 }
 
+void Editor::applyLanguage() {
+    const bool en = !classicUi_ && cfg.language == "english";
+    i18n::setLanguage(en ? "en" : "ru");
+    if (en) i18n::loadCatalog(resolvePath("Resources/Lang/en.txt"));
+    m.needRepaint = true;
+}
+
+void Editor::loadThemeFiles() {
+    themeFiles_.clear();
+    std::vector<std::string> dirs = {resolvePath("Resources/Themes")};
+    if (const std::string pref = Platform::prefDir(); !pref.empty() && !pf_.scripted())
+        dirs.push_back(pathCombine(pref, "Themes"));
+    for (const std::string& dir : dirs) {
+        for (const std::string& f : listFiles(dir)) {
+            if (pathExtLower(f) != ".txt") continue;
+            const auto text = readFile(pathCombine(dir, f));
+            if (!text) continue;
+            theme::ThemeFile tf;
+            std::vector<std::string> problems;
+            if (!theme::parseThemeFile(*text, tf, problems)) continue;
+            // Ошибка в теме — уведомлением; неверная строка пропущена, и
+            // тема берёт значение у своей базы.
+            if (!problems.empty())
+                notify(
+                    "Тема «" + tf.name + "»",
+                    problems.front() + (problems.size() > 1
+                                            ? " (и ещё " + std::to_string(problems.size() - 1) + ")"
+                                            : ""));
+            tf.path = pathCombine(dir, f);
+            // Тема с тем же именем из папки пользователя заменяет встроенную.
+            std::erase_if(themeFiles_, [&](const theme::ThemeFile& o) {
+                return netToLower(o.name) == netToLower(tf.name);
+            });
+            themeFiles_.push_back(tf);
+        }
+    }
+}
+
 void Editor::applyTheme() {
-    // Сценарии оригинала сверяются с обликом 1.6 — «Классикой».
-    theme::active = classicUi_ ? theme::classicTheme() : theme::themeByName(cfg.theme);
+    // Сценарии оригинала сверяются с обликом 1.6 — «Классикой». Новые темы
+    // считаются из акцента (D8).
+    Color seed = theme::kDefaultSeed;
+    if (!cfg.themeAccent.empty()) theme::parseHexColor(cfg.themeAccent, seed);
+    theme::active = classicUi_ ? theme::classicTheme()
+                               : theme::buildTheme(netToLower(cfg.theme), seed,
+                                                   Platform::systemDark(), themeFiles_);
     m.checkerA = theme::active.checkA;
     m.checkerB = theme::active.checkB;
     applyBars();
@@ -55,13 +101,15 @@ void Editor::applyTheme() {
 }
 
 void Editor::syncTitle() {
-    std::string t = std::string(kAppTitle) + " " + kAppVersion + " — ";
-    if (m.docMode == DOC_MAP) {
-        t += m.currentMapFile.empty() ? "новая карта" : fileNameOnly(m.currentMapFile);
-    } else {
-        t += m.currentFile.empty() ? "новый тайл" : fileNameOnly(m.currentFile);
-    }
-    if (m.isModified()) t += " *";
+    std::string doc =
+        m.docMode == DOC_MAP
+            ? (m.currentMapFile.empty() ? "новая карта" : fileNameOnly(m.currentMapFile))
+            : (m.currentFile.empty() ? "новый тайл" : fileNameOnly(m.currentFile));
+    if (m.isModified()) doc += " *";
+    // Имя файла — впереди (D5, UX-36): в панели задач видно начало
+    // заголовка, и программа с версией его не заслоняют.
+    std::string t = classicUi_ ? std::string(kAppTitle) + " " + kAppVersion + " — " + doc
+                               : doc + " — " + kAppTitle;
     if (t != lastTitle_) {
         lastTitle_ = t;
         pf_.setTitle(t);
@@ -163,6 +211,13 @@ bool Editor::appInit(int argc, char** argv) {
     m.mapTiles = true;
     // Интерфейс 1.7 и дальше (docs/roadmap.md, «Интерфейс — план»).
     classicUi_ = classic;
+    // Набор и свои клавиши (D3); «Классика» разбирает клавиши по-старому.
+    applyKeymap(cfg.keyPreset, cfg.keys);
+    applyLanguage();
+    m.onionPalette = classic ? 0 : cfg.onionColors;
+    // Нажим пера (D6): у оригинала пера не было.
+    m.pressureStrength = !classic && cfg.penPressureBrush;
+    m.pressureFlow = !classic && cfg.penPressureAir;
     m.keepSelectionPerDoc = !classic;
     m.zoomSteps = !classic;
     m.gridAutoZoom = classic ? 0 : cfg.gridAutoZoom;
@@ -185,11 +240,13 @@ bool Editor::appInit(int argc, char** argv) {
     }
     syncFrameSize();
     if (!classic) {
+        pf_.setIcon(appIcon());
         m.undoBudget = std::int64_t{256} * 1024 * 1024;
         m.undoBytesPerPx = 6;
         m.undoMinSteps = 100;
         m.undoMaxSteps = 1000;
     }
+    loadThemeFiles();
     applyTheme();
     m.syncHSVFromColor();
     m.setDefaultPalette();

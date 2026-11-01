@@ -735,8 +735,9 @@ void Model::paintOne(int x, int y) {
     // Неполная непрозрачность кисти — всегда смешивание: заменить точку
     // полупрозрачным цветом значило бы стереть то, что под ней. В строгом
     // индексном режиме смеси нет, и сила кисти не действует.
-    if (brushOpacity < 255 && !strictIndexedOn()) {
-        const int op = clampI(brushOpacity, 1, 255);
+    const int strength = strokeOpacity();
+    if (strength < 255 && !strictIndexedOn()) {
+        const int op = clampI(strength, 1, 255);
         Color& dst = tile.at(x, y);
         if (toolTile == T_ERASER) {
             dst = argb(static_cast<std::uint8_t>(dst.a * (255 - op) / 255), dst.r, dst.g, dst.b);
@@ -1437,6 +1438,13 @@ std::string Model::mapCellTileFile(int x, int y) const {
     }
     // Коды клеток идут в том же порядке, что основные слоты набора.
     return tsetBaseFile(map.at(x, y));
+}
+
+int Model::strokeOpacity() const {
+    if (!pressureStrength || penPressure >= 1.0F) return brushOpacity;
+    // Лёгкое касание всё же кладёт цвет: ноль непрозрачности — не мазок.
+    const float p = std::clamp(penPressure, 0.0F, 1.0F);
+    return std::clamp(static_cast<int>(std::lround(static_cast<float>(brushOpacity) * p)), 1, 255);
 }
 
 }  // namespace tjtm

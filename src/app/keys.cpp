@@ -9,6 +9,7 @@
 #include <deque>
 
 #include "app/editor.h"
+#include "core/i18n.h"
 #include "core/imageops.h"
 #include "core/pmath.h"
 #include "core/text.h"
@@ -356,6 +357,14 @@ void Editor::runCommand(Cmd c, int arg) {
         case Cmd::SwitchMode: m.switchMode(tile ? DOC_MAP : DOC_TILE); break;
         case Cmd::Recent: openRecentAsk(); break;
         case Cmd::Settings: showSettingsScreen(); break;
+        case Cmd::KeysScreen: showKeysScreen(); break;
+        case Cmd::Appearance:
+            if (!classicUi_) showAppearance();
+            break;
+        case Cmd::MenuBar:
+            if (gLayout.top >= MENU_BAR_H && !menuSlots().empty())
+                openMenu(menuSlots().front().menu);
+            break;
         case Cmd::Exit: commandExit(); break;
         case Cmd::ColorOps: showColorOpsScreen(); break;
         case Cmd::LayersScreen: showAnimationScreen(); break;
@@ -445,8 +454,10 @@ void Editor::showCommandSearch() {
         for (const MenuItem& mi : menuItems()) {
             if (mi.text == nullptr || mi.cmd == Cmd::CommandSearch) continue;
             if (mi.where != KeyWhere::Both && (mi.where == KeyWhere::Tile) != tile) continue;
-            const std::string hay = netToLower(std::string(mi.text) + " " + mi.menu + " " +
-                                               commandKeys(mi.cmd, mi.arg, tile));
+            // Ищется и по-русски, и на языке интерфейса (D4).
+            const std::string hay =
+                netToLower(std::string(mi.text) + " " + mi.menu + " " + i18n::tr(mi.text) + " " +
+                           i18n::tr(mi.menu) + " " + commandKeys(mi.cmd, mi.arg, tile));
             if (want.empty() || hay.find(want) != std::string::npos) out.push_back(&mi);
         }
         return out;
@@ -602,6 +613,7 @@ void Editor::showCheatsheet() {
             if (s.where != KeyWhere::Both && (s.where == KeyWhere::Tile) != tile) continue;
             Row r;
             r.keys = shortcutKeys(all, i);
+            if (r.keys.empty()) continue;  // клавиши сняты на экране клавиш
             if (!want.empty() &&
                 netToLower(std::string(s.text) + " " + r.keys).find(want) == std::string::npos)
                 continue;
@@ -620,7 +632,7 @@ void Editor::showCheatsheet() {
             r.keysW = textWidth(r.keys) + 12;
             const int besideW = colW - r.keysW - 10;
             r.keysBelow = besideW < kMinText;
-            r.text = wrapWords(s.text, r.keysBelow ? colW : besideW,
+            r.text = wrapWords(i18n::tr(s.text), r.keysBelow ? colW : besideW,
                                [&](const std::string& t) { return textWidth(t); });
             r.lines = static_cast<int>(r.text.size()) + (r.keysBelow ? 1 : 0);
             rows.push_back(r);
@@ -702,6 +714,13 @@ void Editor::showCheatsheet() {
         if (rows.empty() && foot.empty()) textOut(kX0 + 14, top + 6, "Ничего не нашлось", cTextDim);
         int fx = kX0 + 14;
         const int fy = kY1 - 28;
+        // Промежутки сжимаются, когда клавиши длинные (набор «как в
+        // Aseprite»: Ctrl+Tab, Ctrl+Пробел).
+        int footW = 0;
+        for (const Foot& f : foot)
+            footW += textWidth(f.text) + 6 + textWidth(f.keys) + 12;
+        const int gaps = std::max(1, static_cast<int>(foot.size()) - 1);
+        const int gap = std::clamp((kX1 - kX0 - 28 - footW) / gaps, 4, 16);
         for (const Foot& f : foot) {
             textOut(fx, fy, f.text, cTextDim);
             fx += textWidth(f.text) + 6;
@@ -709,14 +728,19 @@ void Editor::showCheatsheet() {
             fb_.fillRoundRect(fx, fy - 1, fx + kw, fy + lh + 2, 8, 8, cFace);
             fb_.strokeRoundRect(fx, fy - 1, fx + kw, fy + lh + 2, 8, 8, cOutline, 1);
             textOut(fx + 6, fy, f.keys, cText);
-            fx += kw + 16;
+            fx += kw + gap;
         }
 
         redraw();
         const int key = takeKey();
-        if (key == KEY_ESC || key == KEY_F1 || key == KEY_ENTER) done = true;
-        if (key == KEY_SLASH && lastKey_.shift) done = true;
-        if (key == KEY_H) {
+        // Закрывают и открывают справку те же клавиши, что в таблице: их
+        // могли переназначить (D3).
+        const int mods = (lastKey_.shift ? MOD_SHIFT : 0) | (lastKey_.ctrl ? MOD_CTRL : 0) |
+                         (lastKey_.alt ? MOD_ALT : 0);
+        const Shortcut* sc = key != 0 ? findShortcut(key, mods, tile) : nullptr;
+        if (key == KEY_ESC || key == KEY_ENTER || (sc != nullptr && sc->cmd == Cmd::Cheatsheet))
+            done = true;
+        if (sc != nullptr && sc->cmd == Cmd::Help) {
             endCard(backdrop);
             showHelpScreen();
             return;

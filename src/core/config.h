@@ -7,6 +7,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace tjtm {
@@ -47,6 +48,11 @@ struct Config {
 
     /// Тема окна: «светлая», «тёмная» или «классика» (облик 1.6).
     std::string theme = "светлая";
+    /// Уменьшить движение (D9): уведомления, диалоги и меню появляются
+    /// сразу, без въезда и проявления.
+    bool reduceMotion = false;
+    /// Акцент схемы (D8): «#RRGGBB»; пусто — синий 1.9 (#2468D8).
+    std::string themeAccent;
     /// Всплывающие подсказки при наведении.
     bool tooltips = true;
     /// Рамка клетки под курсором на холсте.
@@ -67,6 +73,21 @@ struct Config {
     /// возможности на виду, «базовый» — только повседневное, для маленького
     /// окна. Сочетания скрытого работают и в базовом.
     std::string uiMode = "полный";
+    /// Нажим пера (D6): ослабляет силу кисти карандаша, ластика и узора и
+    /// напор аэрографа. Сила кисти — нет по умолчанию: пиксель-арт рисуют
+    /// без полупрозрачности.
+    bool penPressureBrush = false;
+    bool penPressureAir = true;
+    /// Цвета луковой кожи (D7): 0 — красный и синий, 1 — оранжевый и
+    /// голубой, 2 — пурпурный и зелёный.
+    int onionColors = 0;
+    /// Язык интерфейса (D4): «русский» или «english».
+    std::string language = "русский";
+    /// Набор клавиш (D3): «стандартный» или «как в Aseprite».
+    std::string keyPreset = "стандартный";
+    /// Свои клавиши поверх набора: имя действия и сочетания через «|»
+    /// («Key.Save = Ctrl+S | F2»; «нет» — без клавиши).
+    std::vector<std::pair<std::string, std::string>> keys;
     /// Недавние файлы, последний — первым; не больше kRecentMax (UX-24).
     std::vector<std::string> recentFiles;
     static constexpr std::size_t kRecentMax = 10;
