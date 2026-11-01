@@ -59,7 +59,8 @@ Linux, со всем планом `RoadToProLevel` и тем, что сдела�
 
 Версия 2.0.1 добавляет значки инструментов одного стиля, окрашенные
 темой, и палитру по умолчанию Resurrect 64 — последние пункты плана
-«Интерфейс».
+«Интерфейс». Версия 2.0.2 доводит английский: фразы, которые программа
+собирает из кусков, на редких экранах теперь переведены целиком.
 
 **English.** True Joint Tile Maker is a pixel art, animation and tile map
 editor. Switch the interface to English in Settings → Language (or
