@@ -114,6 +114,21 @@ void Editor::drawToolsSection() {
             textCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, toolLabel(i),
                          m.curTool() == i ? sel : cText);
         }
+        // У инструментов карты — образец того, что они кладут (C7, UX-31):
+        // четыре значка карты — почти одинаковые сетки, а образец местности
+        // или знак вида объекта их различает.
+        if (active.modern && m.docMode == DOC_MAP) {
+            const int sx = x0 + 3;
+            const int sy = y0 + TOOL_CH - 14;
+            if (i == M_PAINT || i == M_FILL || i == M_RECT) {
+                fb_.fillRect(sx, sy, sx + 10, sy + 10, mapTileColor(m.mapBrush));
+                fb_.frameRect(sx - 1, sy - 1, sx + 11, sy + 11, cBorder);
+            } else if (i == M_OBJ) {
+                fb_.fillRect(sx, sy, sx + 10, sy + 10, active.mapLabelBack);
+                textCentered(sx, sy - 2, sx + 10, sy + 11, mapObjGlyph(mapKindName(m.mapObjKind)),
+                             active.mapLabelText);
+            }
+        }
         // Уголок — у инструмента есть параметры, правой кнопкой (UX-08): у
         // 1.6 об этом намёка не было нигде.
         const bool params = m.docMode == DOC_TILE ? (i == T_PEN || i == T_FILL || i == T_LINE ||

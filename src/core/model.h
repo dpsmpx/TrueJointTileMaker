@@ -34,7 +34,7 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них, 1.7 и дальше — этапы плана
 // «Интерфейс» (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.8.0";
+inline constexpr const char* kAppVersion = "1.9.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
