@@ -46,6 +46,7 @@ void Editor::applyTheme() {
     theme::active = classicUi_ ? theme::classicTheme() : theme::themeByName(cfg.theme);
     m.checkerA = theme::active.checkA;
     m.checkerB = theme::active.checkB;
+    applyBars();
     m.tileBmpDirty = true;
     m.overDirty = true;
     m.needRepaint = true;
@@ -135,6 +136,10 @@ bool Editor::appInit(int argc, char** argv) {
         return false;
     }
     if (mono.empty() || !mono_.open(mono, 11.0F)) mono_.open(ui, 11.0F);
+    // 15 и 18 точек при 96 dpi; нет полужирного — тот же шрифт крупнее.
+    const std::string bold = gfx::findUiBoldFont(resources);
+    if (bold.empty() || !titleFont_.open(bold, 11.25F)) titleFont_.open(ui, 11.25F);
+    if (bold.empty() || !headFont_.open(bold, 13.5F)) headFont_.open(ui, 13.5F);
 
     // Отсутствующий файл настроек — не ошибка: берутся значения по
     // умолчанию, и файл создаётся, чтобы его было легко найти и поправить.
@@ -160,7 +165,25 @@ bool Editor::appInit(int argc, char** argv) {
     classicUi_ = classic;
     m.keepSelectionPerDoc = !classic;
     m.zoomSteps = !classic;
+    m.gridAutoZoom = classic ? 0 : cfg.gridAutoZoom;
     pf_.input().fineWheel = !classic;
+    // Окно растягивается, разворачивается и бывает во весь экран (C1,
+    // dpsmpx/TrueJointTileMaker#13); «Классика» — окно 780×560 оригинала.
+    // Сценарии задают размер сами (window W H): их снимки не должны
+    // зависеть от экрана машины.
+    if (!classic) {
+        pf_.setUiScale(cfg.uiScale);
+        pf_.setResizable(WIN_W, WIN_H);
+        if (!pf_.scripted()) {
+            if (cfg.windowW > 0 && cfg.windowH > 0) {
+                pf_.setWindowSize(cfg.windowW, cfg.windowH);
+            } else {
+                pf_.fitToDisplay();
+            }
+            if (cfg.windowMaximized) pf_.setMaximized(true);
+        }
+    }
+    syncFrameSize();
     if (!classic) {
         m.undoBudget = std::int64_t{256} * 1024 * 1024;
         m.undoBytesPerPx = 6;
@@ -241,6 +264,7 @@ void Editor::appStep() {
     // Значки перечитываются здесь, а не там, где их правят: правка приходит
     // из экрана наборов, а он в это время сам занимает окно.
     ensureIcons();
+    applyDock();
     applyLayout();
     stepPlayback();
     stepArrowPan();
@@ -274,7 +298,7 @@ void Editor::appStep() {
         timelineWheel(wheel);
         wheel = 0;
     }
-    if (wheel != 0 && m.docMode == DOC_TILE && m.palMaxScroll() > 0 && mouseX() >= PANEL_X &&
+    if (wheel != 0 && m.docMode == DOC_TILE && m.palMaxScroll() > 0 && mouseX() >= panelX() &&
         mouseY() >= PAL_Y0 && mouseY() < PAL_Y1) {
         m.scrollPalette(-wheel);
         wheel = 0;
@@ -286,13 +310,33 @@ void Editor::appStep() {
 
     const int key = takeKey();
     if (key != 0) handleEditorKey(key);
+    if (pendingCmd_) {
+        const auto [c, arg] = *pendingCmd_;
+        pendingCmd_.reset();
+        runCommand(c, arg);
+    }
+    // Клавиша могла открыть экран: дальше снова кадр главного окна, без
+    // страницы по середине.
+    setPage(false);
 
     if (frameClick_) {
         frameClick_ = false;
-        if (frameClickX_ < m.W && timelineShown() && frameClickY_ >= m.H) {
+        const bool aboveCanvas = frameClickY_ < gLayout.top;
+        const bool belowAll = frameClickY_ >= gLayout.h - gLayout.bottom;
+        if (frameClickX_ < panelX() && aboveCanvas) {
+            if (frameClickY_ < MENU_BAR_H) {
+                handleMenuBarClick();
+            } else {
+                handleOptionsBarClick();
+            }
+        } else if (frameClickX_ < panelX() && belowAll) {
+            // Строка состояния — только сведения.
+        } else if (frameClickX_ < m.W && timelineShown() && frameClickY_ >= m.H) {
             handleTimelineClick();
         } else if (frameClickX_ < m.W && (frameClickX_ < m.X0 || frameClickY_ < m.Y0)) {
             handleRulerPress();
+        } else if (frameClickX_ >= m.W && frameClickX_ < panelX()) {
+            handleDockClick();
         } else if (frameClickX_ < m.W) {
             // Рисовать по бегущим кадрам нельзя: щелчок по холсту
             // останавливает проигрывание.
@@ -301,6 +345,7 @@ void Editor::appStep() {
         } else {
             handlePanelClick();
         }
+        setPage(false);
     }
 
     // Координаты курсора обновляются точечно, без полной перерисовки окна.
@@ -317,8 +362,33 @@ void Editor::appStep() {
             ghostShown_ = brushGhostShown();
             cellFrameWas_ = frame;
             drawInfoSection();
+            drawStatusBar();
             // Метка курсора на линейках идёт за мышью.
             drawRulers();
+            redraw();
+        }
+    }
+    // Название меню под курсором подсвечено: строка меню отвечает на
+    // наведение, как кнопки.
+    if (gLayout.top > 0 && !m.needRepaint) {
+        const int hover = menuSlotAt(mouseX(), mouseY());
+        if (hover != menuHover_) {
+            menuHover_ = hover;
+            drawMenuBar();
+            redraw();
+        }
+        // Кнопка панели параметров под курсором — тоже.
+        int opt = -1;
+        if (mouseY() >= MENU_BAR_H && mouseY() < gLayout.top && mouseX() < panelX()) {
+            const std::vector<BarItem> items = optionsItems();
+            for (std::size_t i = 0; i < items.size(); ++i) {
+                if (items[i].button && mouseX() >= items[i].x0 && mouseX() < items[i].x1)
+                    opt = static_cast<int>(i);
+            }
+        }
+        if (opt != optionsHover_) {
+            optionsHover_ = opt;
+            drawOptionsBar();
             redraw();
         }
     }

@@ -193,7 +193,7 @@ void Editor::showFiltersScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 6, WIN_W, 34, "Фильтры и эффекты", cText);
+        uiTitle(0, 6, WIN_W, 34, "Фильтры и эффекты");
         uiLabel(0, 32, WIN_W, 20,
                 "Не пиксель-арт: новые цвета, полупрозрачность и мягкие края. "
                 "В строгом индексном режиме итог сводится к палитре.",

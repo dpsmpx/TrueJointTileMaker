@@ -9,6 +9,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -44,6 +45,14 @@ private:
     gfx::Surface fb_;
     gfx::Font font_;
     gfx::Font mono_;
+    /// Шрифт по ролям (C1, ДС-4, UX-30): заголовок экрана и карточки —
+    /// полужирный 15 точек, заголовок главного меню — 18. У «Классики» —
+    /// один шрифт на всё, как у 1.6.
+    gfx::Font titleFont_;
+    gfx::Font headFont_;
+    void uiTitle(int x0, int y0, int x1, int y1, const std::string& s);
+    void uiTitle(int x0, int y0, int x1, int y1, const std::string& s, Color c);
+    void uiHeadline(int x0, int y0, int x1, int y1, const std::string& s);
     std::string configPath_;
     std::string baseDir_;
     bool quitNow_ = false;
@@ -102,12 +111,30 @@ private:
     std::vector<Grid<Color>> tsetBmp_;
     int tsetKind_ = TS_BASE;
     int tsetPage_ = 0;
+    /// Экран наборов в новых темах (C9, UX-21, UX-43): выбранный слот,
+    /// поиск по имени; запись — отдельной кнопкой.
+    int tsetSel_ = -1;
+    std::string tsetQuery_;
+    int tsetLastClick_ = -1;
+    int tsetLastMs_ = -100000;
+    /// Слоты, подходящие под поиск, по порядку набора.
+    [[nodiscard]] std::vector<int> tsetView() const;
+    /// Карточка «было — станет» перед записью текущего тайла в слот.
+    bool askWriteSlot(int slot);
 
     // --- утилиты (TJTM.pas: «Мелкие утилиты», «Ввод») ---
     void idle();
     /// screen = false — кадр главного окна: там Tab переключает режим, а
-    /// не фокус.
+    /// не фокус, и нет страницы по середине окна.
     void beginFrameInput(bool screen = true);
+    /// Экраны свёрстаны под окно 780×560: в большом окне они — страница по
+    /// середине, со своим началом координат и мыши (план «Интерфейс», C1).
+    int pageX_ = 0;
+    int pageY_ = 0;
+    bool screenFrame_ = false;
+    void setPage(bool screen);
+    /// Окно сменило размер: кадр и раскладка — под него.
+    void syncFrameSize();
     void dropInput();
 
     // --- фокус с клавиатуры (план «Интерфейс», B14, UX-19) ---
@@ -139,8 +166,9 @@ private:
     void waitMouseRelease();
     [[nodiscard]] bool isKeyPressed(int key) const { return pf_.keyHeld(key); }
     static bool isMiddle(int b) { return b != MB_LEFT && b != MB_RIGHT; }
-    int mouseX() { return pf_.input().mouseX; }
-    int mouseY() { return pf_.input().mouseY; }
+    // Мышь — в координатах кадра, а на экране — страницы (C1).
+    int mouseX() { return pf_.input().mouseX - pageX_; }
+    int mouseY() { return pf_.input().mouseY - pageY_; }
     bool mousePressed() { return pf_.input().mousePressed; }
     void redraw();
     /// Окно закрывают крестиком: оригинал выходил молча, перенос
@@ -215,6 +243,16 @@ private:
     [[nodiscard]] bool overCanvas(int x, int y) const {
         return x >= m.X0 && x < m.W && y >= m.Y0 && y < m.H;
     }
+    /// Ручки осей симметрии на холсте (C2, UX-40): у 1.6 ось двигали
+    /// только числом на экране параметров.
+    struct AxisHandles {
+        int vx = 0, vy = 0;  // вертикальной оси
+        int hx = 0, hy = 0;  // горизонтальной
+    };
+    [[nodiscard]] AxisHandles axisHandles() const;
+    /// 1 — ручка вертикальной оси, 2 — горизонтальной, 0 — ни одной.
+    [[nodiscard]] int axisHandleAt(int x, int y) const;
+    bool dragAxisHandle();
     void drawTilePixel(int x, int y);
     void drawPreviewPixel(int x, int y);
     void ensureTileBmp();
@@ -412,6 +450,74 @@ private:
     int edgeStartY_ = 0;
     bool edgeArmed_ = false;
 
+    // --- базовый и полный режимы (C4, dpsmpx/TrueJointTileMaker#14) ---
+    /// Базовый режим: на виду только повседневное. Прячет элементы, а не
+    /// возможности: клавиши скрытого работают (решение владельца).
+    [[nodiscard]] bool baseUi() const {
+        return !classicUi_ && theme::active.modern && cfg.uiMode == "базовый";
+    }
+    /// Клетки замечаний проверки локации (C10): рамками на карте, пока
+    /// её не правили (отметка — по размерам истории).
+    std::vector<std::pair<int, int>> mapIssues_;
+    std::size_t mapIssuesStamp_ = 0;
+    [[nodiscard]] bool mapIssuesShown() const;
+    /// Инструмент спрятан в базовом режиме: узор у тайла, выделение у карты.
+    [[nodiscard]] bool toolHidden(int i) const {
+        return baseUi() && (m.docMode == DOC_TILE ? i == T_DITHER : i == M_SELECT);
+    }
+    /// Окно стало большим или маленьким: предложить другой режим, но не
+    /// переключать молча. 0 — ещё не предлагали.
+    int modeHint_ = 0;
+
+    // --- строка меню и строка состояния (bars.cpp, C2) ---
+    struct MenuSlot {
+        int menu, x0, x1;
+    };
+    /// Полосы над холстом и под ним — по теме: у «Классики» их нет.
+    void applyBars() const;
+    [[nodiscard]] bool menuShown(int i) const;
+    [[nodiscard]] std::vector<MenuSlot> menuSlots() const;
+    [[nodiscard]] int menuSlotAt(int x, int y) const;
+    void drawMenuBar(int open = -1);
+    [[nodiscard]] bool cmdChecked(Cmd c) const;
+    void handleMenuBarClick();
+    void openMenu(int menu);
+    std::string statusInfo();
+    void drawStatusBar();
+    int menuHover_ = -1;
+    /// Галочка включённого: в шрифте знака ✓ нет — рисуется линиями.
+    void drawCheck(int x, int y, Color c);
+
+    // Панель параметров инструмента (C2, UX-08, UX-18): всё, что у 1.6
+    // открывалось правой кнопкой по инструменту, и режимы — с видимым
+    // состоянием. Раскладка — списком элементов: по нему и рисуется, и
+    // разбирается щелчок, и находятся подсказки.
+    struct BarItem {
+        int x0 = 0, x1 = 0;
+        std::string text;
+        std::string tip;
+        bool on = false;
+        bool button = true;  // false — подпись
+        std::function<void()> act;
+    };
+    std::vector<BarItem> optionsItems();
+    void drawOptionsBar();
+    void handleOptionsBarClick();
+    int optionsHover_ = -1;
+
+    // --- боковая панель (dock.cpp, C3) ---
+    struct DockLayout {
+        int x0 = 0, x1 = 0;
+        int layersHead = 0, layersY0 = 0, layersY1 = 0;
+        int historyHead = 0, historyY0 = 0, historyY1 = 0;
+    };
+    void applyDock();
+    [[nodiscard]] DockLayout dockLayout() const;
+    void drawDock();
+    void handleDockClick();
+    bool dockLayersOpen_ = true;
+    bool dockHistoryOpen_ = true;
+
     // --- клавиатура (keys.cpp): таблица сочетаний, шпаргалка ---
     void handleEditorKey(int key);
     /// Разбор клавиш 1.6 для «Классики»: Ctrl с буквой — та же буква, если
@@ -421,6 +527,11 @@ private:
     void runCommand(Cmd c, int arg = 0);
     /// Шпаргалка клавиш поверх холста (F1, ?), из той же таблицы.
     void showCheatsheet();
+    /// Поиск команды по названию (C6, UX-05): пункты строки меню — и
+    /// спрятанные базовым режимом — с клавишами; Enter выполняет.
+    void showCommandSearch();
+    /// Команда, выбранная в поиске: её выполнит следующий шаг главного цикла.
+    std::optional<std::pair<Cmd, int>> pendingCmd_;
     /// Стрелки двигают выделенное: инструмент выделения и есть что двигать
     /// (правило владельца, #16). Иначе стрелки двигают холст.
     bool arrowsMoveSelection() const;
@@ -449,6 +560,14 @@ private:
     void showToolOptions();
     void showImageScreen();
     void showRotateDialog();
+    /// Диалог панелью у правого края холста, итог — на самом холсте (C5).
+    /// controls рисует параметры и говорит, сменились ли они; apply
+    /// применяет операцию (она сама кладёт шаг истории). true — применено.
+    bool previewPanel(const std::string& title, int height,
+                      const std::function<bool(int x, int y)>& controls,
+                      const std::function<bool()>& apply, const std::string& okText);
+    bool rotatePreviewPanel();
+    bool outlinePreviewPanel();
     void showOutlineDialog();
     /// Два числа со ступенями ±1 и ±8; anchor — сетка якоря 3x3 (номер
     /// ay * 3 + ax) или nullptr.
@@ -617,6 +736,8 @@ private:
     std::vector<int> timelineRows() const;
     void drawLayerKindMark(int x, int cy, const Layer& layer);
     void handleTimelineClick();
+    /// Протяжка ячейки или номера кадра по ленте — порядок кадров (C3).
+    void dragFrame();
     void timelineWheel(int wheel);
     void togglePlayback();
     void stopPlayback();
@@ -641,6 +762,21 @@ private:
     std::string askExportFile(const std::string& title, const std::string& suggested,
                               const std::string& ext, const std::string& filterName);
     void exportSheetAsk();
+    /// Задание выгрузки (C8, UX-50): что, какие кадры, увеличение и куда.
+    /// Запоминается в метаданных проекта — «Экспортировать снова» повторяет
+    /// его без вопросов.
+    struct ExportJob {
+        std::string kind;  // png, sheet, gif, apng, frames
+        int first = 1, last = 1, scale = 1, plays = 0;
+        std::string path;
+    };
+    void runExport(const ExportJob& job);
+    void rememberExport(const ExportJob& job);
+    [[nodiscard]] std::optional<ExportJob> lastExport() const;
+    void exportPngAsk();
+    void exportAgain();
+    /// Окно «Экспорт»: все виды выгрузки в одном месте.
+    void showExportCard();
     void exportAnimationAsk(bool gif);
     void exportFramesAsk();
     /// Первый кадр сведённым PNG — в слот набора тайлов из метаданных.

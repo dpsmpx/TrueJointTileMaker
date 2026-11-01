@@ -27,12 +27,47 @@ void Editor::idle() {
 /// Снимок щелчка на кадр. Весь кадр — и отрисовка, и попадания — работает
 /// с ним, а живой признак снова копит приходящее. Щелчок посреди кадра
 /// поэтому не пропадает: он достаётся следующему.
+void Editor::syncFrameSize() {
+    int w = 0;
+    int h = 0;
+    const bool changed = pf_.takeFrameSize(w, h);
+    if (!changed && fb_.width() == w && fb_.height() == h) return;
+    gLayout.w = w;
+    gLayout.h = h;
+    fb_.resize(w, h, cWindow);
+    m.overDirty = true;
+    m.needRepaint = true;
+    // Режим к размеру окна — предложением, а не молча (#14): большое окно
+    // и базовый режим, маленькое и полный.
+    if (!classicUi_ && active.modern && !pf_.scripted()) {
+        const bool big = w >= 1100 && h >= 700;
+        const bool small = w <= WIN_W + 40 && h <= WIN_H + 40;
+        const bool base = cfg.uiMode == "базовый";
+        if (big && base && modeHint_ != 1) {
+            modeHint_ = 1;
+            notify("Окно большое", "Полный режим покажет все возможности — Shift+Tab.");
+        } else if (small && !base && modeHint_ != 2) {
+            modeHint_ = 2;
+            notify("Окно маленькое", "Базовый режим оставит только повседневное — Shift+Tab.");
+        }
+    }
+}
+
+void Editor::setPage(bool screen) {
+    screenFrame_ = screen;
+    pageX_ = screen ? std::max(0, (gLayout.w - WIN_W) / 2) : 0;
+    pageY_ = screen ? std::max(0, (gLayout.h - WIN_H) / 2) : 0;
+    fb_.setOrigin(pageX_, pageY_);
+}
+
 void Editor::beginFrameInput(bool screen) {
     pf_.pump();
+    syncFrameSize();
+    setPage(screen);
     Input& in = pf_.input();
     frameClick_ = in.clickPending;
-    frameClickX_ = in.clickX;
-    frameClickY_ = in.clickY;
+    frameClickX_ = in.clickX - pageX_;
+    frameClickY_ = in.clickY - pageY_;
     frameClickButton_ = in.clickButton;
     in.clickPending = false;
     tipEvaluate();
@@ -599,6 +634,26 @@ void Editor::uiLabel(int x, int y, int bw, int bh, const std::string& caption, C
 /// подписями настроек от этого стояли светлые плашки. Здесь — без них.
 void Editor::uiLabelLeft(int x, int y, int bh, const std::string& caption, Color c) {
     textOut(x, y + (bh - textHeight()) / 2, caption, c);
+}
+
+void Editor::uiTitle(int x0, int y0, int x1, int y1, const std::string& s) {
+    uiTitle(x0, y0, x1, y1, s, cText);
+}
+
+void Editor::uiTitle(int x0, int y0, int x1, int y1, const std::string& s, Color c) {
+    if (!active.modern) {
+        textCentered(x0, y0, x1, y1, s, c);
+        return;
+    }
+    titleFont_.drawCentered(fb_, x0, y0, x1, y1, s, c);
+}
+
+void Editor::uiHeadline(int x0, int y0, int x1, int y1, const std::string& s) {
+    if (!active.modern) {
+        textCentered(x0, y0, x1, y1, s, cText);
+        return;
+    }
+    headFont_.drawCentered(fb_, x0, y0, x1, y1, s, cText);
 }
 
 void Editor::textCentered(int x0, int y0, int x1, int y1, const std::string& s, Color c) {

@@ -70,8 +70,9 @@ std::string Editor::toolLabel(int i) const {
 }
 
 void Editor::drawToolsSection() {
-    fb_.fillRect(PANEL_X, 0, PANEL_X + PANEL_W, TOOLS_Y1 + 2, cPanel);
+    fb_.fillRect(panelX(), 0, panelX() + PANEL_W, TOOLS_Y1 + 2, cPanel);
     for (int i = 0; i < m.toolCount(); ++i) {
+        if (toolHidden(i)) continue;
         const int x0 = Model::toolCellX(i);
         const int y0 = Model::toolCellY(i);
         const bool over = mouseX() >= x0 && mouseX() < x0 + TOOL_CW - 2 && mouseY() >= y0 &&
@@ -113,12 +114,38 @@ void Editor::drawToolsSection() {
             textCentered(x0, y0, x0 + TOOL_CW - 2, y0 + TOOL_CH - 2, toolLabel(i),
                          m.curTool() == i ? sel : cText);
         }
+        // У инструментов карты — образец того, что они кладут (C7, UX-31):
+        // четыре значка карты — почти одинаковые сетки, а образец местности
+        // или знак вида объекта их различает.
+        if (active.modern && m.docMode == DOC_MAP) {
+            const int sx = x0 + 3;
+            const int sy = y0 + TOOL_CH - 14;
+            if (i == M_PAINT || i == M_FILL || i == M_RECT) {
+                fb_.fillRect(sx, sy, sx + 10, sy + 10, mapTileColor(m.mapBrush));
+                fb_.frameRect(sx - 1, sy - 1, sx + 11, sy + 11, cBorder);
+            } else if (i == M_OBJ) {
+                fb_.fillRect(sx, sy, sx + 10, sy + 10, active.mapLabelBack);
+                textCentered(sx, sy - 2, sx + 10, sy + 11, mapObjGlyph(mapKindName(m.mapObjKind)),
+                             active.mapLabelText);
+            }
+        }
+        // Уголок — у инструмента есть параметры, правой кнопкой (UX-08): у
+        // 1.6 об этом намёка не было нигде.
+        const bool params = m.docMode == DOC_TILE ? (i == T_PEN || i == T_FILL || i == T_LINE ||
+                                                     i == T_RECT || i == T_ELLIPSE)
+                                                  : (i == M_PAINT || i == M_FILL || i == M_RECT);
+        if (active.modern && params) {
+            const int cx = x0 + TOOL_CW - 5;
+            const int cy = y0 + TOOL_CH - 5;
+            for (int k = 0; k < 5; ++k)
+                fb_.fillRect(cx - k, cy - 4 + k, cx + 1, cy - 3 + k, cTextDim);
+        }
     }
     drawToolChips();
 }
 
 void Editor::drawPaletteSection() {
-    fb_.fillRect(PANEL_X, SLOT1_Y0 - 2, PANEL_X + PANEL_W, SLOT1_Y1 + 2, cPanel);
+    fb_.fillRect(panelX(), SLOT1_Y0 - 2, panelX() + PANEL_W, SLOT1_Y1 + 2, cPanel);
     // Палитра любой длины: на панели окно 8x8 с прокруткой колесом.
     // Пустые клетки за концом палитры — фон панели: щелчок по ним добавляет
     // первый цвет.
@@ -148,7 +175,7 @@ void Editor::drawPaletteSection() {
     if (m.palMaxScroll() > 0) {
         // Полоса прокрутки справа от палитры: где окно и сколько всего.
         const int total = (m.palCount() + PAL_COLS - 1) / PAL_COLS;
-        const int x0 = PAL_X0 + PAL_COLS * PAL_CELL + 3;
+        const int x0 = palX0() + PAL_COLS * PAL_CELL + 3;
         const int h = PAL_ROWS * PAL_CELL;
         fb_.fillRect(x0, PAL_Y0, x0 + 3, PAL_Y0 + h, cLine);
         const int t0 = PAL_Y0 + h * m.palScroll / total;
@@ -158,7 +185,7 @@ void Editor::drawPaletteSection() {
     // Рамка цветом выделения: индексный режим включён, и правка ячейки
     // перекрасит тайл — об этом надо знать заранее.
     const Color edge = (m.indexedOn && m.docMode == DOC_TILE) ? cAccent : cBorder;
-    fb_.frameRect(PAL_X0 - 1, PAL_Y0 - 1, PAL_X0 + PAL_COLS * PAL_CELL + 1,
+    fb_.frameRect(palX0() - 1, PAL_Y0 - 1, palX0() + PAL_COLS * PAL_CELL + 1,
                   PAL_Y0 + PAL_ROWS * PAL_CELL + 1, edge);
     // Ячейка, из которой взят первый цвет: она поедет за кистью при правке.
     const int fRow = m.firstIdx / PAL_COLS - m.palScroll;
@@ -172,34 +199,34 @@ void Editor::drawPaletteSection() {
 }
 
 void Editor::drawColorSection() {
-    fb_.fillRect(PANEL_X, SLOT2_Y0 - 2, PANEL_X + PANEL_W, ALPHA_Y1 + 2, cPanel);
+    fb_.fillRect(panelX(), SLOT2_Y0 - 2, panelX() + PANEL_W, ALPHA_Y1 + 2, cPanel);
     ensureHSVBitmap();
-    fb_.drawImage(bmpHSV_, HSV_X0, HSV_Y0);
-    fb_.drawImage(bmpHue_, HSV_X0, HUE_Y0);
-    fb_.drawImage(bmpAlpha_, HSV_X0, ALPHA_Y0);
+    fb_.drawImage(bmpHSV_, hsvX0(), HSV_Y0);
+    fb_.drawImage(bmpHue_, hsvX0(), HUE_Y0);
+    fb_.drawImage(bmpAlpha_, hsvX0(), ALPHA_Y0);
 
-    int mx = HSV_X0 + percentToAxis(m.sat, BAR_SIZE);
+    int mx = hsvX0() + percentToAxis(m.sat, BAR_SIZE);
     const int my = HSV_Y0 + valueToAxis(m.val, BAR_SIZE);
     fb_.fillRect(mx - 1, HSV_Y0, mx + 1, HSV_Y1, active.barMarker);
-    fb_.fillRect(HSV_X0, my - 1, HSV_X0 + BAR_SIZE, my + 1, active.barMarker);
+    fb_.fillRect(hsvX0(), my - 1, hsvX0() + BAR_SIZE, my + 1, active.barMarker);
 
-    mx = HSV_X0 + hueToAxis(m.hue, BAR_SIZE);
+    mx = hsvX0() + hueToAxis(m.hue, BAR_SIZE);
     fb_.fillRect(mx - 1, HUE_Y0, mx + 1, HUE_Y1, active.barMarker);
 
-    mx = HSV_X0 + byteToAxis(m.firstColor.a, BAR_SIZE);
+    mx = hsvX0() + byteToAxis(m.firstColor.a, BAR_SIZE);
     fb_.fillRect(mx - 1, ALPHA_Y0, mx + 1, ALPHA_Y1, active.alphaMarker);
 
     // Оба рабочих цвета: первым рисуют, второй участвует в дизеринге и обмене.
-    fb_.fillRect(PANEL_X + 4, SLOT2_Y0, PANEL_X + 34, SLOT2_Y0 + 30,
+    fb_.fillRect(panelX() + 4, SLOT2_Y0, panelX() + 34, SLOT2_Y0 + 30,
                  blendOver(m.firstColor, cCheckA));
-    fb_.frameRect(PANEL_X + 4, SLOT2_Y0, PANEL_X + 34, SLOT2_Y0 + 30, cBorder);
-    fb_.fillRect(PANEL_X + 4, SLOT2_Y0 + 34, PANEL_X + 34, SLOT2_Y0 + 64,
+    fb_.frameRect(panelX() + 4, SLOT2_Y0, panelX() + 34, SLOT2_Y0 + 30, cBorder);
+    fb_.fillRect(panelX() + 4, SLOT2_Y0 + 34, panelX() + 34, SLOT2_Y0 + 64,
                  blendOver(m.secondColor, cCheckA));
-    fb_.frameRect(PANEL_X + 4, SLOT2_Y0 + 34, PANEL_X + 34, SLOT2_Y0 + 64, cBorder);
+    fb_.frameRect(panelX() + 4, SLOT2_Y0 + 34, panelX() + 34, SLOT2_Y0 + 64, cBorder);
 }
 
 void Editor::drawTerrainSection() {
-    fb_.fillRect(PANEL_X, SLOT1_Y0 - 2, PANEL_X + PANEL_W, SLOT1_Y1 + 2, cPanel);
+    fb_.fillRect(panelX(), SLOT1_Y0 - 2, panelX() + PANEL_W, SLOT1_Y1 + 2, cPanel);
     for (int i = 0; i < MT_COUNT; ++i) {
         const int x0 = Model::mselX(i);
         const int y0 = Model::terrCellY(i);
@@ -218,15 +245,18 @@ void Editor::drawTerrainSection() {
 }
 
 void Editor::drawObjectKindSection() {
-    fb_.fillRect(PANEL_X, SLOT2_Y0 - 2, PANEL_X + PANEL_W, ALPHA_Y1 + 2, cPanel);
+    fb_.fillRect(panelX(), SLOT2_Y0 - 2, panelX() + PANEL_W, ALPHA_Y1 + 2, cPanel);
     for (int i = 0; i < mapKindCount(); ++i) {
         const int x0 = Model::mselX(i);
         const int y0 = Model::objCellY(i);
         fb_.fillRoundRect(x0, y0, x0 + MSEL_CW - 2, y0 + MOBJ_CH - 2, 4, 4, cBorder);
         fb_.fillRoundRect(x0 + 1, y0 + 1, x0 + MSEL_CW - 3, y0 + MOBJ_CH - 3, 4, 4,
                           m.mapObjKind == i ? cAccent : cBack);
-        textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MOBJ_CH - 2,
-                     mapObjGlyph(mapKindName(i)) + " " + mapKindName(i),
+        // Виды по-русски (UX-42), код игры — в подсказке.
+        const std::string label = active.modern
+                                      ? mapKindTitle(mapKindName(i))
+                                      : mapObjGlyph(mapKindName(i)) + " " + mapKindName(i);
+        textCentered(x0, y0, x0 + MSEL_CW - 2, y0 + MOBJ_CH - 2, label,
                      m.mapObjKind == i ? active.onAccent : cText);
     }
 }
@@ -248,7 +278,7 @@ void Editor::buildOverview() {
 }
 
 void Editor::drawOverviewSection() {
-    fb_.fillRect(PANEL_X, OVER_Y0 - 2, PANEL_X + PANEL_W, OVER_Y1 + 2, cPanel);
+    fb_.fillRect(panelX(), OVER_Y0 - 2, panelX() + PANEL_W, OVER_Y1 + 2, cPanel);
     buildOverview();
     const int ox = m.overOriginX();
     const int oy = m.overOriginY();
@@ -282,18 +312,18 @@ void Editor::drawGridThumb(const Grid<Color>& g, int x0, int y0, int size) {
 void Editor::drawInfoSection() {
     // Фон — между разделителями, не задевая их: в оригинале заливка от
     // INFO_Y0 - 2 до INFO_Y1 + 2 стирала оба, верхний не был виден вовсе.
-    fb_.fillRect(PANEL_X, INFO_Y0 - 1, PANEL_X + PANEL_W, INFO_Y1 + 1, cPanel);
+    fb_.fillRect(panelX(), INFO_Y0 - 1, panelX() + PANEL_W, INFO_Y1 + 1, cPanel);
     if (m.docMode == DOC_TILE) {
-        fb_.fillRect(PANEL_X + 2, INFO_Y0, PANEL_X + 42, INFO_Y0 + 40, cFace);
+        fb_.fillRect(panelX() + 2, INFO_Y0, panelX() + 42, INFO_Y0 + 40, cFace);
         // У тайлкарты здесь — тайл кисти, у прочих — буфер выделения.
         const Tileset* ts = m.activeTileset();
         if (ts != nullptr && m.tileBrush > 0 && m.tileBrush < static_cast<int>(ts->tiles.size())) {
-            drawGridThumb(ts->tiles[static_cast<std::size_t>(m.tileBrush)], PANEL_X + 2, INFO_Y0,
+            drawGridThumb(ts->tiles[static_cast<std::size_t>(m.tileBrush)], panelX() + 2, INFO_Y0,
                           40);
         } else {
-            drawGridThumb(m.buffer, PANEL_X + 2, INFO_Y0, 40);
+            drawGridThumb(m.buffer, panelX() + 2, INFO_Y0, 40);
         }
-        fb_.frameRect(PANEL_X + 2, INFO_Y0, PANEL_X + 42, INFO_Y0 + 40, cBorder);
+        fb_.frameRect(panelX() + 2, INFO_Y0, panelX() + 42, INFO_Y0 + 40, cBorder);
     }
     const int tx = m.screenToTileX(mouseX());
     const int ty = m.screenToTileY(mouseY());
@@ -325,29 +355,29 @@ void Editor::drawInfoSection() {
     // У карты нет миниатюры буфера: сведения — во всю ширину, иначе
     // строка размера рвалась на три (UX-32).
     if (m.docMode == DOC_MAP) {
-        uiLabel(PANEL_X + 2, INFO_Y0, PANEL_W - 4, INFO_Y1 - INFO_Y0, s, cText);
+        uiLabel(panelX() + 2, INFO_Y0, PANEL_W - 4, INFO_Y1 - INFO_Y0, s, cText);
     } else {
-        uiLabel(PANEL_X + 46, INFO_Y0, PANEL_W - 48, INFO_Y1 - INFO_Y0, s, cText);
+        uiLabel(panelX() + 46, INFO_Y0, PANEL_W - 48, INFO_Y1 - INFO_Y0, s, cText);
     }
 }
 
 void Editor::drawMenuButtonSection() {
-    fb_.fillRect(PANEL_X, MENU_Y0 - 2, PANEL_X + PANEL_W, WIN_H, cPanel);
+    fb_.fillRect(panelX(), MENU_Y0 - 2, panelX() + PANEL_W, gLayout.h, cPanel);
     std::string caption = m.docMode == DOC_MAP ? "Меню — карта" : "Меню — тайл";
     if (m.isModified()) caption += " *";
-    uiButton(PANEL_X + 4, MENU_Y0, PANEL_W - 8, MENU_Y1 - MENU_Y0, caption, true);
+    uiButton(panelX() + 4, MENU_Y0, PANEL_W - 8, MENU_Y1 - MENU_Y0, caption, true);
 }
 
 /// Тонкая линия во всю ширину панели: инструменты, цвет, обзор и сведения
 /// иначе шли встык, и панель читалась одним столбцом.
 void Editor::panelDivider(int y) {
-    fb_.fillRect(PANEL_X + 6, y, PANEL_X + PANEL_W - 6, y + 1, cLine);
+    fb_.fillRect(panelX() + 6, y, panelX() + PANEL_W - 6, y + 1, cLine);
 }
 
 void Editor::drawPanel() {
-    fb_.fillRect(PANEL_X, 0, PANEL_X + PANEL_W, WIN_H, cPanel);
+    fb_.fillRect(panelX(), 0, panelX() + PANEL_W, gLayout.h, cPanel);
     // Граница панели: на светлой теме разница тонов мала, и край терялся.
-    fb_.fillRect(PANEL_X, 0, PANEL_X + 1, WIN_H, cBorder);
+    fb_.fillRect(panelX(), 0, panelX() + 1, gLayout.h, cBorder);
     drawToolsSection();
     panelDivider(TOOLS_Y1 + 2);
     if (m.docMode == DOC_MAP) {
@@ -374,6 +404,10 @@ void Editor::repaint() {
     drawCanvas();
     drawTimeline();
     drawPanel();
+    drawDock();
+    drawMenuBar();
+    drawOptionsBar();
+    drawStatusBar();
     redraw();
     m.needRepaint = false;
 }

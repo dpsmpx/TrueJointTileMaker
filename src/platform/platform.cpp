@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include <atomic>
+#include <cmath>
 #include <cstdlib>
 #include <mutex>
 
@@ -74,6 +75,8 @@ bool Platform::init(const std::string& title, int w, int h, std::string& error) 
     }
     w_ = w;
     h_ = h;
+    frameW_ = w;
+    frameH_ = h;
     window_ = SDL_CreateWindow(title.c_str(), w, h, 0);
     if (window_ == nullptr) {
         error = SDL_GetError();
@@ -98,6 +101,8 @@ bool Platform::init(const std::string& title, int w, int h, std::string& error) 
         error = SDL_GetError();
         return false;
     }
+    texW_ = w;
+    texH_ = h;
     SDL_SetTextureScaleMode(texture_, SDL_SCALEMODE_NEAREST);
     float mx = 0;
     float my = 0;
@@ -142,11 +147,136 @@ void Platform::setTitle(const std::string& title) {
     if (window_ != nullptr) SDL_SetWindowTitle(window_, title.c_str());
 }
 
+namespace {
+
+/// Точки кадра — в единицы окна: масштаб интерфейса и плотность экрана.
+int toWindow(int v, int scale, float density) {
+    return static_cast<int>(static_cast<double>(v) * scale / 100.0 / density);
+}
+
+}  // namespace
+
+void Platform::setResizable(int minW, int minH) {
+    if (window_ == nullptr) return;
+    resizable_ = true;
+    minW_ = minW;
+    minH_ = minH;
+    SDL_SetWindowResizable(window_, true);
+    updateFrame();
+}
+
+void Platform::setUiScale(int pct) {
+    scalePref_ = pct;
+    updateFrame();
+}
+
+void Platform::updateFrame() {
+    if (window_ == nullptr) return;
+    if (scalePref_ > 0) {
+        scale_ = scalePref_;
+    } else {
+        // По экрану: ближайшая из ступеней — у дробного масштаба значки и
+        // текст размываются, ступеней поэтому немного.
+        const float ds = SDL_GetWindowDisplayScale(window_);
+        const int want = ds > 0 ? static_cast<int>(std::lround(ds * 100.0F)) : 100;
+        scale_ = 100;
+        for (const int s : {125, 150, 200}) {
+            if (std::abs(want - s) < std::abs(want - scale_)) scale_ = s;
+        }
+    }
+    int pw = w_;
+    int ph = h_;
+    if (resizable_) SDL_GetWindowSizeInPixels(window_, &pw, &ph);
+    const int fw = resizable_ ? std::max(minW_, pw * 100 / scale_) : w_;
+    const int fh = resizable_ ? std::max(minH_, ph * 100 / scale_) : h_;
+    if (resizable_) {
+        const float density = std::max(0.01F, SDL_GetWindowPixelDensity(window_));
+        SDL_SetWindowMinimumSize(window_, toWindow(minW_, scale_, density),
+                                 toWindow(minH_, scale_, density));
+    }
+    if (fw != frameW_ || fh != frameH_) {
+        frameW_ = fw;
+        frameH_ = fh;
+        frameChanged_ = true;
+    }
+}
+
+bool Platform::takeFrameSize(int& w, int& h) {
+    w = frameW_;
+    h = frameH_;
+    const bool changed = frameChanged_;
+    frameChanged_ = false;
+    return changed;
+}
+
+void Platform::setWindowSize(int w, int h) {
+    if (window_ == nullptr || !resizable_) return;
+    const float density = std::max(0.01F, SDL_GetWindowPixelDensity(window_));
+    SDL_SetWindowSize(window_, toWindow(w, scale_, density), toWindow(h, scale_, density));
+    SDL_SyncWindow(window_);
+    updateFrame();
+}
+
+void Platform::fitToDisplay() {
+    if (window_ == nullptr || !resizable_) return;
+    SDL_Rect r{};
+    if (!SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(window_), &r) || r.w <= 0) return;
+    // Девять десятых рабочей области: окно видно целиком, и рядом остаётся
+    // место для папки с картинками.
+    SDL_SetWindowSize(window_, r.w * 9 / 10, r.h * 9 / 10);
+    SDL_SetWindowPosition(window_, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    SDL_SyncWindow(window_);
+    updateFrame();
+}
+
+void Platform::setMaximized(bool on) {
+    if (window_ == nullptr || !resizable_) return;
+    if (on) {
+        SDL_MaximizeWindow(window_);
+    } else {
+        SDL_RestoreWindow(window_);
+    }
+    SDL_SyncWindow(window_);
+    updateFrame();
+}
+
+bool Platform::maximized() const {
+    return window_ != nullptr && (SDL_GetWindowFlags(window_) & SDL_WINDOW_MAXIMIZED) != 0;
+}
+
+void Platform::setFullscreen(bool on) {
+    if (window_ == nullptr || !resizable_) return;
+    SDL_SetWindowFullscreen(window_, on);
+    SDL_SyncWindow(window_);
+    updateFrame();
+}
+
+bool Platform::fullscreen() const {
+    return window_ != nullptr && (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
 void Platform::present(const gfx::Surface& frame) {
     // Снимок сценария — то, что показано, а не кадр, который, может быть,
     // как раз перерисовывается.
     if (scripted_) shown_ = frame;
     if (renderer_ == nullptr || texture_ == nullptr) return;
+    if (frame.width() != texW_ || frame.height() != texH_) {
+        // Окно растянули: кадр другого размера — и текстура под него.
+        SDL_Texture* t =
+            SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                              frame.width(), frame.height());
+        if (t == nullptr) return;
+        SDL_DestroyTexture(texture_);
+        texture_ = t;
+        texW_ = frame.width();
+        texH_ = frame.height();
+        SDL_SetRenderLogicalPresentation(renderer_, texW_, texH_,
+                                         SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    }
+    // Целый масштаб — ближайший сосед, без мыла; дробный — сглаженно,
+    // иначе соседние точки выходят разной ширины.
+    SDL_SetTextureScaleMode(texture_,
+                            scale_ % 100 == 0 ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR);
     SDL_UpdateTexture(texture_, nullptr, frame.data(), frame.width() * 4);
     SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
     SDL_RenderClear(renderer_);
@@ -235,6 +365,12 @@ void Platform::handle(const SDL_Event& e0, bool convert) {
             // осталась бы «нажатыми» навсегда.
             in_.keyHeld.fill(false);
             break;
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+        case SDL_EVENT_WINDOW_MAXIMIZED:
+        case SDL_EVENT_WINDOW_RESTORED:
+        case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+        case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN: updateFrame(); break;
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED: in_.quitRequested = true; break;
         default: break;
@@ -314,6 +450,7 @@ void Platform::scriptStep() {
                 e.type = SDL_EVENT_DROP_FILE;
                 e.drop.data = se.text.c_str();
                 break;
+            case ScriptEvent::WINDOW: setWindowSize(se.winW, se.winH); continue;
         }
         handle(e, false);
     }

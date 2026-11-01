@@ -1,6 +1,7 @@
 #include "core/model.h"
 
 #include <algorithm>
+#include <ranges>
 
 #include "core/fsutil.h"
 #include "core/imageops.h"
@@ -234,7 +235,8 @@ bool Model::inDoc(int x, int y) const {
 }
 
 int Model::gridGap() const {
-    return (gridOn && pixelSize >= 4) ? 1 : 0;
+    const bool on = gridOn || (gridAutoZoom > 0 && zoomOut == 1 && pixelSize >= gridAutoZoom);
+    return (on && pixelSize >= 4) ? 1 : 0;
 }
 
 void Model::clampView() {
@@ -428,6 +430,8 @@ void Model::clearTileHistory() {
 void Model::clearMapHistory() {
     mapUndo.clear();
     mapRedo.clear();
+    mapUndoLabels.clear();
+    mapRedoLabels.clear();
 }
 
 void Model::clearHistory() {
@@ -442,9 +446,13 @@ void Model::pushUndo() {
         // Снимок — вся карта, включая название: оригинал брал только сетку
         // и объекты, и отмена переименования ничего не возвращала.
         mapUndo.push_back(map);
-        while (mapUndo.size() > limit)
+        mapUndoLabels.push_back(actionName);
+        while (mapUndo.size() > limit) {
             mapUndo.erase(mapUndo.begin());
+            mapUndoLabels.erase(mapUndoLabels.begin());
+        }
         mapRedo.clear();
+        mapRedoLabels.clear();
     } else {
         if (tile.w < 1 || tile.h < 1) return;
         ensureTileIdx();
@@ -452,7 +460,7 @@ void Model::pushUndo() {
         // любую отменяемую правку тайла разом.
         tileBmpDirty = true;
         undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
-                                         activeFrame, tileShapes, tileMap});
+                                         activeFrame, tileShapes, tileMap, actionName});
         while (undoStack.size() > limit)
             undoStack.erase(undoStack.begin());
         redoStack.clear();
@@ -466,11 +474,16 @@ void Model::doUndo() {
         mapRedo.push_back(map);
         map = std::move(mapUndo.back());
         mapUndo.pop_back();
+        if (!mapUndoLabels.empty()) {
+            mapRedoLabels.push_back(mapUndoLabels.back());
+            mapUndoLabels.pop_back();
+        }
     } else {
         if (undoStack.empty()) return;
         ensureTileIdx();
+        // Отменённая правка уходит в повтор со своим названием.
         redoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
-                                         activeFrame, tileShapes, tileMap});
+                                         activeFrame, tileShapes, tileMap, undoStack.back().label});
         TileSnapshot s = std::move(undoStack.back());
         undoStack.pop_back();
         tile = std::move(s.tile);
@@ -497,11 +510,15 @@ void Model::doRedo() {
         mapUndo.push_back(map);
         map = std::move(mapRedo.back());
         mapRedo.pop_back();
+        if (!mapRedoLabels.empty()) {
+            mapUndoLabels.push_back(mapRedoLabels.back());
+            mapRedoLabels.pop_back();
+        }
     } else {
         if (redoStack.empty()) return;
         ensureTileIdx();
         undoStack.push_back(TileSnapshot{tile, tileIdx, palette, transparentIdx, doc, activeLayer,
-                                         activeFrame, tileShapes, tileMap});
+                                         activeFrame, tileShapes, tileMap, redoStack.back().label});
         TileSnapshot s = std::move(redoStack.back());
         redoStack.pop_back();
         tile = std::move(s.tile);
@@ -520,6 +537,32 @@ void Model::doRedo() {
     markModified();
     tileBmpDirty = true;
     needRepaint = true;
+}
+
+std::vector<std::string> Model::historyLabels(int& done) const {
+    std::vector<std::string> out;
+    if (docMode == DOC_MAP) {
+        out = mapUndoLabels;
+        done = static_cast<int>(out.size());
+        out.insert(out.end(), mapRedoLabels.rbegin(), mapRedoLabels.rend());
+        return out;
+    }
+    for (const TileSnapshot& s : undoStack)
+        out.push_back(s.label);
+    done = static_cast<int>(out.size());
+    for (const TileSnapshot& s : std::views::reverse(redoStack))
+        out.push_back(s.label);
+    return out;
+}
+
+void Model::historyGoTo(int done) {
+    int now = 0;
+    const int total = static_cast<int>(historyLabels(now).size());
+    done = clampI(done, 0, total);
+    for (; now > done; --now)
+        doUndo();
+    for (; now < done; ++now)
+        doRedo();
 }
 
 // --- документ ---------------------------------------------------------------
@@ -1230,7 +1273,7 @@ void Model::setTool(int i) {
 }
 
 int Model::toolCellX(int i) {
-    return PANEL_X + 2 + (i % TOOL_COLS) * TOOL_CW;
+    return panelX() + 2 + (i % TOOL_COLS) * TOOL_CW;
 }
 
 int Model::toolCellY(int i) {
@@ -1302,7 +1345,7 @@ int Model::overPixH() const {
 }
 
 int Model::overOriginX() const {
-    return PANEL_X + 2 + (OVER_W - overPixW()) / 2;
+    return panelX() + 2 + (OVER_W - overPixW()) / 2;
 }
 
 int Model::overOriginY() const {

@@ -121,7 +121,7 @@ void Editor::showColorPicker() {
         }
 
         dialogBack(backdrop, x0, y0, x0 + kW, y0 + kH);
-        textCentered(x0, y0 + 12, x0 + kW, y0 + 40, "Цвет", cText);
+        uiTitle(x0, y0 + 12, x0 + kW, y0 + 40, "Цвет");
 
         // Квадрат насыщенности и яркости — по тону, перерисовка при смене.
         if (planeHue != h) {

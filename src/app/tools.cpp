@@ -255,7 +255,15 @@ void Editor::dragObject(int idx) {
 void Editor::doObjectTool(int mx, int my) {
     const int idx = m.map.objectAt(mx, my);
     if (frameClickButton_ == MB_RIGHT) {
-        if (idx >= 0) {
+        if (idx >= 0 && !classicUi_) {
+            // Правая кнопка берёт вид объекта, как пипетка — местность
+            // (UX-44); удалить — Delete над объектом.
+            const std::string kind = m.map.objects[static_cast<std::size_t>(idx)].kind;
+            for (int k = 0; k < mapKindCount(); ++k) {
+                if (mapKindName(k) == kind) m.mapObjKind = k;
+            }
+            m.needRepaint = true;
+        } else if (idx >= 0) {
             m.pushUndo();
             m.map.deleteObject(idx);
             m.needRepaint = true;
@@ -414,6 +422,16 @@ void Editor::handleMapCanvas(int mx, int my) {
 }
 
 void Editor::handleCanvasClick() {
+    // Ручка оси симметрии (C2) — раньше инструмента: щелчок по ней не
+    // рисует.
+    if (dragAxisHandle()) return;
+    // Название шага истории (C3) — по инструменту.
+    {
+        const int tool = m.docMode == DOC_TILE ? m.toolTile : m.toolMap;
+        std::string name = splitLines(toolTip(tool)).front();
+        if (const std::size_t dot = name.find(" · "); dot != std::string::npos) name.resize(dot);
+        m.actionName = name;
+    }
     const int mx = m.screenToTileX(frameClickX_);
     const int my = m.screenToTileY(frameClickY_);
 
@@ -540,7 +558,7 @@ void Editor::handleCanvasClick() {
 
 void Editor::dragHSVSquare() {
     while (mousePressed() && !quitNow_) {
-        m.sat = axisToPercent(mouseX() - HSV_X0, BAR_SIZE);
+        m.sat = axisToPercent(mouseX() - hsvX0(), BAR_SIZE);
         m.val = axisToValue(mouseY() - HSV_Y0, BAR_SIZE);
         m.applyHSVToColor();
         repaintColorOnly();
@@ -551,7 +569,7 @@ void Editor::dragHSVSquare() {
 
 void Editor::dragHueBar() {
     while (mousePressed() && !quitNow_) {
-        m.hue = axisToHue(mouseX() - HSV_X0, BAR_SIZE);
+        m.hue = axisToHue(mouseX() - hsvX0(), BAR_SIZE);
         m.applyHSVToColor();
         repaintColorOnly();
         idle();
@@ -561,8 +579,8 @@ void Editor::dragHueBar() {
 
 void Editor::dragAlphaBar() {
     while (mousePressed() && !quitNow_) {
-        m.firstColor = argb(axisToByte(mouseX() - HSV_X0, BAR_SIZE), m.firstColor.r, m.firstColor.g,
-                            m.firstColor.b);
+        m.firstColor = argb(axisToByte(mouseX() - hsvX0(), BAR_SIZE), m.firstColor.r,
+                            m.firstColor.g, m.firstColor.b);
         repaintColorOnly();
         idle();
     }
@@ -641,7 +659,7 @@ void Editor::handlePanelClick() {
     const int py = frameClickY_;
     int idx = 0;
     if (py >= TOOLS_Y0 && py < TOOLS_Y1) {
-        if (m.toolHit(frameClickX_, frameClickY_, idx)) {
+        if (m.toolHit(frameClickX_, frameClickY_, idx) && !toolHidden(idx)) {
             m.setTool(idx);
             // Правая кнопка по инструменту тайла — его параметры; у линии и
             // фигур — параметры фигур (этап 6).
@@ -662,7 +680,7 @@ void Editor::handlePanelClick() {
                 }
             }
         } else if (m.docMode == DOC_TILE) {
-            const int chip = chipHit(frameClickX_, frameClickY_);
+            const int chip = baseUi() ? -1 : chipHit(frameClickX_, frameClickY_);
             if (chip >= 0) handleChipClick(chip);
         }
     } else if (py >= OVER_Y0 && py < OVER_Y1) {

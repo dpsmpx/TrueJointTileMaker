@@ -34,17 +34,44 @@ inline constexpr const char* kAppTitle = "True Joint Tile Maker";
 // RoadToProLevel поднимают младший номер; 1.0 — все четыре этапа плана,
 // 1.1 и дальше — разделы плана сверх них, 1.7 и дальше — этапы плана
 // «Интерфейс» (docs/roadmap.md).
-inline constexpr const char* kAppVersion = "1.8.0";
+inline constexpr const char* kAppVersion = "1.9.0";
 
 // --- раскладка окна ---------------------------------------------------------
 
-/// Холст редактирования и панель справа от него.
+/// Холст редактирования и панель справа от него — окно оригинала. Под
+/// этот размер свёрстаны экраны: в большом окне они — страница по
+/// середине.
 inline constexpr int CANVAS_W = 600;
 inline constexpr int CANVAS_H = 560;
-inline constexpr int PANEL_X = CANVAS_W;
 inline constexpr int PANEL_W = 180;
 inline constexpr int WIN_W = CANVAS_W + PANEL_W;
 inline constexpr int WIN_H = CANVAS_H;
+
+/// Размер кадра главного окна (план «Интерфейс», C1): окно растягивается,
+/// панель прижата к правому краю, холст — всё, что слева от неё. У 1.6 и
+/// у «Классики» — 780×560. Одна на окно, поэтому общая.
+struct WindowLayout {
+    int w = WIN_W;
+    int h = WIN_H;
+    /// Полосы над холстом (строка меню, параметры инструмента) и под ним
+    /// (строка состояния) — в новых темах (C2); у «Классики» их нет.
+    int top = 0;
+    int bottom = 0;
+    /// Боковая панель между холстом и панелью инструментов (C3); 0 — нет.
+    int dock = 0;
+};
+inline WindowLayout gLayout;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+/// Левый край панели.
+inline int panelX() {
+    return gLayout.w - PANEL_W;
+}
+
+/// Строка меню над холстом и строка состояния под ним (план «Интерфейс»,
+/// C2) — в новых темах.
+inline constexpr int MENU_BAR_H = 26;
+inline constexpr int STATUS_BAR_H = 24;
+/// Панель параметров инструмента под строкой меню (C2, UX-08).
+inline constexpr int OPTIONS_BAR_H = 34;
 
 /// Ширина линеек слева и сверху холста (этап 5).
 inline constexpr int RULER_SIZE = 20;
@@ -88,8 +115,12 @@ inline constexpr int BAR_H = 12;
 inline constexpr int OVER_W = PANEL_W - 4;
 inline constexpr int OVER_H = OVER_Y1 - OVER_Y0;
 inline constexpr int PAL_CELL = 16;
-inline constexpr int PAL_X0 = PANEL_X + (PANEL_W - PAL_COLS * PAL_CELL) / 2;
-inline constexpr int HSV_X0 = PANEL_X + (PANEL_W - BAR_SIZE) / 2;
+inline int palX0() {
+    return panelX() + (PANEL_W - PAL_COLS * PAL_CELL) / 2;
+}
+inline int hsvX0() {
+    return panelX() + (PANEL_W - BAR_SIZE) / 2;
+}
 /// Виды местности и объектов раскладываются в две колонки.
 inline constexpr int MSEL_COLS = 2;
 inline constexpr int MSEL_CW = 88;
@@ -177,6 +208,8 @@ struct TileSnapshot {
     /// Активная ячейка векторного слоя и тайлкарты (этап 6).
     std::vector<VecShape> shapes;
     Grid<int> tileMap;
+    /// Что за правка шла после снимка — строка панели истории (C3, UX-25).
+    std::string label;
 };
 
 /// Какая команда идёт по всем ячейкам (forEachCel): цветовая меняет
@@ -285,6 +318,10 @@ public:
     /// Оси симметрии в половинах точки: зеркало x — это axis - 1 - x.
     /// -1 — середина документа, как в оригинале.
     int symAxisX2 = -1, symAxisY2 = -1;
+    /// Сетка точек сама с этого масштаба (C2, UX-40), как в Pixelorama:
+    /// на крупном масштабе она нужна почти всегда. 0 — только по G, как у
+    /// оригинала.
+    int gridAutoZoom = 0;
     /// Вид выделения и действие по умолчанию (img::SelOp).
     int selShape = SS_RECT;
     int selOp = 0;
@@ -406,6 +443,11 @@ public:
 
     std::vector<TileSnapshot> undoStack, redoStack;
     std::vector<MapDoc> mapUndo, mapRedo;
+    /// Названия шагов карты — рядом со снимками, в том же порядке.
+    std::vector<std::string> mapUndoLabels, mapRedoLabels;
+    /// Название следующей правки: его ставит тот, кто её начинает
+    /// (инструмент, команда), pushUndo кладёт его в снимок.
+    std::string actionName = "Правка";
 
     // --- этап 6: активная ячейка векторного слоя и тайлкарты ---
     /// Фигуры активной ячейки векторного слоя; tile — их растр.
@@ -518,6 +560,11 @@ public:
     void pushUndo();
     void doUndo();
     void doRedo();
+    /// Шаги для панели истории: сделанные — старшие первыми, затем
+    /// отменённые — ближайший к повтору первым; done — сколько сделано.
+    [[nodiscard]] std::vector<std::string> historyLabels(int& done) const;
+    /// Отменить или повторить до состояния после done шагов.
+    void historyGoTo(int done);
 
     // --- документ ---
     void setTile(Grid<Color> newTile, const std::string& fileName);
@@ -592,10 +639,10 @@ public:
     static int toolCellX(int i);
     static int toolCellY(int i);
     bool toolHit(int px, int py, int& idx) const;
-    static int palCellX(int j) { return PAL_X0 + j * PAL_CELL; }
+    static int palCellX(int j) { return palX0() + j * PAL_CELL; }
     static int palCellY(int i) { return PAL_Y0 + i * PAL_CELL; }
     static bool palHit(int px, int py, int& cj, int& ci);
-    static int mselX(int i) { return PANEL_X + 2 + (i % MSEL_COLS) * MSEL_CW; }
+    static int mselX(int i) { return panelX() + 2 + (i % MSEL_COLS) * MSEL_CW; }
     static int terrCellY(int i) { return SLOT1_Y0 + (i / MSEL_COLS) * MTERR_CH; }
     static int objCellY(int i) { return SLOT2_Y0 + (i / MSEL_COLS) * MOBJ_CH; }
     static bool terrHit(int px, int py, int& idx);

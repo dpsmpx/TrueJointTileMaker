@@ -329,6 +329,27 @@ bool mapSave(const std::string& fileName, const MapDoc& doc) {
     return writeFile(fileName, doc.serialize());
 }
 
+std::string mapKindTitle(const std::string& kind) {
+    if (kind == "npc") return "Житель";
+    if (kind == "item") return "Предмет";
+    if (kind == "exit") return "Переход";
+    if (kind == "spawn") return "Враг";
+    if (kind == "chest") return "Сундук";
+    if (kind == "note") return "Записка";
+    if (kind == "bed") return "Кровать";
+    if (kind == "sign") return "Табличка";
+    return {};
+}
+
+std::vector<std::pair<int, int>> MapDoc::problemCells() const {
+    std::vector<std::pair<int, int>> out;
+    for (const MapObject& o : objects) {
+        if (o.x >= 0 && o.y >= 0 && o.x < w && o.y < h && !mapTileWalkable(at(o.x, o.y)))
+            out.emplace_back(o.x, o.y);
+    }
+    return out;
+}
+
 std::vector<std::string> MapDoc::validate() const {
     std::vector<std::string> out;
     if (w < 1 || h < 1) {

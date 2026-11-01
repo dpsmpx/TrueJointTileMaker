@@ -38,11 +38,25 @@ public:
     [[nodiscard]] Color pixel(int x, int y) const;
     void setPixel(int x, int y, Color c);
 
+    /// Начало координат рисования (план «Интерфейс», C1): экраны, свёрстанные
+    /// под окно 780×560, рисуются страницей по середине большого окна, не
+    /// меняя ни одной своей координаты. Сдвигают только «листовые»
+    /// примитивы — точка, прямоугольник, ограничение; остальные зовут их.
+    void setOrigin(int x, int y) {
+        ox_ = x;
+        oy_ = y;
+    }
+    [[nodiscard]] int originX() const { return ox_; }
+    [[nodiscard]] int originY() const { return oy_; }
+
     /// Ограничение рисования прямоугольником; пустой — без ограничения.
     void setClip(Rect r);
     void resetClip();
     /// Текущее ограничение; пустое, если его нет.
-    [[nodiscard]] Rect clip() const { return clipOn_ ? clip_ : Rect{}; }
+    [[nodiscard]] Rect clip() const {
+        return clipOn_ ? Rect{clip_.x0 - ox_, clip_.y0 - oy_, clip_.x1 - ox_, clip_.y1 - oy_}
+                       : Rect{};
+    }
 
     /// Залить весь кадр (ClearWindow).
     void clear(Color c);
@@ -85,10 +99,17 @@ private:
     int w_ = 0;
     int h_ = 0;
     std::vector<std::uint32_t> px_;
-    Rect clip_{};
+    Rect clip_{};  // в точках кадра, без начала координат
     bool clipOn_ = false;
+    int ox_ = 0;
+    int oy_ = 0;
 
+    /// Где можно рисовать — в координатах вызывающего (с началом координат).
     [[nodiscard]] Rect bounds() const;
+    std::uint32_t& at(int x, int y) {
+        return px_[static_cast<std::size_t>(y + oy_) * static_cast<std::size_t>(w_) +
+                   static_cast<std::size_t>(x + ox_)];
+    }
 };
 
 }  // namespace tjtm::gfx

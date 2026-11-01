@@ -226,6 +226,19 @@ std::string findUiFont(const std::string& resourcesDir) {
     });
 }
 
+std::string findUiBoldFont(const std::string& resourcesDir) {
+    return firstExisting({
+#ifdef _WIN32
+        "C:/Windows/Fonts/arialbd.ttf",
+#endif
+        pathCombine(resourcesDir, "Fonts/LiberationSans-Bold.ttf"),
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/Library/Fonts/Arial Bold.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    });
+}
+
 std::string findMonoFont(const std::string& resourcesDir) {
     return firstExisting({
 #ifdef _WIN32

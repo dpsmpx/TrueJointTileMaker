@@ -190,7 +190,7 @@ TEST_P(AppScreens, MatchOriginal) {
 INSTANTIATE_TEST_SUITE_P(Screens, AppScreens,
                          ::testing::Values("tile", "map", "draw", "mapedit", "pro1", "pal2",
                                            "anim4", "prec5", "layers6", "game7", "fx8", "art9",
-                                           "map10", "uia", "uib"));
+                                           "map10", "uia", "uib", "uic"));
 
 /// Настройки выпуска (Config.txt в корне): при запуске — сразу редактор с
 /// последним файлом, без меню во всё окно (план «Интерфейс», A9).
@@ -210,10 +210,13 @@ TEST(AppScreens, ReleaseConfigOpensLastFile) {
     ASSERT_TRUE(tjtm::pngLoad((base / fs::path(u8"Картинки") / "debug.png").string(), img, err))
         << err;
     // Картинка вписана в холст: её середина — посреди холста. Меню на её
-    // месте рисовало бы кнопки.
-    const int ps = std::min(tjtm::CANVAS_W / img.w, tjtm::CANVAS_H / img.h);
+    // месте рисовало бы кнопки. Над холстом выпуска — строка меню и
+    // параметры инструмента, под ним — строка состояния (светлая тема, C2).
+    const int top = tjtm::MENU_BAR_H + tjtm::OPTIONS_BAR_H;
+    const int ch = tjtm::CANVAS_H - top - tjtm::STATUS_BAR_H;
+    const int ps = std::min(tjtm::CANVAS_W / img.w, ch / img.h);
     const int ox = (tjtm::CANVAS_W - img.w * ps) / 2;
-    const int oy = (tjtm::CANVAS_H - img.h * ps) / 2;
+    const int oy = top + (ch - img.h * ps) / 2;
     int same = 0;
     for (int y = 0; y < img.h; ++y) {
         for (int x = 0; x < img.w; ++x) {

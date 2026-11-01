@@ -202,7 +202,23 @@ void Editor::drawMapCells() {
             textCentered(sx, sy, sx + m.pixelSize, sy + m.pixelSize, mapObjGlyph(o.kind),
                          active.mapLabelText);
     }
+    // Замечания проверки — рамками на самой карте (UX-44), пока карту не
+    // правили.
+    if (mapIssuesShown()) {
+        for (const auto& [ix, iy] : mapIssues_) {
+            const int sx = m.tileToScreenX(ix);
+            const int sy = m.tileToScreenY(iy);
+            const int cp = m.cellPx();
+            fb_.frameRect(sx - 2, sy - 2, sx + cp + 2, sy + cp + 2, active.warn);
+            fb_.frameRect(sx - 1, sy - 1, sx + cp + 1, sy + cp + 1, active.warn);
+        }
+    }
     fb_.resetClip();
+}
+
+bool Editor::mapIssuesShown() const {
+    return !mapIssues_.empty() && m.docMode == DOC_MAP &&
+           m.mapUndo.size() + 100000 * m.mapRedo.size() == mapIssuesStamp_;
 }
 
 /// Рамка выделения «бегущими муравьями»: сплошная светлая линия и поверх
@@ -252,14 +268,37 @@ void Editor::drawCanvas() {
     // Оси симметрии видно на холсте, иначе легко забыть, что они включены.
     fb_.setClip(canvasRect());
     const Color axis = active.symAxis;
-    if (m.symX) {
-        // Ось может стоять не посередине: её место — в половинах точки.
-        const int cx = m.tileToScreenX(0) + m.scr2(m.axisX2());
-        fb_.fillRect(cx - 1, m.tileToScreenY(0), cx + 1, m.tileToScreenY(m.docH()), axis);
-    }
-    if (m.symY) {
-        const int cy = m.tileToScreenY(0) + m.scr2(m.axisY2());
-        fb_.fillRect(m.tileToScreenX(0), cy - 1, m.tileToScreenX(m.docW()), cy + 1, axis);
+    if (active.modern && !classicUi_) {
+        // Оси — двойной линией, светлой и тёмной, как «муравьи»: на сером
+        // поле и пёстром тайле полупрозрачная красная полоса терялась
+        // (UX-40). На краю документа — ручка: ось тянут мышью.
+        const AxisHandles h = axisHandles();
+        if (m.symX) {
+            fb_.fillRect(h.vx - 1, m.tileToScreenY(0), h.vx, m.tileToScreenY(m.docH()),
+                         active.antsDark);
+            fb_.fillRect(h.vx, m.tileToScreenY(0), h.vx + 1, m.tileToScreenY(m.docH()),
+                         active.antsLight);
+            fb_.fillRoundRect(h.vx - 6, h.vy - 6, h.vx + 6, h.vy + 6, 12, 12, active.antsDark);
+            fb_.fillRoundRect(h.vx - 4, h.vy - 4, h.vx + 4, h.vy + 4, 8, 8, active.antsLight);
+        }
+        if (m.symY) {
+            fb_.fillRect(m.tileToScreenX(0), h.hy - 1, m.tileToScreenX(m.docW()), h.hy,
+                         active.antsDark);
+            fb_.fillRect(m.tileToScreenX(0), h.hy, m.tileToScreenX(m.docW()), h.hy + 1,
+                         active.antsLight);
+            fb_.fillRoundRect(h.hx - 6, h.hy - 6, h.hx + 6, h.hy + 6, 12, 12, active.antsDark);
+            fb_.fillRoundRect(h.hx - 4, h.hy - 4, h.hx + 4, h.hy + 4, 8, 8, active.antsLight);
+        }
+    } else {
+        if (m.symX) {
+            // Ось может стоять не посередине: её место — в половинах точки.
+            const int cx = m.tileToScreenX(0) + m.scr2(m.axisX2());
+            fb_.fillRect(cx - 1, m.tileToScreenY(0), cx + 1, m.tileToScreenY(m.docH()), axis);
+        }
+        if (m.symY) {
+            const int cy = m.tileToScreenY(0) + m.scr2(m.axisY2());
+            fb_.fillRect(m.tileToScreenX(0), cy - 1, m.tileToScreenX(m.docW()), cy + 1, axis);
+        }
     }
     fb_.resetClip();
     drawVectorHandles();
@@ -327,9 +366,52 @@ void Editor::drawCellFrame() {
     fb_.resetClip();
 }
 
+Editor::AxisHandles Editor::axisHandles() const {
+    // Ручка — на верхнем (у вертикальной оси) и левом (у горизонтальной)
+    // краю документа, но не дальше края холста: прокрученный документ
+    // ручку не уносит.
+    AxisHandles h;
+    h.vx = m.tileToScreenX(0) + m.scr2(m.axisX2());
+    h.vy = std::clamp(m.tileToScreenY(0) + 8, m.Y0 + 8, m.H - 8);
+    h.hy = m.tileToScreenY(0) + m.scr2(m.axisY2());
+    h.hx = std::clamp(m.tileToScreenX(0) + 8, m.X0 + 8, m.W - 8);
+    return h;
+}
+
+int Editor::axisHandleAt(int x, int y) const {
+    if (classicUi_ || !active.modern || m.docMode != DOC_TILE) return 0;
+    const AxisHandles h = axisHandles();
+    if (m.symX && std::abs(x - h.vx) <= 7 && std::abs(y - h.vy) <= 7) return 1;
+    if (m.symY && std::abs(x - h.hx) <= 7 && std::abs(y - h.hy) <= 7) return 2;
+    return 0;
+}
+
+bool Editor::dragAxisHandle() {
+    const int which = axisHandleAt(frameClickX_, frameClickY_);
+    if (which == 0 || frameClickButton_ != MB_LEFT) return false;
+    // Ось встаёт на границу точек, с Shift — и на середину точки, как
+    // направляющая.
+    while (mousePressed() && !quitNow_) {
+        const bool vertical = which == 1;
+        const int origin = vertical ? m.tileToScreenX(0) : m.tileToScreenY(0);
+        const double u = static_cast<double>((vertical ? mouseX() : mouseY()) - origin) / m.scale();
+        const int limit2 = 2 * (vertical ? m.docW() : m.docH());
+        const int v2 =
+            std::clamp(isKeyPressed(KEY_SHIFT) ? pround(u * 2) : 2 * pround(u), 0, limit2);
+        if (v2 != (vertical ? m.axisX2() : m.axisY2())) {
+            (vertical ? m.symAxisX2 : m.symAxisY2) = v2;
+            repaintCanvasOnly();
+        }
+        idle();
+    }
+    m.needRepaint = true;
+    return true;
+}
+
 Platform::Cursor Editor::cursorWanted() {
     if (classicUi_ || !overCanvas(mouseX(), mouseY())) return Platform::CURSOR_ARROW;
     if (isKeyPressed(KEY_SPACE)) return Platform::CURSOR_MOVE;
+    if (axisHandleAt(mouseX(), mouseY()) != 0) return Platform::CURSOR_MOVE;
     const int tx = m.screenToTileX(mouseX());
     const int ty = m.screenToTileY(mouseY());
     if (m.docMode == DOC_MAP) {

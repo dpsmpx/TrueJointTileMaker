@@ -157,3 +157,20 @@ uib        16_nudge         0    0  780  560
 uib        17_edge_scroll   0    0  780  560
 uib        18_focus_tab     0    0  780  560
 uib        19_menu_arrows   0    0  780  560
+# Интерфейс, этап C — окно любого размера: снимок целиком.
+uic        01_menu_centered 0    0  1100  700
+uic        02_resized       0    0  1100  700
+uic        03_card_centered 0    0  1100  700
+uic        04_timeline      0    0  1100  700
+uic        05_back          0    0  780  560
+uic        06_menu_view     0    0  780  560
+uic        07_axis          0    0  780  560
+uic        08_axis_moved    0    0  780  560
+uic        09_base          0    0  780  560
+uic        10_base_menu     0    0  780  560
+uic        11_search        0    0  780  560
+uic        12_tileset       0    0  780  560
+uic        13_write_slot    0    0  780  560
+uic        14_export        0    0  780  560
+uic        15_rotate_preview 0    0  780  560
+uic        16_rotate_cancel 0    0  780  560

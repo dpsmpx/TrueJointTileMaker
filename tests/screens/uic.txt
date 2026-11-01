@@ -1,0 +1,116 @@
+# План «Интерфейс», этап C (1.9), в светлой теме (uic.config).
+#
+# C1: окно растягивается — холст занимает всё место слева от панели,
+# панель прижата к правому краю, экраны и карточки — страницей по середине
+# окна; мышь на странице попадает туда же, куда и в окне 780×560.
+window 1100 700
+sleep 0.3
+move 1090 690
+sleep 0.2
+shot 01_menu_centered       # меню при запуске — по середине окна
+key Escape
+sleep 0.2
+move 1090 690
+sleep 0.2
+shot 02_resized
+key ctrl+n                  # новый документ — карточкой по середине
+sleep 0.3
+click 470 357               # «32×32»
+sleep 0.2
+shot 03_card_centered
+click 453 500               # «Создать»
+sleep 0.3
+key j                       # лента кадров — во всю ширину холста, внизу окна
+move 1090 690
+sleep 0.2
+shot 04_timeline
+key j
+window 780 560              # и обратно: окно оригинала
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 05_back
+# C2: строка меню — список «Вид», галочки у включённого.
+click 420 13
+sleep 0.3
+move 470 200
+sleep 0.2
+shot 06_menu_view
+key Escape
+sleep 0.2
+# C2: оси симметрии двойной линией, ручку оси тянут мышью.
+key f
+move 770 550
+sleep 0.2
+shot 07_axis
+drag 299 81 355 81          # ручка оси — на 4 точки вправо
+move 770 550
+sleep 0.2
+shot 08_axis_moved
+key f
+# C4: базовый режим (Shift+Tab) — только повседневное: без узора, «Зам.»,
+# «ПП», режимов и меню «Анимация»; клавиши скрытого работают.
+key shift+Tab
+sleep 4.5                   # уведомление о режиме догорает
+move 770 550
+sleep 0.2
+shot 09_base
+click 205 13                # меню «Выделение» — без кисти из выделения
+sleep 0.3
+move 250 120
+sleep 0.2
+shot 10_base_menu
+key Escape
+sleep 0.2
+key shift+Tab
+sleep 4.5
+# C6: поиск команды (Ctrl+K) — пункты меню с клавишами, Enter выполняет.
+key ctrl+k
+sleep 0.3
+type сетк
+move 770 300
+sleep 0.2
+shot 11_search
+key Escape
+sleep 0.2
+# C9: наборы тайлов — щелчок выбирает, запись — кнопкой с карточкой
+# «было — станет», поиск по имени.
+key t
+sleep 0.4
+click 100 160               # слот «пол» — выбран, не записан
+sleep 0.2
+move 700 300
+sleep 0.2
+shot 12_tileset
+click 126 472               # «Записать в слот» — карточка
+sleep 0.3
+shot 13_write_slot
+key Escape
+sleep 0.2
+key Escape
+sleep 0.2
+# C8: окно «Экспорт» (Ctrl+Shift+E) — все виды выгрузки в одном месте.
+key ctrl+shift+e
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 14_export
+key Escape
+sleep 0.2
+# C5: поворот на любой угол — панелью у холста, итог на самом холсте.
+key k
+sleep 0.4
+click 390 248               # «Повернуть на любой угол…»
+sleep 0.4
+click 444 163               # +15
+sleep 0.3
+click 444 163               # +15 — 30°
+sleep 0.5
+move 770 550
+sleep 0.2
+shot 15_rotate_preview
+key Escape                  # отмена: картинка прежняя
+sleep 0.3
+move 770 550
+sleep 0.2
+shot 16_rotate_cancel

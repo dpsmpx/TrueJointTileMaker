@@ -80,5 +80,8 @@ private:
 std::string findUiFont(const std::string& resourcesDir);
 /// Моноширинный для поля ввода: Courier New на Windows, иначе Liberation Mono.
 std::string findMonoFont(const std::string& resourcesDir);
+/// Полужирный той же гарнитуры — заголовки новых тем (UX-30): отдельное
+/// начертание, а не искусственное утолщение. Пусто — не нашёлся.
+std::string findUiBoldFont(const std::string& resourcesDir);
 
 }  // namespace tjtm::gfx

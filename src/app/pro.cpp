@@ -57,7 +57,9 @@ int Editor::chipHit(int px, int py) {
 }
 
 void Editor::drawToolChips() {
-    if (m.docMode != DOC_TILE) return;
+    // «Зам.», «ПП» и «…» — полного режима: в базовом сокращений нет
+    // (dpsmpx/TrueJointTileMaker#14).
+    if (m.docMode != DOC_TILE || baseUi()) return;
     for (int c = 0; c < kChipCount; ++c) {
         const int x0 = Model::toolCellX(kChipFirst + c);
         const int y0 = Model::toolCellY(kChipFirst + c);
@@ -169,7 +171,7 @@ void Editor::definePolygonSelection(int ax, int ay, int op) {
         }
     };
     while (!closed && !cancelled && !quitNow_) {
-        beginFrameInput();
+        beginFrameInput(false);  // холст, а не экран
         const int cx = std::clamp(m.screenToTileX(mouseX()), 0, m.docW() - 1);
         const int cy = std::clamp(m.screenToTileY(mouseY()), 0, m.docH() - 1);
         drawCanvas();
@@ -404,7 +406,7 @@ void Editor::showToolOptions() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 12, WIN_W, 40, "Параметры инструментов", cText);
+        uiTitle(0, 12, WIN_W, 40, "Параметры инструментов");
 
         // --- кисть ---
         uiLabelLeft(LX, 46, 24, "Карандаш, ластик, узор", cTextDim);
@@ -553,7 +555,7 @@ bool Editor::askNumbers(const std::string& title, const std::string& hint,
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 30, WIN_W, 66, title, cText);
+        uiTitle(0, 30, WIN_W, 66, title);
         uiLabel(0, 70, WIN_W, 26, hint, cTextDim);
         int y = 120;
         for (const NumField& f : fields) {
@@ -593,6 +595,11 @@ bool Editor::askNumbers(const std::string& title, const std::string& hint,
 
 /// Поворот на любой угол: угол, способ, рост холста.
 void Editor::showRotateDialog() {
+    // В новых темах — панелью у холста, с поворотом на самом холсте (C5).
+    if (active.modern && !classicUi_) {
+        rotatePreviewPanel();
+        return;
+    }
     int deg = rotateDeg_;
     bool done = false;
     bool ok = false;
@@ -602,7 +609,7 @@ void Editor::showRotateDialog() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 30, WIN_W, 66, "Поворот на любой угол", cText);
+        uiTitle(0, 30, WIN_W, 66, "Поворот на любой угол");
         uiLabel(0, 70, WIN_W, 26,
                 std::string("По часовой стрелке, ") + (sel ? "выделенное" : "все слои и кадры") +
                     (rotateMethod_ == img::ROT_SMOOTH ? "" : "; новых цветов не появляется"),
@@ -662,6 +669,10 @@ void Editor::showRotateDialog() {
 
 /// Контур первым цветом: снаружи или внутри, толщина, соседи.
 void Editor::showOutlineDialog() {
+    if (active.modern && !classicUi_) {
+        outlinePreviewPanel();
+        return;
+    }
     bool done = false;
     bool ok = false;
     dropInput();
@@ -669,7 +680,7 @@ void Editor::showOutlineDialog() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 30, WIN_W, 66, "Контур первым цветом", cText);
+        uiTitle(0, 30, WIN_W, 66, "Контур первым цветом");
         uiLabel(0, 70, WIN_W, 26,
                 std::string("По точкам, без сглаживания; ") +
                     (m.hasSelection ? "в пределах выделения" : "по всему тайлу"),
@@ -723,7 +734,7 @@ void Editor::showImageScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 8, WIN_W, 34, "Изображение и выделение", cText);
+        uiTitle(0, 8, WIN_W, 34, "Изображение и выделение");
         const bool tile = m.docMode == DOC_TILE;
         const bool sel = tile && m.hasSelection;
         const std::string what = sel ? "выделенного" : "всего тайла";

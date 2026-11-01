@@ -9,7 +9,8 @@
 // скорости машины не зависят.
 //
 // «mousedown [КНОПКА]» и «mouseup [КНОПКА]» — кнопка, нажатая там, где
-// курсор, и отпущенная потом, как у xdotool.
+// курсор, и отпущенная потом, как у xdotool. «window W H» — размер окна в
+// точках кадра (только перенос: окно оригинала не растягивается).
 //
 // Сверх команд tools/gui.sh здесь есть «wheel DY [DX]» — прокрутка долями
 // щелчка, как у трекпада, и «drop ПУТЬ» — файл, брошенный в окно (у xdotool
@@ -24,15 +25,16 @@ namespace tjtm {
 
 /// Событие сценария в координатах окна оригинала.
 struct ScriptEvent {
-    enum Kind { MOTION, BUTTON_DOWN, BUTTON_UP, WHEEL, KEY_DOWN, KEY_UP, TEXT, DROP };
+    enum Kind { MOTION, BUTTON_DOWN, BUTTON_UP, WHEEL, KEY_DOWN, KEY_UP, TEXT, DROP, WINDOW };
     Kind kind = MOTION;
     int x = 0, y = 0;
     int button = 0;  // 1 левая, 2 средняя, 3 правая — как у xdotool и SDL
     /// Прокрутка: y +1 от себя, −1 на себя; x +1 вправо. Дробная — как у
     /// трекпада.
     float wheelY = 0, wheelX = 0;
-    int scancode = 0;  // SDL_Scancode
-    int mod = 0;       // SDL_Keymod
+    int winW = 0, winH = 0;  // размер окна для WINDOW
+    int scancode = 0;        // SDL_Scancode
+    int mod = 0;             // SDL_Keymod
     std::string text;
 };
 

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "core/config.h"
+#include "core/mapdoc.h"
 #include "core/model.h"
 #include "core/shortcuts.h"
 #include "core/theme.h"
@@ -287,10 +288,14 @@ TEST(UiShortcuts, NoConflicts) {
 TEST(UiShortcuts, EveryCommandHasKeyAndName) {
     const auto all = shortcuts();
     for (int c = 0; c <= static_cast<int>(Cmd::SwitchMode); ++c) {
-        const bool found = std::any_of(all.begin(), all.end(), [&](const Shortcut& s) {
+        const bool key = std::any_of(all.begin(), all.end(), [&](const Shortcut& s) {
             return static_cast<int>(s.cmd) == c;
         });
-        EXPECT_TRUE(found) << "команда " << c << " без клавиши";
+        const auto menu = menuItems();
+        const bool item = std::any_of(menu.begin(), menu.end(), [&](const MenuItem& mi) {
+            return mi.text != nullptr && static_cast<int>(mi.cmd) == c;
+        });
+        EXPECT_TRUE(key || item) << "команда " << c << " — ни клавиши, ни пункта меню";
     }
     for (const Shortcut& s : all)
         EXPECT_NE(keyName(s.key, s.mods)[0], '#') << "клавиша без имени: " << s.key;
@@ -345,6 +350,26 @@ TEST(UiShortcuts, ShiftFallsBackAndModesSplit) {
     EXPECT_EQ(cmd(KEY_N, 0, true), -1);
     EXPECT_EQ(cmd(KEY_S, 0, true), -1);
     EXPECT_EQ(cmd(KEY_R, 0, true), -1);
+}
+
+TEST(UiShortcuts, MenuItemsAreKnown) {
+    // У каждого меню есть пункты, и пункт стоит в меню из списка.
+    const auto titles = menuTitles();
+    for (const char* t : titles) {
+        const auto items = menuItems();
+        EXPECT_TRUE(std::any_of(items.begin(), items.end(), [&](const MenuItem& mi) {
+            return std::string_view(mi.menu) == t;
+        })) << t;
+    }
+    for (const MenuItem& mi : menuItems()) {
+        EXPECT_TRUE(std::any_of(titles.begin(), titles.end(), [&](const char* t) {
+            return std::string_view(mi.menu) == t;
+        })) << mi.menu;
+    }
+    // Клавиша пункта — из таблицы сочетаний.
+    EXPECT_EQ(commandKeys(Cmd::Save, 0, true), "Ctrl+S");
+    EXPECT_EQ(commandKeys(Cmd::Settings, 0, true), "");
+    EXPECT_EQ(commandKeys(Cmd::ObjectForm, 0, false), "Enter");
 }
 
 TEST(UiShortcuts, SheetLabels) {
@@ -512,6 +537,122 @@ TEST(UiColors, ResetToBlackAndWhite) {
     m.resetColors();
     EXPECT_EQ(m.firstColor, kBlack);
     EXPECT_EQ(m.secondColor, kWhite);
+}
+
+// --- C1: окно с изменяемым размером -----------------------------------------
+
+TEST(UiWindow, ConfigKeys) {
+    // Не запоминалось — в файле ни строки: файл по умолчанию как у
+    // оригинала.
+    Config c;
+    EXPECT_EQ(c.serialize().find("WindowSize"), std::string::npos);
+    EXPECT_EQ(c.serialize().find("UiScale"), std::string::npos);
+    Config back;
+    back.applyLines({"WindowSize = 1280x800", "WindowMaximized = да", "UiScale = 150"});
+    EXPECT_EQ(back.windowW, 1280);
+    EXPECT_EQ(back.windowH, 800);
+    EXPECT_TRUE(back.windowMaximized);
+    EXPECT_EQ(back.uiScale, 150);
+    const std::string text = back.serialize();
+    EXPECT_NE(text.find("WindowSize = 1280x800"), std::string::npos);
+    EXPECT_NE(text.find("UiScale = 150"), std::string::npos);
+    // Масштаб не из ступеней — по экрану.
+    Config odd;
+    odd.applyLines({"UiScale = 133"});
+    EXPECT_EQ(odd.uiScale, 0);
+}
+
+TEST(UiWindow, PanelFollowsWindow) {
+    const WindowLayout saved = gLayout;
+    gLayout = {1100, 700};
+    EXPECT_EQ(panelX(), 1100 - PANEL_W);
+    Model m = tileModel();
+    int idx = -1;
+    // Инструменты — у правого края окна, а не на месте 1.6.
+    EXPECT_TRUE(m.toolHit(panelX() + 10, TOOLS_Y0 + 10, idx));
+    EXPECT_FALSE(m.toolHit(CANVAS_W + 10, TOOLS_Y0 + 10, idx));
+    gLayout = saved;
+}
+
+// --- C3: панель истории ------------------------------------------------------
+
+TEST(UiHistory, LabelsFollowUndoAndRedo) {
+    Model m = tileModel(8, 8);
+    m.actionName = "Карандаш";
+    m.pushUndo();
+    m.tile.at(0, 0) = kBlack;
+    m.actionName = "Заливка";
+    m.pushUndo();
+    m.tile.at(1, 1) = kBlack;
+    int done = 0;
+    EXPECT_EQ(m.historyLabels(done), (std::vector<std::string>{"Карандаш", "Заливка"}));
+    EXPECT_EQ(done, 2);
+    m.doUndo();
+    EXPECT_EQ(m.historyLabels(done), (std::vector<std::string>{"Карандаш", "Заливка"}));
+    EXPECT_EQ(done, 1);
+    // Переход к началу и обратно — отменой и повтором.
+    m.historyGoTo(0);
+    EXPECT_EQ(m.tile.at(0, 0), Model().blankColor());
+    m.historyGoTo(2);
+    EXPECT_EQ(m.tile.at(1, 1), kBlack);
+    EXPECT_FALSE(m.historyLabels(done).empty());
+    EXPECT_EQ(done, 2);
+}
+
+TEST(UiHistory, MapLabels) {
+    Model m = tileModel();
+    m.switchMode(DOC_MAP);
+    m.actionName = "Кисть";
+    m.pushUndo();
+    m.actionName = "Объект";
+    m.pushUndo();
+    m.doUndo();
+    int done = 0;
+    EXPECT_EQ(m.historyLabels(done), (std::vector<std::string>{"Кисть", "Объект"}));
+    EXPECT_EQ(done, 1);
+    m.doRedo();
+    EXPECT_FALSE(m.historyLabels(done).empty());
+    EXPECT_EQ(done, 2);
+}
+
+// --- C4: базовый и полный режимы -------------------------------------------
+
+TEST(UiModes, ConfigAndMenu) {
+    Config c;
+    EXPECT_EQ(c.uiMode, "полный");
+    EXPECT_EQ(c.serialize().find("UiMode"), std::string::npos);
+    c.applyLines({"UiMode = базовый"});
+    EXPECT_EQ(c.uiMode, "базовый");
+    EXPECT_NE(c.serialize().find("UiMode = базовый"), std::string::npos);
+    // Анимация — только полного режима, файл и отмена — обоих.
+    for (const MenuItem& mi : menuItems()) {
+        if (mi.text == nullptr) continue;
+        if (std::string_view(mi.menu) == "Анимация") {
+            EXPECT_TRUE(mi.full) << mi.text;
+        }
+        if (mi.cmd == Cmd::Save || mi.cmd == Cmd::Undo || mi.cmd == Cmd::UiMode) {
+            EXPECT_FALSE(mi.full) << mi.text;
+        }
+    }
+    // Переключатель — Shift+Tab, а Tab остаётся тайлом и картой.
+    EXPECT_EQ(findShortcut(KEY_TAB, MOD_SHIFT, true)->cmd, Cmd::UiMode);
+    EXPECT_EQ(findShortcut(KEY_TAB, 0, true)->cmd, Cmd::SwitchMode);
+}
+
+// --- C10: карта ----------------------------------------------------------------
+
+TEST(UiMap, KindTitlesAndProblemCells) {
+    for (int k = 0; k < mapKindCount(); ++k)
+        EXPECT_FALSE(mapKindTitle(mapKindName(k)).empty()) << mapKindName(k);
+    EXPECT_EQ(mapKindTitle("npc"), "Житель");
+    MapDoc d;
+    d.reset(4, 3);
+    d.at(1, 1) = static_cast<std::uint8_t>(mapCharTile(U'#'));
+    d.addObject("sign", 1, 1, "Стена");
+    d.addObject("npc", 2, 2, "elder");
+    const auto cells = d.problemCells();
+    ASSERT_EQ(cells.size(), 1U);
+    EXPECT_EQ(cells[0], (std::pair{1, 1}));
 }
 
 }  // namespace

@@ -20,7 +20,10 @@ using namespace theme;
 
 namespace {
 
-constexpr int TL_H = 150;
+/// Высота ленты: в новых темах её тянут за верхний край (C3, UX-41), у
+/// 1.6 она отнимала у холста ровно 150 точек.
+int gTlH = 150;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+constexpr int TL_H_MIN = 96;
 constexpr int TL_BAR_H = 30;
 constexpr int TL_TAG_H = 16;
 constexpr int TL_HEAD_H = 18;
@@ -32,12 +35,31 @@ constexpr int TL_LOCK_W = 20;
 constexpr int TL_CELL_W = 26;
 /// Место под знак вида слоя перед именем.
 constexpr int TL_MARK_W = 12;
-constexpr int TL_Y0 = CANVAS_H - TL_H;
-constexpr int TL_TAG_Y = TL_Y0 + TL_BAR_H;
-constexpr int TL_HEAD_Y = TL_TAG_Y + TL_TAG_H;
-constexpr int TL_ROWS_Y = TL_HEAD_Y + TL_HEAD_H;
-constexpr int TL_VIS_ROWS = (CANVAS_H - TL_ROWS_Y) / TL_ROW_H;
-constexpr int TL_VIS_FRAMES = (CANVAS_W - TL_NAME_W) / TL_CELL_W;
+// Лента — внизу холста во всю его ширину: окно растягивается (C1).
+int canvasW() {
+    return panelX() - gLayout.dock;
+}
+int canvasH() {
+    return gLayout.h - gLayout.bottom;
+}
+int tlY0() {
+    return canvasH() - gTlH;
+}
+int tlTagY() {
+    return tlY0() + TL_BAR_H;
+}
+int tlHeadY() {
+    return tlTagY() + TL_TAG_H;
+}
+int tlRowsY() {
+    return tlHeadY() + TL_HEAD_H;
+}
+int tlVisRows() {
+    return (canvasH() - tlRowsY()) / TL_ROW_H;
+}
+int tlVisFrames() {
+    return (canvasW() - TL_NAME_W) / TL_CELL_W;
+}
 
 enum TlButton {
     TB_PLAY,
@@ -52,7 +74,9 @@ enum TlButton {
     TB_COUNT
 };
 constexpr int kTbW[TB_COUNT] = {30, 62, 56, 62, 62, 62, 42, 56, 30};
-constexpr int TB_Y = TL_Y0 + 3;
+int tbY() {
+    return tlY0() + 3;
+}
 constexpr int TB_H = 24;
 
 int tbX(int b) {
@@ -69,15 +93,19 @@ bool blankGrid(const Grid<Color>& g) {
 }  // namespace
 
 void Editor::applyLayout() {
-    const int h = timelineShown() ? TL_Y0 : CANVAS_H;
+    const int w = canvasW();
+    const int h = timelineShown() ? tlY0() : canvasH();
     const int r = m.rulersOn ? RULER_SIZE : 0;
-    if (m.H == h && m.X0 == r && m.Y0 == r) return;
-    // Тайл, что влезал в холст целиком, влезает и в укороченный; иначе
-    // масштаб остаётся прежним, а вид лишь поджимается к краям.
+    const int top = gLayout.top + r;
+    if (m.W == w && m.H == h && m.X0 == r && m.Y0 == top) return;
+    // Тайл, что влезал в холст целиком, влезает и в укороченный (лента,
+    // линейки, окно меньше); иначе масштаб остаётся прежним, а вид лишь
+    // поджимается к краям.
     const bool fitted = m.scr(m.docW()) <= m.W - m.X0 && m.scr(m.docH()) <= m.H - m.Y0;
+    m.W = w;
     m.H = h;
     m.X0 = r;
-    m.Y0 = r;
+    m.Y0 = top;
     if (fitted && (m.scr(m.docW()) > m.W - m.X0 || m.scr(m.docH()) > m.H - m.Y0)) {
         m.fitScale();
     } else {
@@ -99,7 +127,7 @@ void Editor::drawTimeline() {
     // ролик не мог бы отлистать ленту от неё.
     if (af != tlSeenFrame_) {
         if (af < tlFirstFrame_) tlFirstFrame_ = af;
-        if (af >= tlFirstFrame_ + TL_VIS_FRAMES) tlFirstFrame_ = af - TL_VIS_FRAMES + 1;
+        if (af >= tlFirstFrame_ + tlVisFrames()) tlFirstFrame_ = af - tlVisFrames() + 1;
         tlSeenFrame_ = af;
     }
     // Строки ленты — слои сверху вниз без детей свёрнутых групп.
@@ -109,15 +137,15 @@ void Editor::drawTimeline() {
     const int activeRow = found == rows.end() ? -1 : static_cast<int>(found - rows.begin());
     if (al != tlSeenLayer_ && activeRow >= 0) {
         if (activeRow < tlFirstRow_) tlFirstRow_ = activeRow;
-        if (activeRow >= tlFirstRow_ + TL_VIS_ROWS) tlFirstRow_ = activeRow - TL_VIS_ROWS + 1;
+        if (activeRow >= tlFirstRow_ + tlVisRows()) tlFirstRow_ = activeRow - tlVisRows() + 1;
         tlSeenLayer_ = al;
     }
-    tlFirstFrame_ = clampI(tlFirstFrame_, 0, std::max(0, nf - TL_VIS_FRAMES));
-    tlFirstRow_ = clampI(tlFirstRow_, 0, std::max(0, nrows - TL_VIS_ROWS));
+    tlFirstFrame_ = clampI(tlFirstFrame_, 0, std::max(0, nf - tlVisFrames()));
+    tlFirstRow_ = clampI(tlFirstRow_, 0, std::max(0, nrows - tlVisRows()));
 
     fb_.resetClip();
-    fb_.fillRect(0, TL_Y0, CANVAS_W, CANVAS_H, cPanel);
-    fb_.fillRect(0, TL_Y0, CANVAS_W, TL_Y0 + 1, cBorder);
+    fb_.fillRect(0, tlY0(), canvasW(), canvasH(), cPanel);
+    fb_.fillRect(0, tlY0(), canvasW(), tlY0() + 1, cBorder);
 
     // --- кнопки ---
     for (int b = 0; b < TB_COUNT; ++b) {
@@ -139,52 +167,52 @@ void Editor::drawTimeline() {
             default: label = "…"; break;
         }
         if (active.modern) {
-            const bool over = enabled && mouseX() >= x0 && mouseX() < x1 && mouseY() >= TB_Y &&
-                              mouseY() < TB_Y + TB_H;
-            drawButtonModern(x0, TB_Y, kTbW[b], TB_H, label, enabled, on, over, false,
+            const bool over = enabled && mouseX() >= x0 && mouseX() < x1 && mouseY() >= tbY() &&
+                              mouseY() < tbY() + TB_H;
+            drawButtonModern(x0, tbY(), kTbW[b], TB_H, label, enabled, on, over, false,
                              Btn::Outlined);
             continue;
         }
-        fb_.fillRoundRect(x0, TB_Y, x1, TB_Y + TB_H, 5, 5, on ? cAccent : cBorder);
-        fb_.fillRoundRect(x0 + 1, TB_Y + 1, x1 - 1, TB_Y + TB_H - 1, 5, 5,
+        fb_.fillRoundRect(x0, tbY(), x1, tbY() + TB_H, 5, 5, on ? cAccent : cBorder);
+        fb_.fillRoundRect(x0 + 1, tbY() + 1, x1 - 1, tbY() + TB_H - 1, 5, 5,
                           on ? cHover : (enabled ? cBack : cFace));
-        textCentered(x0, TB_Y, x1, TB_Y + TB_H, label, enabled ? cText : cTextDim);
+        textCentered(x0, tbY(), x1, tbY() + TB_H, label, enabled ? cText : cTextDim);
     }
     const std::string info = std::to_string(af + 1) + " / " + std::to_string(nf) + "   " +
                              std::to_string(d.frames[static_cast<std::size_t>(af)].durationMs) +
                              " мс";
-    textCentered(tbX(TB_COUNT), TL_Y0, CANVAS_W - 4, TL_Y0 + TL_BAR_H, info, cTextDim);
+    textCentered(tbX(TB_COUNT), tlY0(), canvasW() - 4, tlY0() + TL_BAR_H, info, cTextDim);
 
     // --- метки ---
-    fb_.fillRect(0, TL_TAG_Y, CANVAS_W, TL_HEAD_Y, cWindow);
+    fb_.fillRect(0, tlTagY(), canvasW(), tlHeadY(), cWindow);
     const bool tagOk = playTag_ >= 0 && playTag_ < static_cast<int>(d.tags.size());
-    fb_.setClip(gfx::Rect{0, TL_TAG_Y, TL_NAME_W - 2, TL_HEAD_Y});
-    textOut(6, TL_TAG_Y + (TL_TAG_H - textHeight()) / 2,
+    fb_.setClip(gfx::Rect{0, tlTagY(), TL_NAME_W - 2, tlHeadY()});
+    textOut(6, tlTagY() + (TL_TAG_H - textHeight()) / 2,
             tagOk ? "► " + d.tags[static_cast<std::size_t>(playTag_)].name : "► все кадры",
             cTextDim);
     fb_.resetClip();
     for (std::size_t i = 0; i < d.tags.size(); ++i) {
         const AnimTag& t = d.tags[i];
         const int a = std::max(t.from, tlFirstFrame_);
-        const int b = std::min(t.to, tlFirstFrame_ + TL_VIS_FRAMES - 1);
+        const int b = std::min(t.to, tlFirstFrame_ + tlVisFrames() - 1);
         if (a > b) continue;
         const int x0 = TL_NAME_W + (a - tlFirstFrame_) * TL_CELL_W + 1;
         const int x1 = TL_NAME_W + (b - tlFirstFrame_ + 1) * TL_CELL_W - 1;
-        fb_.fillRect(x0, TL_TAG_Y + 1, x1, TL_HEAD_Y - 1, active.tag[i % active.tag.size()]);
+        fb_.fillRect(x0, tlTagY() + 1, x1, tlHeadY() - 1, active.tag[i % active.tag.size()]);
         if (static_cast<int>(i) == playTag_)
-            fb_.frameRect(x0, TL_TAG_Y + 1, x1, TL_HEAD_Y - 1, cAccent);
-        fb_.setClip(gfx::Rect{x0 + 1, TL_TAG_Y, x1 - 1, TL_HEAD_Y});
-        textOut(x0 + 3, TL_TAG_Y + (TL_TAG_H - textHeight()) / 2, t.name, cText);
+            fb_.frameRect(x0, tlTagY() + 1, x1, tlHeadY() - 1, cAccent);
+        fb_.setClip(gfx::Rect{x0 + 1, tlTagY(), x1 - 1, tlHeadY()});
+        textOut(x0 + 3, tlTagY() + (TL_TAG_H - textHeight()) / 2, t.name, cText);
         fb_.resetClip();
     }
 
     // --- номера кадров ---
-    for (int k = 0; k < TL_VIS_FRAMES; ++k) {
+    for (int k = 0; k < tlVisFrames(); ++k) {
         const int f = tlFirstFrame_ + k;
         if (f >= nf) break;
         const int x = TL_NAME_W + k * TL_CELL_W;
-        if (f == af) fb_.fillRect(x, TL_HEAD_Y, x + TL_CELL_W, TL_ROWS_Y, cHover);
-        textCentered(x, TL_HEAD_Y, x + TL_CELL_W, TL_ROWS_Y, std::to_string(f + 1),
+        if (f == af) fb_.fillRect(x, tlHeadY(), x + TL_CELL_W, tlRowsY(), cHover);
+        textCentered(x, tlHeadY(), x + TL_CELL_W, tlRowsY(), std::to_string(f + 1),
                      f == af ? cAccent : cTextDim);
     }
 
@@ -192,13 +220,13 @@ void Editor::drawTimeline() {
     // Активная ячейка живёт в m.tile, и в таблице её картинка может
     // отставать: пустоту проверяем по самой картинке.
     const bool activeHas = !blankGrid(m.tile);
-    for (int r = 0; r < TL_VIS_ROWS; ++r) {
+    for (int r = 0; r < tlVisRows(); ++r) {
         const int row = tlFirstRow_ + r;
         if (row >= nrows) break;
         const int l = rows[static_cast<std::size_t>(row)];
         const Layer& layer = d.layers[static_cast<std::size_t>(l)];
         const bool activeL = l == al;
-        const int y = TL_ROWS_Y + r * TL_ROW_H;
+        const int y = tlRowsY() + r * TL_ROW_H;
         const int cy = y + TL_ROW_H / 2;
         fb_.fillRect(0, y, TL_NAME_W, y + TL_ROW_H, activeL ? cHover : cBack);
 
@@ -228,11 +256,11 @@ void Editor::drawTimeline() {
                 layer.visible ? cText : cTextDim);
         fb_.resetClip();
 
-        for (int k = 0; k < TL_VIS_FRAMES; ++k) {
+        for (int k = 0; k < tlVisFrames(); ++k) {
             const int f = tlFirstFrame_ + k;
             const int x = TL_NAME_W + k * TL_CELL_W;
             if (f >= nf) {
-                fb_.fillRect(x, y, CANVAS_W, y + TL_ROW_H, cPanel);
+                fb_.fillRect(x, y, canvasW(), y + TL_ROW_H, cPanel);
                 break;
             }
             fb_.fillRect(x, y, x + TL_CELL_W, y + TL_ROW_H, (f == af || activeL) ? cHover : cBack);
@@ -243,6 +271,21 @@ void Editor::drawTimeline() {
             if (layer.kind == LK_GROUP) {
                 // У группы своих ячеек нет: полоса через кадры.
                 fb_.fillRect(x, cy - 1, x + TL_CELL_W, cy + 1, cBorder);
+            } else if (has && active.modern) {
+                // Миниатюра ячейки вместо точки (UX-41): видно, что в кадре,
+                // не открывая его. Пропорции картинки сохраняются.
+                const Grid<Color>* img = isActive ? &m.tile : &d.cel(l, f)->img;
+                if (!img->empty()) {
+                    const int bw = TL_CELL_W - 6;
+                    const int bh = TL_ROW_H - 4;
+                    const int tw = std::max(1, std::min(bw, img->w * bh / std::max(1, img->h)));
+                    const int th = std::max(1, std::min(bh, img->h * bw / std::max(1, img->w)));
+                    const int tx = x + 3 + (bw - tw) / 2;
+                    const int ty = y + 2 + (bh - th) / 2;
+                    fb_.fillRect(tx, ty, tx + tw, ty + th, active.checkA);
+                    fb_.drawImage(*img, tx, ty, tw, th);
+                    fb_.frameRect(tx - 1, ty - 1, tx + tw + 1, ty + th + 1, cBorder);
+                }
             } else if (has) {
                 fb_.fillRoundRect(cx - 4, cy - 4, cx + 5, cy + 5, 9, 9,
                                   layer.visible ? cText : cTextDim);
@@ -261,21 +304,21 @@ void Editor::drawTimeline() {
                              layer.visible ? cText : cTextDim);
             if (isActive) fb_.frameRect(x + 1, y + 1, x + TL_CELL_W - 1, y + TL_ROW_H - 1, cAccent);
         }
-        fb_.fillRect(0, y + TL_ROW_H - 1, CANVAS_W, y + TL_ROW_H, cLine);
+        fb_.fillRect(0, y + TL_ROW_H - 1, canvasW(), y + TL_ROW_H, cLine);
     }
-    fb_.fillRect(TL_NAME_W - 1, TL_TAG_Y, TL_NAME_W, CANVAS_H, cBorder);
+    fb_.fillRect(TL_NAME_W - 1, tlTagY(), TL_NAME_W, canvasH(), cBorder);
 
     // Полоски прокрутки: сколько кадров и слоёв за краем ленты.
-    if (nf > TL_VIS_FRAMES) {
-        const int span = TL_VIS_FRAMES * TL_CELL_W;
+    if (nf > tlVisFrames()) {
+        const int span = tlVisFrames() * TL_CELL_W;
         const int bx = TL_NAME_W + tlFirstFrame_ * span / nf;
-        fb_.fillRect(bx, CANVAS_H - 3, bx + std::max(8, TL_VIS_FRAMES * span / nf), CANVAS_H - 1,
+        fb_.fillRect(bx, canvasH() - 3, bx + std::max(8, tlVisFrames() * span / nf), canvasH() - 1,
                      cTextDim);
     }
-    if (nrows > TL_VIS_ROWS) {
-        const int span = TL_VIS_ROWS * TL_ROW_H;
-        const int by = TL_ROWS_Y + tlFirstRow_ * span / nrows;
-        fb_.fillRect(TL_NAME_W - 4, by, TL_NAME_W - 2, by + std::max(6, TL_VIS_ROWS * span / nrows),
+    if (nrows > tlVisRows()) {
+        const int span = tlVisRows() * TL_ROW_H;
+        const int by = tlRowsY() + tlFirstRow_ * span / nrows;
+        fb_.fillRect(TL_NAME_W - 4, by, TL_NAME_W - 2, by + std::max(6, tlVisRows() * span / nrows),
                      cTextDim);
     }
 }
@@ -327,7 +370,7 @@ void Editor::drawLayerKindMark(int x, int cy, const Layer& layer) {
 }
 
 int Editor::timelineButtonAt(int x, int y) const {
-    if (y < TB_Y || y >= TB_Y + TB_H) return -1;
+    if (y < tbY() || y >= tbY() + TB_H) return -1;
     for (int b = 0; b < TB_COUNT; ++b) {
         if (x >= tbX(b) && x < tbX(b) + kTbW[b]) return b;
     }
@@ -343,9 +386,24 @@ void Editor::handleTimelineClick() {
     const bool frameOk = frameAt >= 0 && frameAt < nf;
     m.needRepaint = true;
 
-    if (y < TL_TAG_Y) {
+    // Верхний край ленты тянут — высота ленты (UX-41).
+    if (!classicUi_ && y < tbY() && !right) {
+        while (mousePressed() && !quitNow_) {
+            const int h = std::clamp(canvasH() - mouseY(), TL_H_MIN,
+                                     std::max(TL_H_MIN, (canvasH() - gLayout.top) * 2 / 3));
+            if (h != gTlH) {
+                gTlH = h;
+                applyLayout();
+                repaint();
+            }
+            idle();
+        }
+        return;
+    }
+
+    if (y < tlTagY()) {
         for (int b = 0; b < TB_COUNT; ++b) {
-            if (x < tbX(b) || x >= tbX(b) + kTbW[b] || y < TB_Y || y >= TB_Y + TB_H) continue;
+            if (x < tbX(b) || x >= tbX(b) + kTbW[b] || y < tbY() || y >= tbY() + TB_H) continue;
             if (b != TB_PLAY) stopPlayback();
             switch (b) {
                 case TB_PLAY: togglePlayback(); break;
@@ -366,7 +424,7 @@ void Editor::handleTimelineClick() {
         return;
     }
 
-    if (y < TL_HEAD_Y) {
+    if (y < tlHeadY()) {
         // Метка под курсором: левая кнопка выбирает её для проигрывания
         // (повторный щелчок — снова все кадры), правая правит. Самая узкая
         // из накрывающих — она и видна поверх.
@@ -390,16 +448,20 @@ void Editor::handleTimelineClick() {
         return;
     }
 
-    if (y < TL_ROWS_Y) {
+    if (y < tlRowsY()) {
         if (!frameOk) return;
         stopPlayback();
         m.setActiveCel(m.activeLayer, frameAt);
-        if (right) editFrameDuration(frameAt);
+        if (right) {
+            editFrameDuration(frameAt);
+        } else {
+            dragFrame();
+        }
         return;
     }
 
     const std::vector<int> rows = timelineRows();
-    const int row = tlFirstRow_ + (y - TL_ROWS_Y) / TL_ROW_H;
+    const int row = tlFirstRow_ + (y - tlRowsY()) / TL_ROW_H;
     if (row >= static_cast<int>(rows.size())) return;
     const int l = rows[static_cast<std::size_t>(row)];
     const Layer& layer = m.doc.layers[static_cast<std::size_t>(l)];
@@ -429,17 +491,36 @@ void Editor::handleTimelineClick() {
     }
     if (frameOk) {
         m.setActiveCel(l, frameAt);
-        if (right) editFrameDuration(frameAt);
+        if (right) {
+            editFrameDuration(frameAt);
+        } else {
+            dragFrame();
+        }
+    }
+}
+
+void Editor::dragFrame() {
+    // Протяжка вдоль ленты — порядок кадров (UX-41): кадр идёт за мышью
+    // шаг за шагом; у 1.6 — только кнопками «Левее» и «Правее» на экране.
+    if (classicUi_) return;
+    m.actionName = "Порядок кадров";
+    while (mousePressed() && !quitNow_) {
+        const int nf = m.doc.frameCount();
+        const int want =
+            std::clamp(tlFirstFrame_ + (mouseX() - TL_NAME_W) / TL_CELL_W, 0, std::max(0, nf - 1));
+        const int dir = want > m.activeFrame ? 1 : (want < m.activeFrame ? -1 : 0);
+        if (dir != 0 && m.moveFrame(dir)) repaint();
+        idle();
     }
 }
 
 void Editor::timelineWheel(int wheel) {
     // Над слоями ролик листает слои, над кадрами — кадры.
     if (mouseX() < TL_NAME_W) {
-        tlFirstRow_ = clampI(tlFirstRow_ - wheel, 0, std::max(0, m.doc.layerCount() - TL_VIS_ROWS));
+        tlFirstRow_ = clampI(tlFirstRow_ - wheel, 0, std::max(0, m.doc.layerCount() - tlVisRows()));
     } else {
         tlFirstFrame_ =
-            clampI(tlFirstFrame_ - wheel, 0, std::max(0, m.doc.frameCount() - TL_VIS_FRAMES));
+            clampI(tlFirstFrame_ - wheel, 0, std::max(0, m.doc.frameCount() - tlVisFrames()));
     }
     m.needRepaint = true;
 }
@@ -538,7 +619,7 @@ void Editor::editTag(int i) {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 30, WIN_W, 66, fresh ? "Новая метка анимации" : "Метка анимации", cText);
+        uiTitle(0, 30, WIN_W, 66, fresh ? "Новая метка анимации" : "Метка анимации");
         uiLabel(0, 70, WIN_W, 26, "Именованный отрезок кадров: бег, прыжок, удар", cTextDim);
         uiLabel(40, 120, 180, 34, "Имя", cText);
         fb_.fillRoundRect(230, 120, 540, 154, 6, 6, cFace);
@@ -623,7 +704,7 @@ void Editor::showAnimationScreen() {
     while (!done && !quitNow_) {
         beginFrameInput();
         fb_.clear(cWindow);
-        textCentered(0, 8, WIN_W, 34, "Слои, кадры и экспорт", cText);
+        uiTitle(0, 8, WIN_W, 34, "Слои, кадры и экспорт");
         const bool tile = m.docMode == DOC_TILE;
         const int nl = m.doc.layerCount();
         const int nf = m.doc.frameCount();

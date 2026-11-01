@@ -6,6 +6,7 @@
 // не расходится с тем, что делает клавиша.
 
 #include <algorithm>
+#include <deque>
 
 #include "app/editor.h"
 #include "core/imageops.h"
@@ -138,6 +139,8 @@ void Editor::handleClassicKey(int key) {
 
 void Editor::runCommand(Cmd c, int arg) {
     const bool tile = m.docMode == DOC_TILE;
+    // Название шага истории (C3) — по команде.
+    m.actionName = commandTitle(c, arg, tile);
     const int nf = m.doc.frameCount();
     const int nl = m.doc.layerCount();
     const int step = std::max(1, m.pixelSize * 4);
@@ -212,6 +215,7 @@ void Editor::runCommand(Cmd c, int arg) {
             m.needRepaint = true;
             break;
         case Cmd::Zoom100: m.setZoom(1, 1, (m.X0 + m.W) / 2, (m.Y0 + m.H) / 2); break;
+        case Cmd::Fullscreen: pf_.setFullscreen(!pf_.fullscreen()); break;
         case Cmd::Hand: spaceHand(); break;
         case Cmd::Pan:
         case Cmd::Nudge: {
@@ -330,10 +334,51 @@ void Editor::runCommand(Cmd c, int arg) {
             break;
         }
         case Cmd::MapFind: showMapFindScreen(); break;
+        case Cmd::Export: showExportCard(); break;
+        case Cmd::ExportAgain: exportAgain(); break;
+        case Cmd::DeleteObject: {
+            // Удаление — клавишей над объектом (UX-44): правая кнопка у
+            // остальных инструментов берёт, а не портит.
+            const int mx = m.screenToTileX(mouseX());
+            const int my = m.screenToTileY(mouseY());
+            const int obj = m.inDoc(mx, my) ? m.map.objectAt(mx, my) : -1;
+            if (obj >= 0) {
+                m.pushUndo();
+                m.map.deleteObject(obj);
+                m.needRepaint = true;
+            }
+            break;
+        }
         case Cmd::MainMenu: showMainMenu(); break;
         case Cmd::Help: showHelpScreen(); break;
         case Cmd::Cheatsheet: showCheatsheet(); break;
+        case Cmd::CommandSearch: showCommandSearch(); break;
         case Cmd::SwitchMode: m.switchMode(tile ? DOC_MAP : DOC_TILE); break;
+        case Cmd::Recent: openRecentAsk(); break;
+        case Cmd::Settings: showSettingsScreen(); break;
+        case Cmd::Exit: commandExit(); break;
+        case Cmd::ColorOps: showColorOpsScreen(); break;
+        case Cmd::LayersScreen: showAnimationScreen(); break;
+        case Cmd::GameSet: showGameSetScreen(); break;
+        case Cmd::MapProperties: showMapPropertiesScreen(); break;
+        case Cmd::Dock:
+            cfg.dock = !cfg.dock;
+            saveConfig();
+            applyDock();
+            break;
+        case Cmd::UiMode:
+            // Меняется только раскладка: документ, история, выделение и вид
+            // остаются.
+            cfg.uiMode = cfg.uiMode == "базовый" ? "полный" : "базовый";
+            saveConfig();
+            notify(cfg.uiMode == "базовый" ? "Базовый режим" : "Полный режим",
+                   cfg.uiMode == "базовый"
+                       ? "На виду только повседневное. Клавиши скрытого работают; всё — в "
+                         "полном режиме (Shift+Tab)."
+                       : "На виду все возможности. Базовый режим — Shift+Tab.");
+            modeHint_ = 0;
+            m.needRepaint = true;
+            break;
     }
 }
 
@@ -367,6 +412,115 @@ void Editor::stepArrowPan() {
     m.viewY -= uy * d;
     m.clampView();
     if (m.viewX != vx || m.viewY != vy) m.needRepaint = true;
+}
+
+// ---------------------------------------------------------------------------
+// Поиск команды
+// ---------------------------------------------------------------------------
+
+void Editor::showCommandSearch() {
+    const auto backdrop = cardBackdrop();
+    constexpr int kW = 520;
+    constexpr int kRowH = 28;
+    constexpr int kRows = 12;
+    const int x0 = (WIN_W - kW) / 2;
+    const int y0 = 40;
+    const int y1 = y0 + 64 + kRows * kRowH + 12;
+    const bool tile = m.docMode == DOC_TILE;
+    std::string query;
+    int hot = 0;
+    bool done = false;
+    const MenuItem* chosen = nullptr;
+    dropInput();
+    pf_.input().keys.clear();
+    pf_.input().presses.clear();
+    // Поле поиска сразу принимает набор: окно для того и открыто.
+    textEditId_ = reinterpret_cast<std::uintptr_t>(&query);
+    textEdit_ = TextField{};
+    pf_.startTextInput(x0 + 16, y0 + 16, kW - 32, 32);
+
+    auto matches = [&](const std::string& q) {
+        std::vector<const MenuItem*> out;
+        const std::string want = netToLower(netTrim(q));
+        for (const MenuItem& mi : menuItems()) {
+            if (mi.text == nullptr || mi.cmd == Cmd::CommandSearch) continue;
+            if (mi.where != KeyWhere::Both && (mi.where == KeyWhere::Tile) != tile) continue;
+            const std::string hay = netToLower(std::string(mi.text) + " " + mi.menu + " " +
+                                               commandKeys(mi.cmd, mi.arg, tile));
+            if (want.empty() || hay.find(want) != std::string::npos) out.push_back(&mi);
+        }
+        return out;
+    };
+
+    while (!done && !quitNow_) {
+        beginFrameInput();
+        Input& in = pf_.input();
+        // Стрелки, Enter и Escape — списку, а не полю.
+        std::vector<const MenuItem*> list =
+            matches(textEditId_ != 0 ? u32ToUtf8(textEdit_.text) : query);
+        std::deque<KeyPress> rest;
+        for (const KeyPress& k : in.presses) {
+            if (k.vk == KEY_DOWN) {
+                hot = std::min(hot + 1, static_cast<int>(list.size()) - 1);
+            } else if (k.vk == KEY_UP) {
+                hot = std::max(hot - 1, 0);
+            } else if (k.vk == KEY_ENTER) {
+                if (hot >= 0 && hot < static_cast<int>(list.size()))
+                    chosen = list[static_cast<std::size_t>(hot)];
+                done = true;
+            } else if (k.vk == KEY_ESC) {
+                done = true;
+            } else {
+                rest.push_back(k);
+            }
+        }
+        in.presses = std::move(rest);
+        in.keys.clear();
+
+        dialogBack(backdrop, x0, y0, x0 + kW, y1);
+        uiTextLine(x0 + 16, y0 + 16, kW - 32, 32, query);
+        const std::string live = textEditId_ != 0 ? u32ToUtf8(textEdit_.text) : query;
+        if (live.empty()) textOut(x0 + 26, y0 + 24, "Найти команду…", cTextDim);
+        list = matches(live);
+        hot = std::clamp(hot, 0, std::max(0, static_cast<int>(list.size()) - 1));
+        const int first = std::max(0, hot - kRows + 1);
+        for (int k = 0; k < kRows && first + k < static_cast<int>(list.size()); ++k) {
+            const MenuItem& mi = *list[static_cast<std::size_t>(first + k)];
+            const int y = y0 + 60 + k * kRowH;
+            const bool over = mouseX() >= x0 + 8 && mouseX() < x0 + kW - 8 && mouseY() >= y &&
+                              mouseY() < y + kRowH;
+            if (over) hot = first + k;
+            if (first + k == hot)
+                fb_.fillRoundRect(x0 + 8, y, x0 + kW - 8, y + kRowH, active.radius * 2,
+                                  active.radius * 2, cHover);
+            const int ty = y + (kRowH - textHeight()) / 2;
+            textOut(x0 + 18, ty, mi.text, cText);
+            textOut(x0 + 18 + textWidth(mi.text) + 10, ty, mi.menu, cTextDim);
+            const std::string keys = commandKeys(mi.cmd, mi.arg, tile);
+            if (!keys.empty()) textOut(x0 + kW - 18 - textWidth(keys), ty, keys, cTextDim);
+            if (over && frameClick_ && frameClickButton_ == MB_LEFT) {
+                frameClick_ = false;
+                chosen = &mi;
+                done = true;
+            }
+        }
+        if (list.empty()) textOut(x0 + 18, y0 + 66, "Ничего не нашлось", cTextDim);
+        // Щелчок мимо окна закрывает его.
+        if (frameClick_ && (frameClickX_ < x0 || frameClickX_ >= x0 + kW || frameClickY_ < y0 ||
+                            frameClickY_ >= y1))
+            done = true;
+        redraw();
+        idle();
+    }
+    if (textEditId_ != 0) {
+        textEditId_ = 0;
+        pf_.stopTextInput();
+    }
+    waitMouseRelease();
+    endCard(backdrop);
+    m.needRepaint = true;
+    // Выбранное выполнит главный цикл: окно поиска само открыто командой.
+    if (chosen != nullptr) pendingCmd_ = std::pair{chosen->cmd, chosen->arg};
 }
 
 // ---------------------------------------------------------------------------
@@ -508,9 +662,9 @@ void Editor::showCheatsheet() {
     while (!done && !quitNow_) {
         beginFrameInput();
         dialogBack(backdrop, kX0, kY0, kX1, kY1);
-        textOut(kX0 + 14, kY0 + 15, "Клавиши", cText);
-        textOut(kX0 + 14 + textWidth("Клавиши") + 10, kY0 + 15,
-                tile ? "режим тайла" : "режим карты", cTextDim);
+        const int tw = titleFont_.textWidth("Клавиши");
+        uiTitle(kX0 + 14, kY0 + 8, kX0 + 14 + tw, kY0 + 40, "Клавиши");
+        textOut(kX0 + 14 + tw + 10, kY0 + 16, tile ? "режим тайла" : "режим карты", cTextDim);
         // Поиск: и по делу («слой»), и по клавише («ctrl+d»).
         const int sx = kX1 - 14 - 110 - 8 - 230;
         uiTextLine(sx, kY0 + 8, 230, 32, query);
@@ -550,12 +704,12 @@ void Editor::showCheatsheet() {
         const int fy = kY1 - 28;
         for (const Foot& f : foot) {
             textOut(fx, fy, f.text, cTextDim);
-            fx += textWidth(f.text) + 8;
+            fx += textWidth(f.text) + 6;
             const int kw = textWidth(f.keys) + 12;
             fb_.fillRoundRect(fx, fy - 1, fx + kw, fy + lh + 2, 8, 8, cFace);
             fb_.strokeRoundRect(fx, fy - 1, fx + kw, fy + lh + 2, 8, 8, cOutline, 1);
             textOut(fx + 6, fy, f.keys, cText);
-            fx += kw + 22;
+            fx += kw + 16;
         }
 
         redraw();
