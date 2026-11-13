@@ -1,7 +1,9 @@
 # True Joint Tile Maker
 
-Редактор пиксельной графики и карт игры Andors-Love. Идёт перенос с
-PascalABC.NET на C++ (SDL3) и развитие по плану `RoadToProLevel`.
+Редактор пиксельной графики и карт игры Andors-Love. Перенесён с
+PascalABC.NET 0.6.0 на C++ (SDL3). План `RoadToProLevel` и план интерфейса
+(этапы A–D) **полностью выполнены** в версии 2.0.2.
+
 Подробности — `docs/porting.md`, намеренные расхождения с оригиналом —
 `docs/fixes.md`, сделанное из плана — `docs/roadmap.md`.
 
