@@ -12,7 +12,7 @@
 
 ![Режим тайла](docs/screenshots/01_tile_editor_0.2.0.png)
 
-![Режим карты](docs/screenshots/01_map_editor_0.2.0.png)
+![Режим карты](docs/screenshots/02_map_editor_0.2.0.png)
 
 ## Статус
 
