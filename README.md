@@ -10,9 +10,9 @@
 
 Документы живут одновременно: переключение (`Tab`) ничего не теряет.
 
-![Режим тайла](docs/screenshots/01_tile_editor.png)
+![Режим тайла](docs/screenshots/01_tile_editor.pngnn)
 
-![Режим карты](docs/screenshots/02_map_editor.png)
+![Режим карты](docs/screenshots/02_map_editor.pngnn)
 
 ## Статус
 
